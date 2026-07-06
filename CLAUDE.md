@@ -38,6 +38,18 @@
 
 ---
 
+## Reglas modulares (`.claude/rules/`)
+
+Claude Code carga automáticamente estas reglas por tema. Son los invariantes no negociables de Perito:
+- `rules/hitl.md` — **P1**: el humano decide, nunca auto-decidir.
+- `rules/coverage-determinism.md` — **P2**: cobertura por reglas, no por LLM.
+- `rules/termination.md` — **P4**: terminación acotada, escalar en vez de inventar.
+- `rules/testing.md` — evals por estrato (pytest + DeepEval).
+
+> Si una tarea te llevaría a violar una de estas reglas, detente y avísame.
+
+---
+
 ## Hooks activos
 
 Definidos en `.claude/settings.json`:
