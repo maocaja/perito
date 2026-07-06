@@ -31,10 +31,17 @@
 **Sobre dependencias:**
 - Antes de instalar una librería, verifica si ya tenemos algo equivalente. Justifica cualquier dependencia nueva y pídeme confirmación.
 
-**Sobre el modelo (control de costo):**
+**Sobre el modelo (control de costo — riesgo #2 del PRD):**
 - Para exploración/lectura masiva, usa el subagente Explore (Haiku) — más barato.
 - Para lógica de dominio y orquestación, Sonnet u Opus.
-- Recuerda el diseño por capas de Perito: Haiku para extracción, Opus solo para cobertura ambigua.
+- Diseño por capas de Perito: Haiku para extracción, Sonnet para el grueso, Opus solo para cobertura ambigua.
+- Patrón **opusplan**: Opus planifica → Sonnet ejecuta (arranca Claude con `--model opusplan`).
+- `/cost` para ver el gasto de la sesión; `/clear` entre tareas no relacionadas para no arrastrar contexto caro.
+- Modo headless con presupuesto: `claude -p "..." --max-budget-usd 0.30`. Ver `scripts/semantic-review.sh`.
+
+**CI/CD:**
+- `scripts/semantic-review.sh [base]` — linter semántico headless que revisa el diff contra los invariantes P1-P6 (pre-commit/CI).
+- `.github/workflows/claude-review.yml` — revisión automática al comentar `@claude` en un PR (DORMIDO hasta tener remoto + secret `ANTHROPIC_API_KEY`).
 
 ---
 
@@ -71,6 +78,26 @@ En `.claude/agents/`. Para invocarlos, pídelo explícitamente:
 Además de los integrados: **Explore** (Haiku, lectura masiva barata), **Plan** (planes), **General-purpose**.
 
 ---
+
+## Agent Teams (para el build — experimental, opt-in)
+
+NO activado por defecto (experimental + gasta presupuesto por teammate — riesgo #2).
+Se activa manualmente cuando convenga paralelizar:
+```bash
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+```
+
+**Cuándo usarlo:** solo en Días 2-3 del build, **después** de que los contratos Pydantic (`backend/app/models/`) estén estables — así los teammates no colisionan.
+
+**Descomposición libre de colisiones (cada teammate en su carpeta):**
+- Teammate `tools` → `backend/app/agents/` (extractor, verifier, policy_lookup, fraud_signals)
+- Teammate `observability` → `backend/app/observability/` (Langfuse/OTel)
+- Teammate `tests` → `backend/tests/` (evals por estrato)
+- Teammate `frontend` → `frontend/` (panel)
+
+**Hacer SOLO (el lead, no delegar):** `backend/app/rules/` (motor de cobertura, P2) y `backend/app/orchestrator/` (terminación, P4) — son las rutas críticas protegidas por el hook.
+
+**Quality gates opcionales** (hooks): `TeammateIdle` y `TaskCompleted` con exit code 2 para devolver feedback antes de dar por terminada una tarea.
 
 ## MCPs activos
 Aún no configurados. (La Estación 3 incluye instalar MCPs: PostgreSQL/Neon sería el más útil para Perito.)

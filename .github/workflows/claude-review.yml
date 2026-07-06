@@ -1,0 +1,31 @@
+# Claude Review — Perito (Lección 8)
+# DORMIDO hasta que el repo tenga remoto en GitHub y el secret ANTHROPIC_API_KEY.
+# Se dispara SOLO cuando alguien comenta "@claude" en un PR (no en cada push),
+# para controlar el costo de API (riesgo #2 del PRD).
+name: Claude Review
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          # El action lee AGENTS.md y .claude/rules/ del repo automáticamente,
+          # así que la revisión ya conoce los invariantes P1-P6 de Perito.
+          direct_prompt: >
+            Revisa los cambios del PR con foco en los invariantes de Perito:
+            HITL (P1), cobertura determinística por reglas (P2), terminación
+            acotada (P4), minimización de PII (P5) y superficie de inyección de
+            prompt. Reporta por severidad, citando archivo:línea y el principio.
