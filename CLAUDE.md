@@ -64,7 +64,11 @@ Aún no hay Skills custom. (La tarea de la Estación 3 incluye crear uno propio 
 ---
 
 ## Subagentes disponibles
-Aún no hay subagentes custom. (La Estación 3 incluye crear uno, ej. `test-writer` Sonnet o `code-reviewer` Haiku.)
+En `.claude/agents/`. Para invocarlos, pídelo explícitamente:
+- **`code-reviewer`** (Haiku, solo lectura) — revisa buscando violaciones de P1-P6, bugs, seguridad, PII, inyección de prompt. Úsalo antes de un commit/PR.
+- **`test-writer`** (Sonnet) — escribe evals por estrato con pytest + DeepEval y aserciones fail-closed de los invariantes.
+
+Además de los integrados: **Explore** (Haiku, lectura masiva barata), **Plan** (planes), **General-purpose**.
 
 ---
 
