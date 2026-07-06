@@ -1,0 +1,79 @@
+{
+  "_comment": "Config de Claude Code para Perito (stack Python/FastAPI). 'permissions' define qué puede hacer el agente sin pedir aprobación (allow) y qué tiene prohibido (deny). Regla clave: deny siempre gana sobre allow.",
+
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit(backend/**/*)",
+      "Edit(frontend/**/*)",
+      "Edit(data/**/*)",
+      "Edit(docs/**/*)",
+      "Edit(specs/**/*)",
+      "Write(backend/**/*)",
+      "Write(frontend/**/*)",
+      "Write(data/**/*)",
+
+      "Bash(pytest*)",
+      "Bash(python -m pytest*)",
+      "Bash(ruff*)",
+      "Bash(python -m ruff*)",
+      "Bash(uvicorn*)",
+      "Bash(python*)",
+
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(rg *)"
+    ],
+
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(secrets/**)",
+
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(.github/workflows/**)",
+
+      "Bash(rm -rf*)",
+      "Bash(rm -fr*)",
+      "Bash(sudo *)",
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(git commit --no-verify*)",
+      "Bash(pip install *)",
+      "Bash(pip uninstall *)",
+      "Bash(uv add *)",
+      "Bash(DROP TABLE*)",
+      "Bash(DROP DATABASE*)"
+    ]
+  },
+
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-lint.sh"
+          }
+        ]
+      }
+    ]
+  },
+
+  "_notes": [
+    "Stack Python: allow para pytest/ruff/uvicorn; deny para pip install (requiere confirmación, ver AGENTS.md).",
+    "El motor de reglas (backend/app/rules/) y el orquestador (backend/app/orchestrator/) están en allow para editar, pero AGENTS.md pide confirmación explícita antes de tocarlos — son de máxima cautela.",
+    "El hook PostToolUse asume que .claude/hooks/post-edit-lint.sh existe y es ejecutable (chmod +x).",
+    "Claude Code ignora campos que empiezan con _ (como _comment y _notes)."
+  ]
+}

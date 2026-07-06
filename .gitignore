@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+.env.*
+secrets/
+
+# Data (grandes / generados) — versionar solo el generador, no los outputs
+data/generated/
+data/raw/
+*.parquet
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+
+# Observability / local
+*.log
+.langfuse/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
