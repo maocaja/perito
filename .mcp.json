@@ -1,0 +1,13 @@
+{
+  "_comment": "MCP servers de Perito (proyecto). Solo los que NO requieren credenciales. Verifica con: claude mcp list. Postgres/Neon y GitHub se agregan cuando existan (necesitan token/DB).",
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}

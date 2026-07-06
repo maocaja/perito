@@ -66,7 +66,11 @@ Definidos en `.claude/settings.json`:
 ---
 
 ## Skills disponibles
-Aún no hay Skills custom. (La tarea de la Estación 3 incluye crear uno propio del dominio, ej. `/check-hitl` o `/audit-coverage-rules`.)
+En `.claude/skills/`:
+- **`/check-hitl`** (propio, de dominio) — audita el invariante Human-in-the-Loop (P1): ningún camino decide sin humano.
+- **`/review-pr`** (adaptado del codelab) — revisa un PR/diff por severidad, con foco en P1-P6.
+
+Pendientes de la tarea (necesitan producto): `ui-audit`, `generate-api-docs` (requieren UI/API construida).
 
 ---
 
@@ -100,4 +104,8 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 **Quality gates opcionales** (hooks): `TeammateIdle` y `TaskCompleted` con exit code 2 para devolver feedback antes de dar por terminada una tarea.
 
 ## MCPs activos
-Aún no configurados. (La Estación 3 incluye instalar MCPs: PostgreSQL/Neon sería el más útil para Perito.)
+Configurados en `.mcp.json` (verificar con `claude mcp list`):
+- **`context7`** — docs actualizadas de librerías (LangGraph, FastAPI, Pydantic) → evita alucinar APIs.
+- **`sequential-thinking`** — razonamiento explícito para debugging/arquitectura.
+
+Pendientes (necesitan credenciales/producto): **PostgreSQL/Neon** (cuando exista la BD — el más útil), **GitHub** (token).
