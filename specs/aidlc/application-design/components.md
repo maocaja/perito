@@ -70,6 +70,14 @@
 - **Interfaz**: `indexar(poliza)`, `recuperar_clausula(consulta) -> Clausula`.
 - **Historias**: H-04, H-08. **Invariantes**: P3.
 
+## C11 · dashboard  *(Frontend — UI, demo-grade)*
+- **Propósito**: interfaz de usuario **delgada** que hace visible el flujo HITL y la auditabilidad. Es la **vitrina** de P1/P3, no la tesis (el peso de ingeniería vive en el backend).
+- **Responsabilidades**: bandeja de casos con filtro por estado (H-19), detalle de caso con **evidencia enlazada renderizada** (campo→origen) + dictamen con cláusula + alerta de fraude (H-20), acciones Aprobar/Corregir/Rechazar (delegadas a `HITLService`), panel de cumplimiento con métricas/trazas/export PIA (H-21), **selector de rol stub** (sin auth real, RNF-14).
+- **Interfaz**: consume la API de `HITLService` (S3) y `ObservabilityService` (S4) por REST. **No contiene lógica de dominio** — solo renderiza estado y dispara acciones.
+- **Historias**: H-19, H-20, H-21. **Invariantes**: **experimenta** P1 (botones de decisión humana) y P3 (evidencia/cláusula a la vista); no los *enforca* (eso es backend).
+- **Stack (propuesto, se formaliza en ADR del paso AJIT)**: **FastAPI + templates/HTMX** (un solo toolchain, rápido a la demo) — alternativa React+Vite. Servido junto al backend.
+- 🚫 **Regla dura**: el dashboard **no decide cobertura ni alcanza estados terminales** — solo muestra y delega en `HITLService`; el estado terminal sigue exigiendo `aprobado_por` en el backend (P1 inevadible).
+
 ---
 
 ## CT1 · synthetic_generator  *(Infra de demo/test — INFRA-TEST, NO es producto)*
@@ -91,3 +99,4 @@
 | **hitl** | **DET** | No | **Solo con humano (P1)** |
 | observability | IO | No | No |
 | policy_rag | STORE | No | No |
+| **dashboard** | **UI/FE** | No | No (solo muestra/delega) |

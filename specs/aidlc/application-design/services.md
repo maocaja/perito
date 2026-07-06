@@ -47,6 +47,11 @@
 - **Fail-closed transversal**: ante error en cualquier servicio, denegar/detener (SECURITY-15, P4) — nunca avanzar el caso a ciegas.
 - **Deny-by-default**: endpoints requieren rol (stub) server-side (SECURITY-08).
 
+## C11 · dashboard (cliente UI — no es servicio de dominio)
+- **Rol**: front demo-grade (FastAPI+templates/HTMX, ADR-001). **Consume** `HITLService` (S3) y `ObservabilityService` (S4) por REST; renderiza bandeja, detalle con evidencia enlazada y panel de cumplimiento (H-19/H-20/H-21).
+- **No contiene lógica de dominio**: solo muestra estado y dispara acciones.
+- 🚫 **Regla dura**: no consume `coverage_rules` (P2) ni escribe estado terminal (P1) — la decisión terminal la ejecuta `hitl` con `aprobado_por`. Con HTMX el front es server-rendered dentro del backend (mismo origen, authz server-side; ver ADR-001).
+
 ## Mapa Servicio → Componentes → Persona → Invariante dueño
 | Servicio | Componentes | Persona | Invariante dueño |
 |---|---|---|---|

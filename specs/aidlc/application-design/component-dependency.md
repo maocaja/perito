@@ -27,6 +27,11 @@
 - `coverage_rules ← lee cláusula de policy_rag` — lectura de datos (no LLM).
 - **Ninguna otra.**
 
+### Aristas del Frontend (C11 dashboard) — UI, fuera del control-plane
+- `dashboard ▶ HITLService (S3)` — REST: bandeja, abrir, aprobar/corregir/rechazar (H-19/H-20).
+- `dashboard ▶ ObservabilityService (S4)` — REST: métricas, trazas, export PIA (H-21).
+- **Aristas salientes prohibidas** (🚫): `dashboard → coverage_rules` (P2), `dashboard → orchestrator`, `dashboard →` cualquier escritura de estado terminal (P1). El front **solo muestra y delega**; la acción terminal la ejecuta `hitl` en el backend con `aprobado_por`.
+
 ---
 
 ## 2. Grafo de flujo (data flow)
@@ -91,6 +96,11 @@ Ninguna arista alcanza `APROBADO`/`RECHAZADO` salvo vía `hitl` desde `Humano de
 
 ### P3 — trazabilidad
 Todos los nodos instrumentan en `observability`; el dictamen incluye cláusula (lectura de policy_rag). ✅
+
+### P1/P2 en el Frontend (C11 dashboard)  *(la misma prueba, ahora para el front)*
+- **P2**: el dashboard **no tiene arista a `coverage_rules`** — solo consume `HITLService`/`ObservabilityService` por REST. El front no puede mediar cobertura. ✅
+- **P1**: el dashboard **no escribe estado terminal** — dispara la acción vía `HITLService`, y `hitl` exige `aprobado_por` en el backend (terminal inevadible desde la UI). El front **experimenta** P1 (botones), no lo *enforca*. ✅
+- Regla estructural: `dashboard/` (módulo UI) importa clientes REST de `api/`, **no** importa `rules/` ni `orchestrator/`.
 
 ### Alineación con el repo
 `orchestrator` (P4) ↔ `backend/app/orchestrator/` · `coverage_rules` (P2) ↔ `backend/app/rules/` · LLM tools ↔ `backend/app/agents/`. El grafo respeta las fronteras protegidas por hooks del CLAUDE.md.
