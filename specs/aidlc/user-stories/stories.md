@@ -257,6 +257,37 @@ Escenario: Corrección se captura como dato de eval
   Y alimenta las métricas de accuracy y tasa de corrección
 ```
 
+### H-19 · Ver y filtrar la bandeja de casos
+**Como** analista, **quiero** ver la lista de casos y filtrarla por estado, **para** ubicar rápido lo que me toca revisar.
+*RF-20 · P1 · estrato: happy · UI (demo-grade)*
+
+```gherkin
+Escenario: La bandeja lista los casos con su estado
+  Dado varios casos en distintos estados
+  Cuando abro la bandeja
+  Entonces veo cada caso con su estado (RECIBIDO, LISTO_PARA_APROBAR, REQUIERE_REVISION, ...)
+  Y puedo filtrar por estado
+
+Escenario: Selector de rol stub (sin auth real)
+  Dado que auth real es Won't (RNF-14)
+  Cuando entro con el selector de rol
+  Entonces veo la vista correspondiente a mi rol (Analista / Cumplimiento)
+```
+
+### H-20 · Ver el detalle del caso con la evidencia enlazada
+**Como** analista, **quiero** abrir un caso y ver cada campo junto a su origen y el dictamen con su cláusula, **para** decidir con la evidencia a la vista (no leyendo JSON).
+*RF-05, RF-13 · P1, P3 · estrato: happy · UI (demo-grade)*
+
+```gherkin
+Escenario: El detalle renderiza campo → origen y dictamen → cláusula
+  Dado un caso "LISTO_PARA_APROBAR"
+  Cuando abro su detalle
+  Entonces veo cada campo extraído enlazado visualmente a su origen (span/página/región)
+  Y veo el dictamen de cobertura con la regla aplicada y la cláusula citada
+  Y veo la alerta de fraude con su evidencia (si existe)
+  Y los botones Aprobar / Corregir / Rechazar (que ejercen H-12)
+```
+
 ---
 
 ## E6 — Observabilidad, Evals & Compliance  *(Persona: Andrés / Cumplimiento)*
@@ -299,6 +330,19 @@ Escenario: Runs versionados y export para PIA
   Dado un cambio en una regla de cobertura
   Cuando corre contra el set de evals
   Entonces solo se activa si no rompe accuracy (test-gate)
+```
+
+### H-21 · Panel de cumplimiento (métricas + trazas + export PIA desde la UI)
+**Como** cumplimiento, **quiero** un panel con las métricas del día y acceso a las trazas y al export PIA, **para** auditar y responder ante el regulador desde la pantalla.
+*RF-25, RF-26, RNF-21 · P3, P5 · estrato: observabilidad · UI (demo-grade)*
+
+```gherkin
+Escenario: El panel muestra métricas del día
+  Dado un conjunto de casos procesados
+  Cuando abro el panel de cumplimiento
+  Entonces veo métricas clave (accuracy, % con cláusula, costo/caso, % dentro de cotas)
+  Y puedo abrir la traza por nodo de un caso (H-14)
+  Y puedo exportar la evidencia PIA de un caso (H-15)
 ```
 
 ---
@@ -388,8 +432,13 @@ Escenario: Round-trip de serialización del contrato (PBT-02)
 | H-16 | RF-30/31 | P7 | infra | 🔒 |
 | H-17 | RF-04, RNF-13/24/25 | P3 | infra | 🔒 |
 | H-18 | RNF-19 | **P1, P5, P6** | red-team | 🔒 |
+| H-19 | RF-20, RNF-14 | P1 | happy · UI | — |
+| H-20 | RF-05/13 | P1, P3 | happy · UI | — |
+| H-21 | RF-25/26, RNF-21 | P3, P5 | observabilidad · UI | — |
 
-**Cobertura de principios**: P1 (H-10,11,12,18) · P2 (H-07,08) · P3 (H-01,02,08,13,14,15,17) · P4 (H-03,04,05,06) · P5 (H-15,18) · P6 (H-09,10,18) · P7 (H-16, + exclusiones). **Todos los P1-P7 tienen historias.**
+**Cobertura de principios**: P1 (H-10,11,12,18,19,20) · P2 (H-07,08) · P3 (H-01,02,08,13,14,15,17,20,21) · P4 (H-03,04,05,06) · P5 (H-15,18,21) · P6 (H-09,10,18) · P7 (H-16, + exclusiones). **Todos los P1-P7 tienen historias.**
+
+**Historias de UI (front demo-grade, añadidas tras validación con el framework AI-DLC)**: H-19 (bandeja), H-20 (detalle con evidencia), H-21 (panel cumplimiento). Son historias **centradas en persona** (capacidad de pantalla), NO historias de build técnico — el stack se decide en Application Design + AJIT/C4. El front se mantiene **delgado** (Must = bandeja HITL; tablero visual rico = Should, diferido; auth real = Won't).
 
 **Cobertura de estratos de eval**: happy · campos-faltantes · poliza-no-encontrada · cobertura-negativa · fraude · documento-sucio · observabilidad · infra · red-team. SOAT **diferido** (RF-27.1). ✅
 

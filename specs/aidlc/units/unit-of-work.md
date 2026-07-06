@@ -21,6 +21,7 @@ backend/
     observability/    # U5 — C9 (trazas, evals, export PIA)
     synthetic/        # U1 — CT1 generador es-CO (infra-test)
     api/              # servicios FastAPI (Intake, HITL, Observability, Admin)
+    dashboard/        # U4/U5 — C11 front demo-grade (templates/HTMX; bandeja, detalle, panel)
   tests/              # pytest + Hypothesis (PBT) + DeepEval, por estrato
   docker-compose.yml  # U1 — postgres+pgvector + langfuse (entorno dev, entregable Code Gen)
 ```
@@ -56,15 +57,17 @@ backend/
 ## U4 · Orquestación · Terminación · HITL  *(núcleo — Día 4)*
 - **Propósito**: sistema completo con trazas en vivo; caps duros + escalamiento; bandeja HITL con firma humana.
 - **Componentes**: `orchestrator/` (C7, P4), `hitl/` (C8, P1; único mutador de `Caso.estado`).
-- **Historias**: **H-05** (terminación acotada + escala), **H-11** (bandeja+estados+persistencia), **H-12** (aprobar/corregir/rechazar + `aprobado_por`), **H-13** (correcciones como dato de eval).
-- **Entrega demostrable**: flujo end-to-end con caps; caso llega a HITL y el humano firma.
+- **Historias**: **H-05** (terminación acotada + escala), **H-11** (bandeja+estados+persistencia), **H-12** (aprobar/corregir/rechazar + `aprobado_por`), **H-13** (correcciones como dato de eval), **H-19** (bandeja UI: ver/filtrar), **H-20** (detalle de caso con evidencia renderizada + botones HITL).
+- **Componentes UI**: C11 `dashboard` (bandeja + detalle) — front demo-grade, delega en HITLService.
+- **Entrega demostrable**: flujo end-to-end con caps; caso llega a HITL, se ve en pantalla con evidencia, y el humano firma.
 - **Depende de**: **U2** y **U3** (orquesta sus nodos e invoca el motor). Cierra el fail-closed de U2 (H-06 escalamiento).
 - **Invariantes**: **P4** (dueño terminación), **P1** (terminal solo con humano; estado inmutable salvo vía hitl).
 
 ## U5 · Observabilidad · Evals · Red-team  *(medición — Día 5)*
 - **Propósito**: métricas + demo; harness de evals por estrato + red-team mínimo (inyección + sesgo).
 - **Componentes**: `observability/` (C9), `tests/` (pytest+Hypothesis+DeepEval).
-- **Historias**: **H-14** (traza por nodo + costo + replay), **H-15** (evals por estrato + versionado + export PIA), **H-18** (red-team inyección + sesgo + PII).
+- **Historias**: **H-14** (traza por nodo + costo + replay), **H-15** (evals por estrato + versionado + export PIA), **H-18** (red-team inyección + sesgo + PII), **H-21** (panel de cumplimiento UI: métricas + trazas + export PIA desde pantalla).
+- **Componentes UI**: C11 `dashboard` (panel de cumplimiento de Andrés).
 - **Entrega demostrable**: tablero de métricas + evals verdes por estrato + red-team.
 - **Depende de**: instrumenta U2-U4 (transversal); evals requieren U2-U4 funcionando.
 - **Diferido explícito**: `test_gate_regla` = **firma forward-compat, NO build** (versionado de reglas = Could). Estrato **SOAT** no se corre (RF-27.1).
@@ -73,5 +76,6 @@ backend/
 ---
 
 ## Cobertura de historias (100%)
-U1: H-16, H-17 · U2: H-01, H-02, H-03, H-04, H-06 · U3: H-07, H-08, H-09, H-10 · U4: H-05, H-11, H-12, H-13 · U5: H-14, H-15, H-18.
-**18/18 historias asignadas.** ✅
+U1: H-16, H-17 · U2: H-01, H-02, H-03, H-04, H-06 · U3: H-07, H-08, H-09, H-10 · U4: H-05, H-11, H-12, H-13, **H-19, H-20** · U5: H-14, H-15, H-18, **H-21**.
+**21/21 historias asignadas.** ✅ (18 backend/infra + 3 UI demo-grade)
+El front (C11 `dashboard`) vive en U4 (bandeja/detalle, Analista) y U5 (panel, Cumplimiento); el contenedor "Frontend" se formaliza en el paso AJIT/C4.

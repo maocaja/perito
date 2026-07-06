@@ -22,6 +22,9 @@
 | H-14 Traza por nodo + costo + replay | **U5** | C9 observability | P3 | observabilidad | — |
 | H-15 Evals por estrato + versionado + PIA | **U5** | C9 | P3, P5 | todos (SOAT diferido) | 🔒 |
 | H-18 Red-team inyección + sesgo + PII | **U5** | C-all (test) | **P1, P5, P6** | red-team | 🔒 |
+| H-19 Ver/filtrar bandeja (UI) | **U4** | C11 dashboard | P1 | happy · UI | — |
+| H-20 Detalle de caso con evidencia (UI) | **U4** | C11 dashboard | P1, P3 | happy · UI | — |
+| H-21 Panel de cumplimiento (UI) | **U5** | C11 dashboard | P3, P5 | observabilidad · UI | — |
 
 ## Resumen por unidad
 | Unidad | # Historias | Historias | Estratos que cubre |
@@ -29,11 +32,11 @@
 | U1 Fundaciones & Contratos | 2 | H-16, H-17 | infra |
 | U2 Extracción·Verif·Grounding | 5 | H-01/02/03/04/06 | happy, campos-faltantes, poliza-no-encontrada, documento-sucio |
 | U3 Cobertura·Fraude | 4 | H-07/08/09/10 | cobertura-negativa, fraude, happy |
-| U4 Orquestación·Terminación·HITL | 4 | H-05/11/12/13 | poliza-no-encontrada, campos-faltantes, happy, observabilidad |
-| U5 Observabilidad·Evals·Red-team | 3 | H-14/15/18 | observabilidad, red-team, todos |
+| U4 Orquestación·Terminación·HITL | 6 | H-05/11/12/13/19/20 | poliza-no-encontrada, campos-faltantes, happy, observabilidad, UI |
+| U5 Observabilidad·Evals·Red-team | 4 | H-14/15/18/21 | observabilidad, red-team, todos, UI |
 
 ## Verificación
-- **Cobertura de historias**: 18/18 ✅
+- **Cobertura de historias**: 21/21 ✅ (18 backend/infra + 3 UI demo-grade: H-19/20/21)
 - **Cobertura de principios**: P1 (U3,U4,U5) · P2 (U3) · P3 (U1,U2,U3,U4,U5) · P4 (U2,U4) · P5 (U5) · P6 (U3,U5) · P7 (U1). Todos presentes. ✅
 - **Cobertura de estratos**: happy · campos-faltantes · poliza-no-encontrada · cobertura-negativa · fraude · documento-sucio · observabilidad · infra · red-team. SOAT **diferido** (RF-27.1). ✅
 - **Historias 🔒 fail-closed**: 14 (consistente con `stories.md`).

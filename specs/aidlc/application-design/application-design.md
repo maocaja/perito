@@ -21,6 +21,7 @@ Perito es un **sistema agéntico con control-plane determinístico**: un orquest
 | **C8** | **hitl** | **DET** | M8 | **P1** |
 | C9 | observability | IO | M9 | P3, P5 |
 | C10 | policy_rag | STORE | M10 | P3 |
+| C11 | dashboard (front) | UI/FE | — (demo-grade) | experimenta P1/P3 |
 | CT1 | synthetic_generator | INFRA-TEST | infra | P7 |
 
 ## 3. Capa de servicio
