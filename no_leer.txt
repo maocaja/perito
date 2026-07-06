@@ -1,0 +1,9 @@
+Este archivo es un OBJETIVO DE PRUEBA para verificar que la regla `deny` de
+Claude Code funciona. No contiene secretos reales.
+
+Está listado en `.claude/settings.json` bajo permissions.deny como:
+  "Read(no_leer.txt)"
+
+Ejercicio: pídele a Claude Code (corriendo desde este repo) que lea este
+archivo. Debe NEGARSE, sin importar que "Read" esté en allow — porque deny
+siempre gana sobre allow.
