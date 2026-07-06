@@ -25,6 +25,10 @@
       "Bash(git log*)",
       "Bash(git branch*)",
       "Bash(git add *)",
+      "Bash(git push*)",
+      "Bash(git worktree*)",
+      "Bash(gh pr*)",
+      "Bash(gh *)",
 
       "Bash(ls *)",
       "Bash(cat *)",
@@ -48,7 +52,8 @@
       "Bash(rm -rf*)",
       "Bash(rm -fr*)",
       "Bash(sudo *)",
-      "Bash(git push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
       "Bash(git reset --hard*)",
       "Bash(git commit --no-verify*)",
       "Bash(pip install *)",
@@ -88,6 +93,7 @@
     "Stack Python: allow para pytest/ruff/uvicorn; deny para pip install (requiere confirmación, ver AGENTS.md).",
     "El motor de reglas (backend/app/rules/) y el orquestador (backend/app/orchestrator/) están en allow para editar, pero AGENTS.md pide confirmación explícita antes de tocarlos — son de máxima cautela.",
     "El hook PostToolUse asume que .claude/hooks/post-edit-lint.sh existe y es ejecutable (chmod +x).",
+    "git push: se movió de deny a allow (2026-07-06) para permitir push/PR autónomos. El push destructivo (--force / -f) SIGUE denegado; reset --hard y commit --no-verify también. gh está permitido (incluye gh pr y gh api).",
     "Claude Code ignora campos que empiezan con _ (como _comment y _notes)."
   ]
 }
