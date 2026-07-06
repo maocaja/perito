@@ -53,6 +53,7 @@ Claude Code carga automáticamente estas reglas por tema. Son los invariantes no
 ## Hooks activos
 
 Definidos en `.claude/settings.json`:
+- **`PreToolUse` con matcher `Edit|Write`** → ejecuta `.claude/hooks/protect-critical-paths.sh`. Pide **confirmación explícita** (`ask`) antes de editar `backend/app/rules/` (P2) y `backend/app/orchestrator/` (P4). Convierte esos invariantes de advisory a enforced. Requiere `jq`.
 - **`PostToolUse` con matcher `Edit|Write`** → ejecuta `.claude/hooks/post-edit-lint.sh` (corre `ruff format` + `ruff check --fix` sobre archivos Python; prettier sobre md/json si está disponible).
 
 ---
