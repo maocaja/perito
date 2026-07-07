@@ -128,3 +128,100 @@ class LLMPayloadBuilder:
         )
 
         return prompt
+
+
+# =====================================================================
+# U2 PII REDACTION (aditivo) — Regex span redaction for Colombian text
+# =====================================================================
+
+def redact_pii_spans_es_co(texto: str) -> str:
+    """
+    Regex-based PII redaction for Colombian Spanish freeform text.
+    
+    P5 Deny-by-Default (spans only):
+    - Redacts: C.C./cédula, teléfono (celular/landline), email
+    - Preserves: número póliza, fecha, monto, tipo siniestro
+    
+    Gap (P7 declared, not hidden):
+    - Nombres y direcciones in freeform text → require NER (not MVP)
+    - RES-03 test data: no embedded names/addresses in chaotic mix
+    
+    Args:
+        texto: Raw text (potentially with PII)
+    
+    Returns:
+        Text with PII spans replaced by [REDACTED]
+    """
+    import re
+    
+    if not texto:
+        return texto
+    
+    # Pattern 1: Cédula/C.C. (Colombian ID variations)
+    # "C.C. 1098765432", "cedula 80123456", "Cédula No. 52.987.654"
+    texto = re.sub(
+        r'(?:C\.?C\.?|cedula|cédula|Cédula|CEDULA)\s*(?:No\.?)?\s*(?:\.?\s*)?(\d{2,3}[\.\-]\d{3}[\.\-]\d{3}|\d{6,10})',
+        '[REDACTED]',
+        texto,
+        flags=re.IGNORECASE
+    )
+    
+    # Pattern 2: Teléfono móvil/celular (Colombian)
+    # "3115551234", "311 555 1234", "+57 9 3115551234"
+    texto = re.sub(
+        r'(?:\+57\s*9?\s*)?3\d{2}\s*\d{3}\s*\d{4}',
+        '[REDACTED]',
+        texto
+    )
+    
+    # Pattern 3: Teléfono fijo (Colombian)
+    # "(1) 23456789", "1 23456789"
+    texto = re.sub(
+        r'(?:\(1\)|1)\s*\d{4}\s*\d{4}',
+        '[REDACTED]',
+        texto
+    )
+    
+    # Pattern 4: Email
+    texto = re.sub(
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        '[REDACTED]',
+        texto
+    )
+    
+    return texto
+
+
+def build_extraction_prompt_u2(texto_crudo: str, additional_context: str = "") -> str:
+    """
+    Build extraction prompt for C2, with PII redaction applied.
+    
+    PASO 1 (NFR Design): Redact PII spans, pass operacional text to LLM.
+    
+    Args:
+        texto_crudo: Raw aviso text (potentially with PII)
+        additional_context: Optional extraction instructions
+    
+    Returns:
+        Prompt with PII redacted, ready for Haiku (C2)
+    """
+    
+    # Redact PII spans (P5)
+    texto_redactado = redact_pii_spans_es_co(texto_crudo)
+    
+    # Build prompt
+    prompt = f"""
+Extract structured data from the following insurance claim notice.
+PII has been redacted for privacy; extract only the operational fields that are present.
+
+--- BEGIN NOTICE (PII spans redacted) ---
+{texto_redactado}
+--- END NOTICE ---
+
+{additional_context}
+
+For each field, provide: nombre, valor, confianza (0-1), ausente (true if not found/unclear).
+Return JSON array of extracted fields.
+"""
+    
+    return prompt.strip()
