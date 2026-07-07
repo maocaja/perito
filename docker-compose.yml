@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  # PostgreSQL + pgvector (para Caso, audit logs, RAG)
+  postgres:
+    image: pgvector/pgvector:pg16-latest
+    container_name: perito-postgres
+    environment:
+      POSTGRES_DB: perito
+      POSTGRES_USER: perito_dev
+      POSTGRES_PASSWORD: dev_pwd
+    ports:
+      - "5432:5432"
+    volumes:
+      - perito-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U perito_dev -d perito"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Langfuse (observabilidad self-hosted)
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: perito-langfuse
+    environment:
+      DATABASE_URL: postgresql://perito_dev:dev_pwd@postgres:5432/perito
+      NEXTAUTH_SECRET: dev-secret-change-in-prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  perito-postgres-data:
+
+networks:
+  default:
+    name: perito-network
