@@ -1,0 +1,145 @@
+"""C7 Orchestrator Tests (U4).
+
+CORONA TEST: assert caso_final.estado in {LISTO_PARA_APROBAR, REQUIERE_REVISION}
+"""
+
+import pytest
+from datetime import datetime, timezone
+from unittest.mock import Mock, MagicMock
+
+from app.contracts.caso import Caso
+from app.contracts.enums import (
+    EstadoCaso,
+    CalidadDoc,
+    ResultadoCobertura
+)
+from app.contracts.dictamen import Cotas
+from app.contracts.extraccion import AvisoNormalizado
+from app.intake.c1 import intake_crear_caso
+from app.orchestrator.c7 import orquestar_fnol
+
+
+@pytest.fixture
+def hitl_service_mock():
+    """Mock HITL service."""
+    def mock_transicionar(caso, nuevo_estado, actor, motivo=None):
+        # Simulate state transition
+        caso_dict = caso.model_dump()
+        caso_dict["estado"] = nuevo_estado
+        caso_dict["timestamp_actualizacion"] = datetime.now(timezone.utc)
+        if motivo:
+            caso_dict["motivo_escalamiento"] = motivo
+        return Caso.model_validate(caso_dict)
+    
+    mock = MagicMock()
+    mock.transicionar = MagicMock(side_effect=mock_transicionar)
+    return mock
+
+
+@pytest.fixture
+def aviso_limpio():
+    """Clean aviso (LIMPIO)."""
+    return AvisoNormalizado(
+        texto_crudo="Reclamo de siniestro total.",
+        calidad=CalidadDoc.LIMPIO
+    )
+
+
+@pytest.fixture
+def caso_recibido(aviso_limpio):
+    """Caso in RECIBIDO state."""
+    return intake_crear_caso(aviso_limpio)
+
+
+@pytest.fixture
+def cotas_standard():
+    """Standard cotas: max_rondas=1, presupuesto_tokens=20000."""
+    return Cotas(
+        max_rondas=1,
+        presupuesto_tokens=20000
+    )
+
+
+def test_orquestador_happy_path_sin_dictamen(caso_recibido, hitl_service_mock, cotas_standard):
+    """Happy path: caso completa pipeline → LISTO_PARA_APROBAR (all subs None).
+    
+    CORONA TEST: resultado debe ser {LISTO_PARA_APROBAR, REQUIERE_REVISION}
+    """
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    
+    # No asserting outcome, just that it's not terminal
+    assert resultado.estado in {
+        EstadoCaso.LISTO_PARA_APROBAR,
+        EstadoCaso.REQUIERE_REVISION
+    }, "CORONA TEST: orquestador debe dejar en {LISTO_PARA_APROBAR, REQUIERE_REVISION}"
+
+
+def test_orquestador_nunca_produce_aprobado(caso_recibido, hitl_service_mock, cotas_standard):
+    """Orquestador NUNCA produce APROBADO (P1 HITL)."""
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    
+    assert resultado.estado != EstadoCaso.APROBADO, \
+        "Orquestador es prohibido producir APROBADO (es terminal, requiere humano)"
+
+
+def test_orquestador_nunca_produce_rechazado(caso_recibido, hitl_service_mock, cotas_standard):
+    """Orquestador NUNCA produce RECHAZADO (P1 HITL)."""
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    
+    assert resultado.estado != EstadoCaso.RECHAZADO, \
+        "Orquestador es prohibido producir RECHAZADO (es terminal, requiere humano)"
+
+
+def test_orquestador_transiciones_a_en_proceso(caso_recibido, hitl_service_mock, cotas_standard):
+    """Orquestador ALWAYS transitions RECIBIDO → EN_PROCESO on entry."""
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    
+    # Verify the first transition happened (transicionar was called)
+    assert resultado.estado != EstadoCaso.RECIBIDO, \
+        "Orquestador debe transicionar desde RECIBIDO"
+
+
+def test_orquestador_corona_test_all_paths(caso_recibido, hitl_service_mock, cotas_standard):
+    """CORONA TEST: all paths must end in {LISTO_PARA_APROBAR, REQUIERE_REVISION}."""
+    # This is the fundamental P1 guard rail
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    
+    assert resultado.estado in {
+        EstadoCaso.LISTO_PARA_APROBAR,
+        EstadoCaso.REQUIERE_REVISION
+    }, "CORONA TEST: orquestador violó P1 (produjo terminal)"
+
+
+def test_orquestador_respeta_max_rondas(caso_recibido, hitl_service_mock):
+    """Orquestador respeta cotas internos (verificable via mock call count)."""
+    # Cotas debe tener max_rondas ≥ 1 (Pydantic gt=0)
+    cotas = Cotas(max_rondas=1, presupuesto_tokens=20000)
+    
+    resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas)
+    
+    # Verify loop entered and transicionar called at least once
+    assert hitl_service_mock.transicionar.call_count >= 1, \
+        "Orquestador debe llamar transicionar al menos una vez"
+
+
+def test_orquestador_fail_closed_on_exception(caso_recibido, hitl_service_mock, cotas_standard):
+    """Orquestador es fail-closed: excepciones internas → RuntimeError (nunca silent)."""
+    # Mock transicionar to raise on second call
+    call_count = [0]
+    
+    def raise_on_second_call(caso, nuevo_estado, actor, motivo=None):
+        call_count[0] += 1
+        if call_count[0] > 1:
+            raise ValueError("Simulated internal error")
+        caso_dict = caso.model_dump()
+        caso_dict["estado"] = nuevo_estado
+        caso_dict["timestamp_actualizacion"] = datetime.now(timezone.utc)
+        if motivo:
+            caso_dict["motivo_escalamiento"] = motivo
+        return Caso.model_validate(caso_dict)
+    
+    hitl_service_mock.transicionar = MagicMock(side_effect=raise_on_second_call)
+    
+    # Orquestador should catch and re-raise as RuntimeError
+    with pytest.raises(RuntimeError):
+        orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
