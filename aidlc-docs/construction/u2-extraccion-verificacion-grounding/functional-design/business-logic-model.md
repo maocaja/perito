@@ -23,9 +23,15 @@ PASO 2: C2 Extractor (Haiku)
   #   ]
   # }
 
-PASO 3: C3 Verifier (Sonnet)
-  verificada = verifier.verify(extraccion)
+PASO 3a: C3 Verifier Capa 1 — Confirmación Adversarial (Sonnet, P5)
+  aviso_redactado = LLMPayloadBuilder.build_verification_prompt(aviso_original)
+  # Sonnet re-lee y valida que cada campo esté confirmado en texto
+  verificada_capa1 = verify_adversarial(extraccion, aviso_redactado)
+  # → ExtraccionValidada (confirmada) OR SeñalEscalamiento (alucinación detectada)
+
+PASO 3b: C3 Verifier Capa 2 — Consistencia Interna (Código)
   # Valida: fecha ≤ hoy, monto > 0, tipo ∈ enum, nombre ≠ vacío, cédula válida
+  verificada = verify_consistency(verificada_capa1)
   # → ExtraccionValidada (sin cambios si pasa)
 
 PASO 4: C4 PolicyLookup (SQL + RAG)
@@ -37,9 +43,10 @@ PASO 4: C4 PolicyLookup (SQL + RAG)
   #      candidatas: []
   #    }
 
-SALIDA: Caso con:
-  Caso.extraccion = ExtraccionValidada ✅
-  Caso.poliza_match = ResultadoPoliza(encontrada=True) ✅
+SALIDA:
+  ExtraccionValidada (confirmada + consistente) ✅
+  ResultadoPoliza(encontrada=True) ✅
+  [U4 adjunta: Caso.extraccion = ..., Caso.poliza_match = ...]
   → Listo para U3 (motor R1-R5)
 
 FIN FLUJO HAPPY PATH

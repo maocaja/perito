@@ -118,11 +118,34 @@ else:
 
 ---
 
-## Reglas de Verificación (C3 Verifier)
+## Reglas de Verificación (C3 Verifier — Dos Capas)
 
-### RULE-VER-01: Consistencia de Campos
+### RULE-VER-01: Confirmación Adversarial (Capa 1, LLM Sonnet, H-03/RF-07-08)
 
-**Definición:** Valida que la ExtraccionValidada sea internamente consistente (no lógica de cobertura — eso es U3).
+**Definición:** C3 re-lee AvisoNormalizado redactado y pregunta al LLM (Sonnet): "¿Cada campo extraído está realmente en el texto, o es alucinación de Haiku?"
+
+**Implementación:**
+```
+def verify_adversarial(extraccion: ExtraccionValidada, aviso_redactado: str):
+  prompt = LLMPayloadBuilder.build_verification_prompt(aviso_redactado, extraccion)
+  # Prompt: "¿Está confirmado número_poliza='POL-123456' en el texto? Sí/No."
+  response = sonnet.complete(prompt)
+  
+  for campo in extraccion.campos:
+    if response[campo.nombre] == "NO":
+      → SeñalEscalamiento(VERIFIER_RECHAZA, motivo=f"Alucinación: {campo.nombre} no confirmado")
+  return ExtraccionValidada (validada)
+```
+
+**Garantías:**
+- ✅ P4 (anti-invención): Detecta alucinaciones de Haiku
+- ✅ P5 (PII): Redactado via LLMPayloadBuilder (deny-by-default)
+
+---
+
+### RULE-VER-02: Consistencia Interna (Capa 2, Código Determinístico)
+
+**Definición:** Valida que ExtraccionValidada sea plausible internamente (no toca cobertura — eso es U3).
 
 **Reglas específicas:**
 
@@ -151,31 +174,21 @@ else:
    formato válido (heurístico país — para Colombia: XX-XXXXXXXX-X)
    ```
 
----
-
-### RULE-VER-02: Escalamiento si Rechaza
-
-**Definición:** Si la Verifier rechaza una regla ↑, NO fuerza error fatal. Emite SeñalEscalamiento.
-
 **Implementación:**
 ```
-try:
-  verify(extraccion)
-except ValidationError as e:
-  → SeñalEscalamiento(
-      VERIFIER_RECHAZA,
-      motivo=str(e),
-      evidencia=[EvidenciaOrigen(tipo=VALIDACION, referencia=campo)]
-    )
+def verify_consistency(extraccion: ExtraccionValidada):
+  # Código puro, sin LLM
+  for campo in extraccion.campos:
+    if not validate_rule(campo):
+      → SeñalEscalamiento(VERIFIER_RECHAZA, motivo=f"Inconsistencia: {campo.nombre}")
+  return ExtraccionValidada (consistente)
 ```
-
-**Garantía:** U4 decide escalamiento (REQUIERE_REVISION), no U2.
 
 ---
 
 ### RULE-VER-03: No Reparar (P3 P4)
 
-**Definición:** El Verifier NO altera valores, solo valida.
+**Definición:** Verifier NO altera valores, solo valida.
 
 **Prohibido:**
 - Normalizar teléfono silenciosamente
@@ -186,7 +199,31 @@ except ValidationError as e:
 
 ---
 
-## Reglas de Grounding (C4 PolicyLookup)
+### RULE-VER-04: Orquestación de C3
+
+**Definición:** C3 es una cascada de dos validaciones; primera alucinación, segunda plausibilidad.
+
+**Flujo:**
+```
+ENTRADA: ExtraccionValidada (sin validar) + AvisoNormalizado original
+
+PASO 1: Redactar (P5)
+  aviso_redactado = LLMPayloadBuilder.build_verification_prompt(aviso_original)
+
+PASO 2: Capa 1 — Confirmación Adversarial (Sonnet)
+  resultado = verify_adversarial(extraccion, aviso_redactado)
+  if SeñalEscalamiento: return (termina aquí)
+
+PASO 3: Capa 2 — Consistencia Interna (Código)
+  resultado = verify_consistency(resultado)
+  if SeñalEscalamiento: return
+
+SALIDA: ExtraccionValidada (confirmada + consistente) OR SeñalEscalamiento
+```
+
+---
+
+## Reglas de Grounding## Reglas de Grounding (C4 PolicyLookup)
 
 ### RULE-POL-01: Match Determinístico (P4 RF-10)
 

@@ -217,7 +217,7 @@ U4 (LangGraph, dueño P4)
 | Invariante | Cómo lo cierra U2 |
 |-----------|-------------------|
 | **P1 (HITL)** | SeñalEscalamiento tipado, NO setea estado. Solo U4 muta (RULE-CTR-05). |
-| **P2 (Cobertura determinística)** | Verifier valida consistencia, NO reglas de cobertura. R1-R5 son U3. |
+| **P2 (Cobertura determinística)** | Verifier (Capa 2) valida consistencia, NO reglas de cobertura. R1-R5 son U3. |
 | **P3 (Trazabilidad)** | Cada campo con EvidenciaOrigen. Citas de cláusulas por ID. |
 | **P4 (Terminación acotada)** | No inventar (ausente=True), no loops. Escala a U4. |
 | **P5 (PII)** | LLMPayloadBuilder redacta antes de LLM. Refs a cláusulas por ID. |
