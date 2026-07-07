@@ -2,6 +2,8 @@
 
 CORONA TEST: assert caso_final.estado in {LISTO_PARA_APROBAR, REQUIERE_REVISION}
 The orchestrator NEVER produces terminal (APROBADO/RECHAZADO).
+
+C9 OBSERVABILITY INJECTION: Optional Tracer for per-node tracing (no logic mutation).
 """
 
 import hashlib
@@ -12,12 +14,14 @@ from typing import Optional
 from app.contracts.caso import Caso
 from app.contracts.enums import EstadoCaso, ResultadoCobertura
 from app.contracts.dictamen import Cotas
+from app.observability.tracer import Tracer
 
 
 def orquestar_fnol(
     caso: Caso,
     hitl_service,
-    cotas: Cotas
+    cotas: Cotas,
+    tracer: Optional[Tracer] = None  # C9 injection: optional
 ) -> Caso:
     """Main FNOL case processing orchestrator.
     
@@ -26,11 +30,13 @@ def orquestar_fnol(
     - Never produces terminal (APROBADO/RECHAZADO)
     - Respects Cotas (max_rondas, presupuesto_tokens, cycle detection)
     - Exception capture → escalate, never propagate
+    - C9 Observability: optional Tracer for instrumentation (no logic mutation)
     
     Args:
         caso: Caso in RECIBIDO state
         hitl_service: HITL service for state transitions
         cotas: Cotas contract with max_rondas and presupuesto_tokens
+        tracer: Optional Tracer for per-node tracing (C9)
     
     Returns:
         Caso in LISTO_PARA_APROBAR or REQUIERE_REVISION (NEVER terminal)
@@ -48,6 +54,9 @@ def orquestar_fnol(
             motivo="Inicio orquestación FNOL"
         )
         
+        if tracer:
+            tracer.emit("orquestador_inicio", "Transición a EN_PROCESO")
+        
         # --- Phase 2: Process loop with caps ---
         ronda = 0
         tokens_usados = 0
@@ -64,6 +73,8 @@ def orquestar_fnol(
                     actor="SISTEMA",
                     motivo=f"Máximo de rondas ({cotas.max_rondas}) agotado"
                 )
+                if tracer:
+                    tracer.emit("orquestador_cap_rondas", f"Rondas agotadas (max={cotas.max_rondas})")
                 break
             
             # Cap 2: Token budget
@@ -74,6 +85,8 @@ def orquestar_fnol(
                     actor="SISTEMA",
                     motivo=f"Presupuesto de tokens ({cotas.presupuesto_tokens}) agotado"
                 )
+                if tracer:
+                    tracer.emit("orquestador_cap_tokens", f"Tokens agotados (presupuesto={cotas.presupuesto_tokens})", tokens_in=tokens_usados)
                 break
             
             # Cap 3: Cycle detection
@@ -85,6 +98,8 @@ def orquestar_fnol(
                     actor="SISTEMA",
                     motivo="Ciclo detectado: sin progreso en esta ronda"
                 )
+                if tracer:
+                    tracer.emit("orquestador_ciclo", "Ciclo detectado")
                 break
             snapshot_previo = snapshot_actual
             
@@ -93,6 +108,8 @@ def orquestar_fnol(
                 try:
                     # In real implementation: c2_extraccion(caso.aviso)
                     # For now: stub (tests will mock)
+                    if tracer:
+                        tracer.emit("c2_extraccion", "Extracción completada (stub)")
                     pass
                 except Exception as e:
                     caso = hitl_service.transicionar(
@@ -101,6 +118,8 @@ def orquestar_fnol(
                         actor="SISTEMA",
                         motivo=f"Extracción falló: {str(e)}"
                     )
+                    if tracer:
+                        tracer.emit("c2_extraccion", "Extracción falló", error=str(e))
                     break
             
             # --- C4: Policy Lookup (stub) ---
@@ -108,6 +127,8 @@ def orquestar_fnol(
                 try:
                     # In real implementation: c4_policy_lookup(caso.extraccion)
                     # For now: stub
+                    if tracer:
+                        tracer.emit("c4_policy_lookup", "Policy lookup completado (stub)")
                     pass
                 except Exception as e:
                     caso = hitl_service.transicionar(
@@ -116,6 +137,8 @@ def orquestar_fnol(
                         actor="SISTEMA",
                         motivo=f"Póliza lookup falló: {str(e)}"
                     )
+                    if tracer:
+                        tracer.emit("c4_policy_lookup", "Policy lookup falló", error=str(e))
                     break
             
             # --- C5: Motor Cobertura (stub) ---
@@ -123,6 +146,8 @@ def orquestar_fnol(
                 try:
                     # In real implementation: c5_motor_cobertura(caso.extraccion, caso.poliza_match.poliza)
                     # For now: stub
+                    if tracer:
+                        tracer.emit("c5_motor_cobertura", "Motor ejecutado (stub)")
                     pass
                 except Exception as e:
                     caso = hitl_service.transicionar(
@@ -131,6 +156,8 @@ def orquestar_fnol(
                         actor="SISTEMA",
                         motivo=f"Motor falló: {str(e)}"
                     )
+                    if tracer:
+                        tracer.emit("c5_motor_cobertura", "Motor falló", error=str(e))
                     break
             
             # --- C6: Fraude (stub) ---
@@ -138,9 +165,13 @@ def orquestar_fnol(
                 try:
                     # In real implementation: c6_fraude(caso.extraccion, caso.poliza_match.poliza)
                     # For now: stub (AlertaFraude optional, can be None)
+                    if tracer:
+                        tracer.emit("c6_fraude", "Fraude verificado (stub)")
                     pass
                 except Exception:
                     # Fraude failures don't escalate; just continue
+                    if tracer:
+                        tracer.emit("c6_fraude", "Fraude verificación silenciosa (no escalada)", error="pass")
                     pass
             
             # --- Decision: LISTO_PARA_APROBAR or continue ---
@@ -155,6 +186,8 @@ def orquestar_fnol(
                     actor="SISTEMA",
                     motivo="Extracción + Póliza + Motor completados"
                 )
+                if tracer:
+                    tracer.emit("orquestador_decision", "LISTO_PARA_APROBAR")
                 break
         
         # --- CORONA TEST: Verify orchestrator never produces terminal ---
@@ -167,6 +200,8 @@ def orquestar_fnol(
     
     except Exception as e:
         # Fail-closed: unexpected error → escalate
+        if tracer:
+            tracer.emit("orquestador", "Excepción no capturada", error=str(e))
         raise RuntimeError(f"Orquestador failed: {str(e)}") from e
 
 
