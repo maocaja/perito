@@ -358,7 +358,7 @@ Todas: U2 emite, U4 escala.
 | P2 (Cobertura determinística) | RULE-VER-01 (consistencia ≠ cobertura), RULE-POL-03 (U3 aplica reglas) |
 | P3 (Trazabilidad) | RULE-EXT-05 (evidencia de origen), RULE-VER-03 (no reparar silenciosamente) |
 | P4 (Terminación acotada) | RULE-EXT-06 (no inventar), RULE-POL-01 (determinístico), RULE-SIGNAL-01 (escala a U4) |
-| P5 (PII) | RULE-EXT-04 (redacción LLMPayloadBuilder), RULE-POL-03 (refs por ID) |
+| P5 (PII) | RULE-EXT-04 (redacción C2), RULE-VER-01 (redacción C3 Capa 1), RULE-POL-03 (refs por ID) |
 | P6 (Explicabilidad) | RULE-SIGNAL-03 (hechos, no preferencia) |
 
 ---

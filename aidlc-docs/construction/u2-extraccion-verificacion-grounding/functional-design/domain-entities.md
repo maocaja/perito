@@ -119,32 +119,54 @@ def extract(aviso: AvisoNormalizado, campos_esperados: list[str]) -> ExtraccionV
 
 ---
 
-### C3: Verifier
+### C3: Verifier (Dos Capas: Confirmación Adversarial + Consistencia Interna)
 
 **Responsabilidad:**
-- Recibe ExtraccionValidada
-- Valida **consistencia interna** (no lógica de cobertura)
-- Retorna ExtraccionValidada (sin cambios) o SeñalEscalamiento
+- **Capa 1 (LLM Sonnet):** Re-lee AvisoNormalizado redactado via LLMPayloadBuilder, confirma cada campo contra fuente original (P4 anti-alucinación, H-03/RF-07-08, P5)
+- **Capa 2 (Código determinístico):** Valida consistencia interna sin LLM (fecha≤hoy, monto>0, tipo∈enum, formato cédula)
 
-**Reglas de Consistencia:**
-- fecha_siniestro ≤ hoy
-- monto_reclamado > 0
-- tipo_siniestro ∈ enum TipoSiniestro (definido en U1)
-- nombre_asegurado ≠ vacío
-- Formato cédula válido (si presente)
-
-**Contrato:**
+**Contrato Capa 1 — Confirmación Adversarial:**
 ```
-def verify(extraccion: ExtraccionValidada) -> ExtraccionValidada | SeñalEscalamiento:
-  # Valida reglas ↑
-  # Si rechaza → SeñalEscalamiento(VERIFIER_RECHAZA, evidencia=[...])
-  # Else → ExtraccionValidada (sin mutación)
+def verify_adversarial(
+  extraccion: ExtraccionValidada,
+  aviso_redactado: str  # salida de LLMPayloadBuilder.build_verification_prompt()
+) -> ExtraccionValidada | SeñalEscalamiento:
+  # Sonnet re-lee: "¿Cada campo extraído está confirmado en el texto?"
+  # Si alucinación detectada → SeñalEscalamiento(VERIFIER_RECHAZA)
+  # Else → ExtraccionValidada
+```
+
+**Contrato Capa 2 — Consistencia Interna:**
+```
+def verify_consistency(extraccion: ExtraccionValidada) -> ExtraccionValidada | SeñalEscalamiento:
+  # Valida: fecha≤hoy, monto>0, tipo∈enum, nombre≠vacío, cédula válida
+  # Código determinístico, sin LLM
+  # Si falla → SeñalEscalamiento(VERIFIER_RECHAZA)
+  # Else → ExtraccionValidada
+```
+
+**Orquestación de C3:**
+```
+ENTRADA: ExtraccionValidada (sin validar) + AvisoNormalizado original
+
+PASO 1: Redactar (P5)
+  aviso_redactado = LLMPayloadBuilder.build_verification_prompt(aviso_original)
+
+PASO 2: Capa 1 — Confirmación Adversarial (Sonnet)
+  resultado = verify_adversarial(extraccion, aviso_redactado)
+  if SeñalEscalamiento: return (termina)
+
+PASO 3: Capa 2 — Consistencia Interna (Código)
+  resultado = verify_consistency(resultado)
+  
+SALIDA: ExtraccionValidada (confirmada + consistente) OR SeñalEscalamiento
 ```
 
 **Garantías:**
+- ✅ P4: Confirmación adversarial detecta alucinaciones (H-03 anti-invención)
+- ✅ P5: Sonnet redactado via LLMPayloadBuilder (deny-by-default)
 - ✅ P3: Cita inconsistencia (EvidenciaOrigen + motivo)
 - ✅ P2: NO toca vigencia (R1), exclusiones (R3), cobertura → eso es U3
-- ✅ P4: No repara (no altera valor silenciosamente)
 
 ---
 
