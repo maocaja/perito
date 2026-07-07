@@ -12,8 +12,8 @@ U2 integra **dos llamadas LLM sintéticas** (C2: extracción, C3: verificación)
 
 | Componente | Modelo | Rationale |
 |------------|--------|-----------|
-| **C2 Extractor** | `claude-haiku-4-5-20250108` | Velocidad + costo (200K ctx). No soporta `effort` param. |
-| **C3 Verifier Capa 1** | `claude-sonnet-5-20250514` | Razonamiento adversarial (anti-hallucination H-03). 1M ctx. Adaptive thinking ON by default. |
+| **C2 Extractor** | `claude-haiku-4-5` | Velocidad + costo (200K ctx). No soporta `effort` param. |
+| **C3 Verifier Capa 1** | `claude-sonnet-5` | Razonamiento adversarial (anti-hallucination H-03). 1M ctx. Adaptive thinking ON by default. |
 | **C3 Verifier Capa 2** | N/A (código Python) | Validaciones determinísticas (no LLM). |
 
 **Configuración:** Model IDs en `backend/app/config.py` (não hardcoded). Facilita cambio sin redeploy.
@@ -42,7 +42,7 @@ U2 integra **dos llamadas LLM sintéticas** (C2: extracción, C3: verificación)
 ```python
 # Pseudocódigo
 response = client.messages.parse(
-    model="claude-haiku-4-5-20250108",
+    model="claude-haiku-4-5",
     max_tokens=2000,
     system=[...],  # Instrucciones extracción
     messages=[
@@ -65,7 +65,7 @@ response = client.messages.parse(
 ```python
 # Pseudocódigo
 response = client.messages.parse(
-    model="claude-sonnet-5-20250514",
+    model="claude-sonnet-5",
     max_tokens=3000,
     system=[...],  # Adversarial challenge: "re-read source, confirm each field"
     messages=[
@@ -196,8 +196,8 @@ backend/app/orchestrator/ # Hereda U4
 ```python
 class Settings(BaseSettings):
     # LLM Models (NO hardcoded en código)
-    EXTRACTOR_MODEL: str = "claude-haiku-4-5-20250108"
-    VERIFIER_MODEL: str = "claude-sonnet-5-20250514"
+    EXTRACTOR_MODEL: str = "claude-haiku-4-5"
+    VERIFIER_MODEL: str = "claude-sonnet-5"
     
     # LLM Behavior
     EXTRACTOR_MAX_TOKENS: int = 2000
