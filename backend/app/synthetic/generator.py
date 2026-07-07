@@ -36,38 +36,6 @@ class SyntheticCaseGenerator:
         """Inicializa con Faker en locale colombiano."""
         self.faker = Faker(locale)
 
-    def _generate_inconsistency(self) -> EvidenciaOrigen:
-        """Genera una inconsistencia aleatoria (diversidad en evals).
-
-        Retorna: EvidenciaOrigen con tipo y referencia variados
-        """
-        inconsistency_type = self.faker.random_element([
-            ("SPAN", "Fecha siniestro antes de vigencia"),
-            ("AMOUNT", "Monto reclamado > suma_asegurada"),
-            ("COVERAGE", "Cobertura no contratada en póliza"),
-            ("EXCLUSION", "Siniestro aplica exclusión póliza"),
-        ])
-
-        tipo, base_msg = inconsistency_type
-
-        # Generar referencia con datos sintéticos
-        if tipo == "SPAN":
-            siniestro_date = self.faker.date_object()
-            vigencia_start = self.faker.date_object() + timedelta(days=30)
-            referencia = f"Siniestro {siniestro_date} anterior a vigencia {vigencia_start}"
-        elif tipo == "AMOUNT":
-            claimed = self.faker.random_int(200000, 500000)
-            insured = self.faker.random_int(100000, 150000)
-            referencia = f"Monto ${claimed} > suma_asegurada ${insured}"
-        elif tipo == "COVERAGE":
-            coverage = self.faker.random_element(["ROBO", "INUNDACION", "TERREMOTO"])
-            referencia = f"Siniestro por {coverage}, no contratada"
-        else:  # EXCLUSION
-            exclusion = self.faker.random_element(["Uso comercial", "Conductor sin licencia"])
-            referencia = f"Aplica exclusión: {exclusion}"
-
-        return EvidenciaOrigen(tipo=tipo, referencia=referencia)
-
     def generate_ground_truth(
         self,
         etiqueta_fraude: bool = False,
@@ -89,7 +57,11 @@ class SyntheticCaseGenerator:
 
         if etiqueta_fraude:
             # RULE-GEN-02: fraude EXIGE inconsistencia encodada en los datos
-            inconsistencia_esperada = self._generate_inconsistency()
+            # Ejemplo: fecha de siniestro antes de vigencia, o monto > suma_asegurada
+            inconsistencia_esperada = EvidenciaOrigen(
+                tipo="SPAN",
+                referencia="Fecha siniestro 2023-01-01 es anterior a vigencia 2024-01-01",
+            )
 
         # ASSERTION FAIL-CLOSED: si etiqueta_fraude pero sin inconsistencia, rompe
         assert (
@@ -100,8 +72,8 @@ class SyntheticCaseGenerator:
             campos_esperados={
                 "numero_poliza": self.faker.bothify(text="POL-########"),
                 "fecha_siniestro": str(self.faker.date_object()),
-                "tipo_siniestro": self.faker.random_element(["AUTO_COLISION", "ROBO", "INUNDACION"]),
-                "monto_reclamado": str(self.faker.random_int(10000, 200000)),
+                "tipo_siniestro": "AUTO_COLISION",
+                "monto_reclamado": "50000.00",
             },
             resultado_cobertura_esperado=resultado_cobertura,
             etiqueta_fraude=etiqueta_fraude,

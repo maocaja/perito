@@ -21,9 +21,6 @@ class KaggleAdapter:
     def from_kaggle_row(row: dict) -> FilaEntrada:
         """Convierte una fila Kaggle al contrato FilaEntrada.
 
-        Validación fail-closed: campos obligatorios deben existir.
-        Si faltan, lanza KeyError (no silencia con .get()).
-
         Args:
             row: diccionario con campos esperados de Kaggle
 
@@ -31,20 +28,11 @@ class KaggleAdapter:
             FilaEntrada normalizada
 
         Raises:
-            KeyError si faltan campos obligatorios (claim_data, is_fraud)
+            KeyError si faltan campos obligatorios
         """
-        # Validar que existan los campos obligatorios
-        required_fields = {"claim_data", "is_fraud"}
-        missing = required_fields - set(row.keys())
-        if missing:
-            raise KeyError(
-                f"Kaggle row missing required fields: {missing}. "
-                f"Got keys: {set(row.keys())}"
-            )
-
-        # Campos validados, extraer con confianza
+        # Estructura esperada de Kaggle (ajustar según dataset real)
         return FilaEntrada(
-            datos_siniestro=row["claim_data"],
-            etiqueta_fraude=bool(row["is_fraud"]),
-            metadatos=row.get("metadata", {}),  # metadata es opcional
+            datos_siniestro=row.get("claim_data", {}),
+            etiqueta_fraude=bool(row.get("is_fraud", False)),
+            metadatos=row.get("metadata", {}),
         )

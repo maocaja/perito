@@ -73,7 +73,7 @@ class LLMPayloadBuilder:
 
     def build_extraction_prompt(
         self,
-        aviso: "AvisoNormalizado",  # Type hint explícito (no Any)
+        aviso: Any,  # AvisoNormalizado
         whitelist: set[str] | None = None,
     ) -> str:
         """Construye prompt de extracción redactando texto_crudo por defecto.
@@ -84,18 +84,12 @@ class LLMPayloadBuilder:
 
         Returns:
             Prompt seguro para enviar al LLM
-
-        Raises:
-            TypeError si aviso no es AvisoNormalizado
         """
         from app.contracts.extraccion import AvisoNormalizado
 
-        if not isinstance(aviso, AvisoNormalizado):
-            raise TypeError(f"aviso debe ser AvisoNormalizado, got {type(aviso).__name__}")
-
         # Redactar: deny-by-default, whitelist vacía = solo "[REDACTED]" en PII
         safe_aviso = self.serializer.redact(
-            aviso.model_dump(),  # Usar model_dump() en lugar de dict manual
+            {"texto_crudo": aviso.texto_crudo, "calidad": aviso.calidad.value},
             AvisoNormalizado,
             whitelist=whitelist or set(),
         )
@@ -111,7 +105,7 @@ class LLMPayloadBuilder:
 
     def build_fraud_detection_prompt(
         self,
-        caso: "Caso",  # Type hint explícito (no Any)
+        caso: Any,  # Caso
         whitelist: set[str] | None = None,
     ) -> str:
         """Construye prompt de detección de fraude redactando PII.
@@ -122,15 +116,7 @@ class LLMPayloadBuilder:
 
         Returns:
             Prompt seguro para detección de fraude
-
-        Raises:
-            TypeError si caso no es Caso
         """
-        from app.contracts.caso import Caso
-
-        if not isinstance(caso, Caso):
-            raise TypeError(f"caso debe ser Caso, got {type(caso).__name__}")
-
         # Fraude no necesita PII — deny-by-default total
         prompt = (
             f"Analiza inconsistencias en el caso (no necesitas PII):\n"
