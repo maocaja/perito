@@ -160,7 +160,7 @@ def redact_pii_spans_es_co(texto: str) -> str:
     # Pattern 1: Cédula/C.C. (Colombian ID variations)
     # "C.C. 1098765432", "cedula 80123456", "Cédula No. 52.987.654"
     texto = re.sub(
-        r'(?:C\.?C\.?|cedula|cédula|Cédula|CEDULA)\s*(?:No\.?)?\s*(?:\.?\s*)?(\d{2,3}[\.\-]\d{3}[\.\-]\d{3}|\d{6,10})',
+        r'(?:C\.?C\.?|cedula|cédula|Cédula|CEDULA)\s*(?:No\.?)?\s*(?:\.?\s*)?(\d{1,4}(?:[\.\-\s]\d{3}){2,3}|\d{6,10})',
         '[REDACTED]',
         texto,
         flags=re.IGNORECASE
