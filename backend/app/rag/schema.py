@@ -5,7 +5,7 @@ En U1: solo definición. El embedding real se conecta en U2/U3.
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, MetaData, Table, create_engine
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
@@ -34,32 +34,28 @@ class RAGSchema:
             MetaData con tabla 'rag_documents' lista
 
         Nota: Si embedding_dim es None, la tabla se crea SIN la columna embedding
-        (será añadida en U2 tras confirmar el modelo).
+        (será añadida en U2 tras confirmar el modelo). SQLAlchemy 2.0+ compatible.
         """
         metadata = MetaData()
 
-        # Tabla de documentos (cláusulas de pólizas, referencias, etc)
-        # En U1: sin contenido real, solo estructura.
-        rag_documents = Table(
-            "rag_documents",
-            metadata,
+        # Construir lista de columnas dinámicamente (SQLAlchemy 2.0+ compatible)
+        columns = [
             Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
             Column("content", Text, nullable=False),
             Column("source", String(255), nullable=False),  # ej: "CLAUSULA_VIGENCIA_POL_123"
             Column("tipo", String(50), nullable=False),  # CLAUSULA, EXCLUSION, LIMITE, etc
             Column("created_at", DateTime, default=datetime.utcnow),
             Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
-        )
+        ]
 
-        # Añadir columna de embedding si la dimensión está configurada
+        # Agregar columna de embedding si la dimensión está configurada
         if embedding_dim is not None:
-            rag_documents.append_column(
+            columns.append(
                 Column("embedding", Vector(embedding_dim), nullable=True, comment="pgvector: embeddings")
             )
-            # Índice HNSW para búsqueda rápida (en producción)
-            # CREATE INDEX ON rag_documents USING hnsw (embedding vector_cosine_ops);
 
-        metadata.add_table(rag_documents)
+        # Crear tabla de una sola vez (no usar append_column, deprecated en 2.0+)
+        rag_documents = Table("rag_documents", metadata, *columns)
         return metadata
 
 
@@ -76,6 +72,9 @@ def get_rag_connection_string(database_url: str) -> str:
 
     Returns:
         URL validada
+
+    Raises:
+        ValueError si no es PostgreSQL
     """
     if not database_url.startswith("postgresql"):
         raise ValueError("RAG solo soporta PostgreSQL con extensión pgvector")
