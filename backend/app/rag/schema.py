@@ -7,7 +7,7 @@ En U1: solo definición. El embedding real se conecta en U2/U3.
 from sqlalchemy import Column, String, Integer, DateTime, Text, MetaData, Table, create_engine
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from pgvector.sqlalchemy import Vector
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -47,8 +47,8 @@ class RAGSchema:
             Column("content", Text, nullable=False),
             Column("source", String(255), nullable=False),  # ej: "CLAUSULA_VIGENCIA_POL_123"
             Column("tipo", String(50), nullable=False),  # CLAUSULA, EXCLUSION, LIMITE, etc
-            Column("created_at", DateTime, default=datetime.utcnow),
-            Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
+            Column("created_at", DateTime, default=lambda: datetime.now(timezone.utc)),
+            Column("updated_at", DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)),
         )
 
         # Añadir columna de embedding si la dimensión está configurada
