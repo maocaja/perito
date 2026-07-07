@@ -3,8 +3,10 @@
 ## Project Information
 - **Project Type**: Greenfield
 - **Start Date**: 2026-07-06
-- **Current Phase**: INCEPTION
-- **Current Stage**: AJIT COMPLETO — Inception + arquitectura JIT listas. Pendiente: re-cosecha a specs/aidlc/ (front + AJIT). Siguiente fase: Construction.
+- **Current Phase**: CONSTRUCTION
+- **Current Stage**: U1 — Actividad 5 (Code Generation) Part 2 · Tanda A ✅ APROBADA (con P1) · Tanda B/C AUTORIZADAS · venv autorizado para tests
+- **Unidad en curso**: U1 · Fundaciones & Contratos (historias H-16, H-17)
+- **Loop por-unidad**: Functional Design → NFR Requirements → NFR Design → Infrastructure Design → Code Generation (por unidad); Build & Test tras todas las unidades.
 
 ## Workspace State
 - **Existing Code**: No
@@ -54,13 +56,16 @@
 
 **✅ FASE INCEPTION COMPLETA (2026-07-06).** Siguiente: cosecha a `specs/aidlc/` (pendiente aprobación del plan de cosecha).
 
-### 🟢 CONSTRUCTION PHASE (planificada, fuera de esta sesión)
-- [ ] Functional Design — EXECUTE
-- [ ] NFR Requirements — EXECUTE
-- [ ] NFR Design — EXECUTE
-- [ ] Infrastructure Design — SKIP (nada se despliega)
-- [ ] Code Generation — EXECUTE
-- [ ] Build and Test — EXECUTE
+### 🟢 CONSTRUCTION PHASE — EN CURSO (loop por-unidad)
+**U1 · Fundaciones & Contratos:**
+- [x] Functional Design — aprobado 2026-07-06
+- [x] NFR Requirements — aprobado 2026-07-06
+- [x] NFR Design — aprobado 2026-07-06
+- [x] Infrastructure Design — SKIP prod + dev-env spec, aprobado 2026-07-06
+- [~] Code Generation — Tanda A (Steps 1-3) revisada (code-reviewer limpio, estático); Tandas B/C pendientes
+- [ ] Build and Test — tras todas las unidades (U1-U5)
+
+**U2-U5:** pendientes (cada una repite el loop tras cerrar U1).
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations — PLACEHOLDER
