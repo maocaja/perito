@@ -9,6 +9,7 @@ from app.contracts.extraccion import CampoExtraido, AvisoNormalizado
 from app.contracts.dictamen import Dictamen, AlertaFraude
 from app.contracts.dataset import GroundTruth
 from app.contracts.caso import Caso
+from app.contracts.enums import EstadoCaso
 from tests.generators import (
     st_rango_fechas,
     st_poliza,
