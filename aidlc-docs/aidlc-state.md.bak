@@ -1,0 +1,71 @@
+# AI-DLC State Tracking — Perito
+
+## Project Information
+- **Project Type**: Greenfield
+- **Start Date**: 2026-07-06
+- **Current Phase**: CONSTRUCTION
+- **Current Stage**: U1 — Actividad 5 (Code Generation) Part 2 · Tanda A (Steps 1-3) generada, gate de revisión (Tandas B/C pendientes)
+- **Unidad en curso**: U1 · Fundaciones & Contratos (historias H-16, H-17)
+- **Loop por-unidad**: Functional Design → NFR Requirements → NFR Design → Infrastructure Design → Code Generation (por unidad); Build & Test tras todas las unidades.
+
+## Workspace State
+- **Existing Code**: No
+- **Programming Languages**: N/A (sin código de app aún)
+- **Build System**: N/A
+- **Project Structure**: Empty (greenfield — solo docs, PRD, specs, framework AI-DLC)
+- **Reverse Engineering Needed**: No
+- **Workspace Root**: /Users/mauricio/dev/perito
+
+## Domain Inputs
+- `PRD.md` — Product Requirements Document (Estación 2), input principal de AI-DLC.
+- `AGENTS.md` — contexto de negocio/arquitectura y principios no negociables P1-P7.
+- `.claude/rules/` — reglas duras: hitl (P1), coverage-determinism (P2), termination (P4), testing.
+
+## Code Location Rules
+- **Application Code**: Workspace root (NUNCA en aidlc-docs/)
+- **Documentation / Artefactos AI-DLC**: aidlc-docs/ únicamente
+- **Cosecha final**: a `specs/aidlc/` (NO se mergea CLAUDE.md de esta rama a main)
+
+## Extension Configuration
+| Extension | Enabled | Mode | Decided At |
+|---|---|---|---|
+| Security Baseline | Yes | Blocking (todas las reglas SECURITY-01..15) | Requirements Analysis |
+| Property-Based Testing | Yes | **Partial** — enforced: PBT-02, PBT-03, PBT-07, PBT-08, PBT-09; resto advisory | Requirements Analysis |
+
+## Decisiones de alcance (Requirements Analysis)
+- **Q1 Alcance**: B — Must completo (13 items → módulos M1-M10). Should/SOAT fuera de esta Inception.
+- **Q2 Depth**: A — Comprehensive (con matriz de trazabilidad a P1-P7).
+- **Q3 Idioma**: A — Español (es-CO).
+- **Q4 User Stories**: A — Sí, con Gherkin (Given/When/Then reutilizables como escenarios de eval por estrato).
+
+## Execution Plan Summary
+- **Stages to Execute (Inception)**: Application Design, Units Generation.
+- **Stages to Execute (Construction, sesión posterior)**: Functional Design, NFR Requirements, NFR Design, Code Generation, Build & Test.
+- **Stages to Skip**: Reverse Engineering (greenfield), Infrastructure Design (portafolio — nada se despliega, RES-02/P7; Won't).
+- **Alcance activo de esta sesión**: hasta Units Generation + Arquitectura Just-in-Time → luego cosecha a `specs/aidlc/`.
+
+## Stage Progress
+### 🔵 INCEPTION PHASE
+- [x] Workspace Detection
+- [x] Reverse Engineering (SKIPPED — greenfield)
+- [x] Requirements Analysis (aprobado 2026-07-06; ajuste RF-27.1 SOAT diferido)
+- [x] User Stories (Gherkin) — aprobado 2026-07-06 (18 historias, 14 fail-closed; ESPERANDO_INFO diferido declarado)
+- [x] Workflow Planning — aprobado 2026-07-06 (Infra Design SKIP firme; docker-compose local = entregable de Code Gen)
+- [x] Application Design — aprobado 2026-07-06 (A/A/A; P2 probado en grafo; 2 notas de endurecimiento anotadas)
+- [x] Units Generation — aprobado 2026-07-06 (5 unidades, DAG verificado, P1/P2 preservados a nivel de import)
+
+**✅ FASE INCEPTION COMPLETA (2026-07-06).** Siguiente: cosecha a `specs/aidlc/` (pendiente aprobación del plan de cosecha).
+
+### 🟢 CONSTRUCTION PHASE — EN CURSO (loop por-unidad)
+**U1 · Fundaciones & Contratos:**
+- [x] Functional Design — aprobado 2026-07-06
+- [x] NFR Requirements — aprobado 2026-07-06
+- [x] NFR Design — aprobado 2026-07-06
+- [x] Infrastructure Design — SKIP prod + dev-env spec, aprobado 2026-07-06
+- [~] Code Generation — Tanda A (Steps 1-3) revisada (code-reviewer limpio, estático); Tandas B/C pendientes
+- [ ] Build and Test — tras todas las unidades (U1-U5)
+
+**U2-U5:** pendientes (cada una repite el loop tras cerrar U1).
+
+### 🟡 OPERATIONS PHASE
+- [ ] Operations — PLACEHOLDER

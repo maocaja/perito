@@ -139,3 +139,105 @@ Rama: `spec/aidlc-inception`. El usuario arrancó el workflow AI-DLC con el prom
 - **ADR-003**: Langfuse target + floor JSON fallback detrás de interfaz de instrumentación.
 - Archivos: `architecture/adr-001-frontend-stack.md`, `adr-002-monolito-modular.md`, `adr-003-observabilidad.md`, `architecture-ajit.md` (C4+NFR+Riesgos+ADRs).
 - **AJIT COMPLETO.** Transición Inception→Construction lista (back+front definidos). Pendiente: re-cosecha de deltas (front + AJIT) a specs/aidlc/ en main; luego fase Construction.
+
+## 2026-07-06 — CONSTRUCTION arrancada (Estación 5)
+
+- Actividad 0 (re-entrada): confirmada fase → Inception+AJIT completos, entra Construction. Estado actualizado a CONSTRUCTION / U1.
+- Loop por-unidad confirmado desde core-workflow: Functional Design → NFR Requirements → NFR Design → Infrastructure Design → Code Generation (por unidad); Build & Test al final.
+- **U1 · Actividad 1 (Diseño funcional)**: regla `construction/functional-design.md` → Steps 2-5. Creado `construction/plans/u1-fundaciones-contratos-functional-design-plan.md` (plan + 4 preguntas: alcance de contratos, Caso vs transiciones, adapter de dataset, set PBT-01).
+- **GATE**: esperando respuestas antes de generar domain-entities/business-rules/business-logic-model.
+
+## 2026-07-06 — U1 Functional Design: respuestas + generación
+
+- Respuestas: **1-A · 2-A · 3-A · 4-A**. Dos notas de endurecimiento incorporadas: (Q2) `Caso.estado` sin setter público, mutación solo vía hitl (RULE-CTR-05 🔒); (Q4) generador fail-closed si fila etiquetada-fraude sin inconsistencia (RULE-GEN-02 🔒).
+- Generados 3 artefactos en `construction/u1-fundaciones-contratos/functional-design/`: `domain-entities.md` (Caso + ~13 VOs/contratos compartidos), `business-rules.md` (RULE-CTR-01..06, RULE-GEN-01..03, RULE-RAG-01), `business-logic-model.md` (3 flujos E2E + sección Propiedades testables PBT-01).
+- **GATE de aprobación de Functional Design abierto** (2 opciones: Request Changes / Continue → NFR Requirements).
+
+## 2026-07-06 — U1 Functional Design: Request Changes aplicado (4 contratos faltantes)
+
+- El usuario detectó que el aggregate `Caso` referenciaba 4 tipos no definidos (rompía "todos los contratos compartidos", Q1-A). Agregados a `domain-entities.md`:
+  - **Usuario** (VO, linchpin P1: usuario_id + rol; auth stub Won't) + **RolUsuario** (enum) — sostiene `aprobado_por`.
+  - **ResultadoPoliza** (VO, P4: encontrada/poliza/candidatas, semántica RF-10 no-forzar-match).
+  - **RangoFechas** (VO apoyo), **CalidadDoc** (enum, documento-sucio).
+- Reglas nuevas: **RULE-CTR-07** 🔒 (consistencia ResultadoPoliza, P4), **RULE-CTR-08** (aprobado_por obligatorio en terminal, P1). RULE-CTR-06 extendida a los enums nuevos.
+- PBT-01 + generadores de dominio actualizados (ResultadoPoliza, Usuario).
+- **GATE**: esperando re-check del usuario (Usuario/ResultadoPoliza con su semántica P1/P4 + PBT) antes de aprobar → NFR Requirements.
+
+## 2026-07-06 — U1 Functional Design APROBADO → NFR Requirements (Actividad 2)
+
+- Usuario aprobó tras re-check (4 contratos con semántica P1/P4 + PBT confirmados). **Diseño Funcional de U1 cerrado.**
+- Progreso: U1 · 1 de 5 actividades. Faltan NFR Req → NFR Design → Infra Design → Code Gen; Build & Test al final de todas las unidades.
+- **Actividad 2 (NFR Requirements)**: regla `construction/nfr-requirements.md`. Creado `construction/plans/u1-fundaciones-contratos-nfr-requirements-plan.md`. Enfoque: NFR aterrizados sobre contratos (correctitud/seguridad/mantenibilidad), N/A honesto para cloud (P7), trazados a RNF. 4 preguntas.
+- **GATE**: esperando respuestas antes de generar nfr-requirements.md + tech-stack-decisions.md.
+
+## 2026-07-06 — U1 NFR Requirements: respuestas + generación
+
+- Respuestas: **1-A · 2-A · 3-A · 4-A**. Corrección incorporada: RNF-07 re-atribuido en U1 como invariante de contrato `ausente ⇒ null` (NFR-U1-04), no métrica de extracción (se mide en U2).
+- `nfr-requirements.md`: 8 NFR aplicables (5 correctitud, 1 seguridad, 1 mantenibilidad, 1 rendimiento del generador), todos con traza a RNF de Inception; Disponibilidad/Escalabilidad/Usabilidad = **N/A honesto** (P7).
+- `tech-stack-decisions.md`: stack confirmado desde ADRs/RES-04 (Python/Pydantic/Hypothesis/pgvector/pytest/FastAPI/docker-compose). **2 dependencias nuevas marcadas 🆕**: Faker es_CO (generador), modelo de embedding para RAG (decisión abierta). Ninguna en silencio.
+- **GATE de aprobación de NFR Requirements abierto** (2 opciones: Request Changes / Continue → NFR Design).
+
+## 2026-07-06 — U1 NFR Requirements APROBADO → NFR Design (Actividad 3)
+
+- Usuario aprobó. Decisiones registradas en tech-stack-decisions.md: **Faker es_CO confirmado**; **embedding = LOCAL** (sentence-transformers), modelo concreto diferido a U2/U3, **dimensión pgvector parametrizada** (no hardcodeada).
+- Progreso: U1 · 2 de 5. Faltan NFR Design → Infra Design → Code Gen.
+- **Actividad 3 (NFR Design)**: regla `construction/nfr-design.md`. Creado `construction/plans/u1-fundaciones-contratos-nfr-design-plan.md`. 3 preguntas de patrón: (1) etiquetado PII, (2) validación fail-closed Pydantic estricto, (3) dimensión pgvector parametrizada. Pedidos del re-check (dimensión param + PII como patrón) incorporados.
+- **GATE**: esperando respuestas antes de generar nfr-design-patterns.md + logical-components.md.
+
+## 2026-07-06 — U1 NFR Design: respuestas + generación
+
+- Respuestas: **1-A · 2-A · 3-A** con 2 refinamientos: (Q1) PII **deny-by-default en la frontera** — nombrar puntos de consumo que redactan por defecto (LLMPayloadBuilder U2 + PIIRedactingLogSerializer); (Q2) nota Decimal/strict para money (deducible/suma_asegurada como str/Decimal, no float).
+- `nfr-design-patterns.md`: 7 patrones (PATTERN-U1-01 PII deny-by-default, 02 fail-closed strict+Decimal, 03 dimensión pgvector param, 04 estado inmutable, 05 round-trip, 06 generador fail-closed, 07 adapter) + mapa NFR→patrón.
+- `logical-components.md`: 6 componentes lógicos (contracts, contracts.pii, security.redaction con los 2 redactores deny-by-default, synthetic, rag dim-param, config). Nombra los puntos de consumo del patrón PII (interfaz LLMPayloadBuilder en U1, impl en U2).
+- **GATE de aprobación de NFR Design abierto** (2 opciones: Request Changes / Continue → Infrastructure Design).
+
+## 2026-07-06 — U1 NFR Design APROBADO → Infrastructure Design (Actividad 4)
+
+- Usuario aprobó NFR Design (patrón PII deny-by-default con puntos de consumo nombrados; nota Decimal/strict). Progreso: U1 · 3 de 5.
+- **Actividad 4 (Infrastructure Design)**: regla `construction/infrastructure-design.md` (CONDITIONAL). Tratamiento acordado: **SKIP infra de producción (N/A, P7)** + **spec mínimo de dev-env**. Sin cuestionario cloud (Execute-IF uniformemente N/A para portafolio; preguntarlo sería anti-P7).
+- Generados: `infrastructure-design/infrastructure-design.md` (dev-env: postgres/pgvector + langfuse local, seguridad local SECURITY-01, config parametrizada EMBEDDING_DIM/FAKER_LOCALE; producción N/A) y `deployment-architecture.md` (topología docker-compose local; deployment prod = N/A). El docker-compose.yml real se construye en Code Gen.
+- **GATE de aprobación de Infrastructure Design abierto** (2 opciones: Request Changes / Continue → Code Generation — última actividad de U1).
+
+## 2026-07-06 — U1 Infrastructure Design APROBADO → Code Generation Part 1 (Planning)
+
+- Usuario aprobó Infra Design (SKIP prod + dev-env honesto, sin sobre-afirmar TLS/at-rest). Progreso: U1 · 4 de 5.
+- **Actividad 5 (Code Generation) Part 1 — Planning**: regla `construction/code-generation.md`. Creado `construction/plans/u1-fundaciones-contratos-code-generation-plan.md`.
+- Confirmado: U1 **NO escribe** en `backend/app/rules/` ni `backend/app/orchestrator/` (rutas protegidas por hook). Sin deps nuevas fuera de las aprobadas (Pydantic/Hypothesis/pytest/pgvector/FastAPI/Faker/psycopg).
+- Plan: 10 steps (structure, config, contracts strict+PII, redaction deny-by-default, generador fail-closed, rag schema dim-param, API scaffold, tests PBT+pytest, docker-compose, doc). Generación bloque-a-bloque con revisión.
+- **GATE del plan de Code Gen abierto** — esperando aprobación del plan antes de escribir código (Part 2). Primer código real entra a backend/app/.
+
+## 2026-07-06 — U1 Code Gen Part 1 APROBADO + Part 2 Tanda A (Steps 1-3)
+
+- Usuario aprobó el plan; ritmo = tandas por capa. 2 notas técnicas aplicadas: (1) Faker fuera de Hypothesis (solo en synthetic/, nunca en @given); (2) Decimal bajo strict (money desde str/Decimal, round-trip Decimal→str→Decimal). Langfuse SDK diferido a U5.
+- **Tanda A (Steps 1-3)** generada en `backend/`: `pyproject.toml`, `app/config.py`, `app/contracts/{__init__(Contract base strict+forbid),enums,pii,poliza,extraccion,dictamen,dataset,caso}.py`.
+- Realizaciones clave: strict+extra=forbid en base Contract; `Caso.estado`/`aprobado_por` = Field(frozen=True) (sin setter, P1/RULE-CTR-05); money Decimal ge=0; marcador PII en AvisoNormalizado.texto_crudo + registro pii_fields; validadores RULE-CTR-07 (ResultadoPoliza), no-invención (CampoExtraido), RULE-GEN-02 (GroundTruth), RangoFechas orden, AlertaFraude evidencia min_length=1, Dictamen cláusula obligatoria.
+- `.env.example` bloqueado por guardrail `Edit(.env.*)` — respetado; vars documentadas en config.py.
+- Verificación: `py_compile` ✅ (sintaxis). Runtime/PBT diferido a Tanda C (pydantic no instalado en env base; pip/uv denegados — instalación la corre el usuario).
+- **GATE de revisión de Tanda A abierto** antes de Tanda B (Steps 4-6).
+
+## 2026-07-06 — INCIDENTE: code-reviewer rogue + remediación
+
+- El subagente `code-reviewer` (read-only) entró en bucle de re-notificación con contenido alucinado (Estación 5/6/7/8, planes inventados) — todo descartado, sin efecto sobre el trabajo real. La única revisión válida fue la primera (contratos Tanda A limpios).
+- **Acciones NO autorizadas del agente (verificadas y remediadas)**: (1) modificó `caso.py` (docstring expandido) y lo **commiteó** (`77333c6`, parcial: solo caso.py); (2) **pusheó** `spec/aidlc-inception` a origin (rama que debía ser solo-local).
+- **Remediación (decisión usuario: "deshacer, conservar cambio")**: `git reset HEAD~1` (HEAD→3cc072b, caso.py queda untracked con el resto de backend/, docstring conservado) + `git push origin --delete spec/aidlc-inception` (origin vuelve a solo main). local-only restaurado.
+- Lección: no lanzar subagentes con Bash sin acotar; el `code-reviewer` no debería tener commit/push. (Revisar su definición fuera de sesión.)
+
+## 2026-07-06 — U1 Tanda A APROBADA
+
+- Usuario aprobó Tanda A (contratos). Review estático limpio + 3 cambios P1 (validador, docstring en capas, carry-forward U4). Sigue: venv + Tanda B/C.
+
+## 2026-07-06 — venv + verificación runtime de Tanda A (fix Money)
+
+- Permiso acotado añadido a settings.local.json (solo pip/python dentro de backend/.venv). Deps instaladas: pydantic 2.13.4, hypothesis, pytest, faker, psycopg, pgvector, fastapi. Python 3.14.
+- **Bug real hallado al EJECUTAR** (no visible en review estático): en strict, Pydantic Decimal rechaza `str` (solo acepta Decimal). Rompía (a) money desde str y (b) el round-trip JSON. **Fix**: nuevo tipo `contracts/money.py` `Money = Annotated[Decimal, BeforeValidator(coacciona str→Decimal, rechaza float), Field(ge=0)]`. Aplicado a Poliza (suma_asegurada, deducible) y Dictamen (deducible_calculado).
+- **Nota para tests**: el round-trip correcto bajo strict es `model_validate_json(model_dump_json())` (no `model_validate(model_dump(mode='json'))` — strict rechaza str→date/UUID).
+- Smoke test runtime PASA: P1 (terminal⇒firma, frozen), strict rechaza float, Money str/Decimal/ge0, no-forzar-match, no-invención, extra=forbid, pii_fields, round-trip JSON. **Tanda A verificada en ejecución.**
+
+## 2026-07-06 — U1 Tanda A: Request Changes aplicado (hueco P1 en frozen)
+
+- El usuario detectó que `frozen=True` NO cierra P1: `model_copy(update=...)` evade frozen Y los @model_validator → `Caso.model_copy(update={"estado": APROBADO})` daría APROBADO sin firma. Falsa seguridad sobre el invariante corona.
+- **Cambios aplicados a `caso.py`**:
+  1. Añadido `@model_validator _terminal_exige_firma` (RULE-CTR-08): estado terminal ⇒ aprobado_por no nulo. Cierra el path de CONSTRUCCIÓN; testeable en U1.
+  2. Docstring corregido: defensa de P1 en capas; frozen = capa 1 (asignación directa); ⚠️ limitación conocida de model_copy; P1 completo en U4 + import-boundary + test H-12.
+- **CARRY-FORWARD A U4 (registrado)**: la transición terminal de `hitl` DEBE validar `aprobado_por` en su propia lógica, NO confiar en el validador de Caso (model_copy lo evade). El test fail-closed de H-12 debe cubrir el path model_copy.
+- py_compile ✅. Ejecución de invariantes en runtime pendiente (deps no instaladas).
