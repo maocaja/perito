@@ -1,6 +1,6 @@
 """Contratos de dictamen y fraude: Dictamen, AlertaFraude, Cotas."""
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.contracts import Contract
 from app.contracts.enums import ResultadoCobertura
@@ -12,15 +12,35 @@ from app.contracts.poliza import Clausula
 class Dictamen(Contract):
     """Dictamen de cobertura. El cálculo (R1-R5) es U3; el contrato es U1.
 
-    RULE-CTR-03: `clausula` es OBLIGATORIA (campo no opcional) — un dictamen
+    RULE-CTR-03: `clausula` es OBLIGATORIA para resultados terminales
+    (CUBIERTO, CUBIERTO_PARCIAL, NO_CUBIERTO) — un dictamen terminal
     sin cláusula es inválido (H-08 🔒, P2/P3).
+    
+    Para REQUIERE_REVISION (escalamiento), clausula puede ser None
+    (no hay cláusula porque pre-validación falló o póliza incompleta).
+    
     RULE-CTR-04: `deducible_calculado` ≥ 0 (Decimal, no float).
     """
 
     resultado: ResultadoCobertura
-    regla_aplicada: str = Field(min_length=1)  # "R1".."R5"
-    clausula: Clausula
+    regla_aplicada: str = Field(min_length=1)  # "R1".."R5", "PRE_MOTOR"
+    clausula: Clausula | None = None  # None solo si REQUIERE_REVISION (validado)
     deducible_calculado: Money
+
+    @model_validator(mode="after")
+    def _clausula_obligatoria_en_terminal(self) -> "Dictamen":
+        """RULE-CTR-03: Resultados terminales exigen cláusula citada (P2/P3 auditabilidad)."""
+        terminales = {
+            ResultadoCobertura.CUBIERTO,
+            ResultadoCobertura.CUBIERTO_PARCIAL,
+            ResultadoCobertura.NO_CUBIERTO
+        }
+        if self.resultado in terminales and self.clausula is None:
+            raise ValueError(
+                f"RULE-CTR-03: resultado terminal '{self.resultado}' exige clausula no-nula "
+                "(P2/P3 auditabilidad: todo dictamen terminal cita la regla y cláusula)"
+            )
+        return self
 
 
 class AlertaFraude(Contract):
