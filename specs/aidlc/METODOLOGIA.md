@@ -41,10 +41,22 @@ verificación → grounding → motor de cobertura → fraude → `LISTO_PARA_AP
 caps de terminación (P4) y trazas de costo/tokens reales, dejando la decisión terminal
 al humano (P1).
 
-## Qué NO se cosechó a `main`
+## Qué NO se cosechó a `main` — y dónde vive
 
-- `.aidlc/` (runtime del framework) y el `CLAUDE.md` que activa AI-DLC — son **proceso, no
-  producto**. `main` mantiene su `CLAUDE.md` agent-ready.
+`main` es el **producto** (código + specs). El **proceso** AI-DLC vive en otro lado:
+
+- **Rama `spec/aidlc-inception`** (tag **`aidlc-process`**): contiene el **runtime del
+  framework** (`.aidlc/`), el `CLAUDE.md` que activa AI-DLC, y el **historial granular**
+  (los ~34 commits paso a paso de la construcción, con los fixes y el teatro que se cazó).
+  En `main` ese trabajo llegó como **una sola cosecha limpia**, no como los 34 commits.
+
+- ⚠️ **Si necesitas VER o ACTUALIZAR el proceso AI-DLC** (los `.aidlc/` rules, el estado del
+  framework, la historia detallada): **ve a la rama `spec/aidlc-inception` / tag
+  `aidlc-process`. NO lo recrees en `main`** — `main` mantiene su `CLAUDE.md` agent-ready y
+  no debe cargar el andamiaje del framework (es proceso, no producto).
+
+- El **producto** (todo `backend/` + `specs/aidlc/`) sí está 100% en `main` — el código es
+  idéntico al de la rama.
 
 ## Lecciones
 
