@@ -5,7 +5,9 @@ CORONA TEST: assert caso_final.estado in {LISTO_PARA_APROBAR, REQUIERE_REVISION}
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
+from datetime import date, timedelta
+from decimal import Decimal
 
 from app.contracts.caso import Caso
 from app.contracts.enums import (
@@ -60,18 +62,57 @@ def cotas_standard():
     )
 
 
-def test_orquestador_happy_path_sin_dictamen(caso_recibido, hitl_service_mock, cotas_standard):
-    """Happy path: caso completa pipeline → LISTO_PARA_APROBAR (all subs None).
-    
-    CORONA TEST: resultado debe ser {LISTO_PARA_APROBAR, REQUIERE_REVISION}
+def _extraccion_consistente():
+    from app.contracts.extraccion import ExtraccionValidada, CampoExtraido, EvidenciaOrigen
+    from app.contracts.enums import TipoOrigen
+    hoy = date.today()
+    def campo(n, v):
+        return CampoExtraido(nombre=n, valor=v, origen=EvidenciaOrigen(tipo=TipoOrigen.SPAN, referencia="s"), confianza=0.9, ausente=False)
+    return ExtraccionValidada(campos=[
+        campo("numero_poliza", "POL-T"), campo("fecha_siniestro", str(hoy)),
+        campo("tipo_siniestro", "AUTO_COLISION"), campo("monto_reclamado", "50000"),
+    ])
+
+
+@pytest.fixture(autouse=True)
+def mock_pipeline():
+    """Mockea los componentes LLM (C2/C3/C6) y siembra una póliza para C4/C5 reales.
+
+    Sin esto, el orquestador haría llamadas LLM reales. Con esto, el pipeline
+    determinístico (C4/C5) corre de verdad y el flujo llega a LISTO_PARA_APROBAR.
+    """
+    from app.contracts.poliza import Poliza, Clausula, RangoFechas
+    from app.contracts.enums import TipoClausula
+    from app.contracts.verificacion import VerificacionAdversarial
+    from app.policy.lookup import set_poliza_store
+
+    hoy = date.today()
+    clausulas = [Clausula(id=i, texto="x", tipo=t, referencia="r") for i, t in [
+        ("V", TipoClausula.VIGENCIA), ("C", TipoClausula.COBERTURA),
+        ("L", TipoClausula.LIMITE), ("D", TipoClausula.DEDUCIBLE)]]
+    pol = Poliza(numero="POL-T", vigencia=RangoFechas(desde=hoy - timedelta(days=365), hasta=hoy + timedelta(days=365)),
+                 coberturas_contratadas=["AUTO_COLISION"], exclusiones=[], suma_asegurada=Decimal("100000"),
+                 deducible=Decimal("1000"), es_soat=False, clausulas=clausulas)
+    set_poliza_store({"POL-T": pol})
+
+    # C3 capa2 NO se mockea: es determinística (sin LLM), corre real para validar la integración.
+    with patch("app.orchestrator.c7.call_c2_extractor", return_value=(_extraccion_consistente(), {"tokens_in": 400, "tokens_out": 100})), \
+         patch("app.orchestrator.c7.call_c3_verifier_capa1", return_value=(VerificacionAdversarial(confianza=0.95, inconsistencias=[], recomendacion="ACEPTA"), {"tokens_in": 300, "tokens_out": 80})), \
+         patch("app.orchestrator.c7.construir_alerta_fraude", return_value=None):
+        yield
+
+
+def test_orquestador_happy_path(caso_recibido, hitl_service_mock, cotas_standard):
+    """Happy path REAL: C2(mock)→C3(mock)→C4(real)→C5(real motor)→C6(mock) → LISTO_PARA_APROBAR.
+
+    El dictamen sale del motor real; la póliza la encuentra C4 real (store sembrado).
     """
     resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
-    
-    # No asserting outcome, just that it's not terminal
-    assert resultado.estado in {
-        EstadoCaso.LISTO_PARA_APROBAR,
-        EstadoCaso.REQUIERE_REVISION
-    }, "CORONA TEST: orquestador debe dejar en {LISTO_PARA_APROBAR, REQUIERE_REVISION}"
+
+    assert resultado.estado == EstadoCaso.LISTO_PARA_APROBAR
+    assert resultado.extraccion is not None and len(resultado.extraccion.campos) == 4
+    assert resultado.poliza_match is not None and resultado.poliza_match.encontrada is True
+    assert resultado.dictamen is not None and resultado.dictamen.resultado == ResultadoCobertura.CUBIERTO_PARCIAL
 
 
 def test_orquestador_nunca_produce_aprobado(caso_recibido, hitl_service_mock, cotas_standard):
@@ -143,3 +184,21 @@ def test_orquestador_fail_closed_on_exception(caso_recibido, hitl_service_mock, 
     # Orquestador should catch and re-raise as RuntimeError
     with pytest.raises(RuntimeError):
         orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+
+
+def test_orquestador_c2_falla_escala(caso_recibido, hitl_service_mock, cotas_standard):
+    """Si C2 (extracción) falla → REQUIERE_REVISION (fail-closed, no inventar)."""
+    from app.llm.extractor import ExtractorError
+    with patch("app.orchestrator.c7.call_c2_extractor", side_effect=ExtractorError("boom")):
+        resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    assert resultado.estado == EstadoCaso.REQUIERE_REVISION
+
+
+def test_orquestador_confianza_baja_escala(caso_recibido, hitl_service_mock, cotas_standard):
+    """Si C3 verificación confianza < umbral → REQUIERE_REVISION (P4 escala, no cierra)."""
+    from app.contracts.verificacion import VerificacionAdversarial
+    with patch("app.orchestrator.c7.call_c3_verifier_capa1",
+               return_value=(VerificacionAdversarial(confianza=0.30, inconsistencias=[], recomendacion="REVISA"),
+                             {"tokens_in": 10, "tokens_out": 5})):
+        resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
+    assert resultado.estado == EstadoCaso.REQUIERE_REVISION

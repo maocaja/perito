@@ -18,12 +18,12 @@ def mock_flat_response_happy():
     return {
         "numero_poliza": "POL-2026-001",
         "fecha_siniestro": "2026-07-05",
-        "monto_siniestro": "5000000",
+        "monto_reclamado": "5000000",
         "tipo_siniestro": "AUTO_COLISION",
         "ausentes": [],
         "numero_poliza_confianza": 0.95,
         "fecha_siniestro_confianza": 0.9,
-        "monto_siniestro_confianza": 0.85,
+        "monto_reclamado_confianza": 0.85,
         "tipo_siniestro_confianza": 0.8,
     }
 
@@ -33,11 +33,11 @@ def mock_flat_response_with_ausentes():
     return {
         "numero_poliza": "POL-2026-001",
         "fecha_siniestro": None,
-        "monto_siniestro": "5000000",
+        "monto_reclamado": "5000000",
         "tipo_siniestro": "AUTO_COLISION",
         "ausentes": ["fecha_siniestro"],
         "numero_poliza_confianza": 0.95,
-        "monto_siniestro_confianza": 0.85,
+        "monto_reclamado_confianza": 0.85,
         "tipo_siniestro_confianza": 0.8,
     }
 
@@ -60,7 +60,7 @@ def test_extractor_maps_flat_json_to_campos(mock_anthropic_class):
     mock_client.messages.create.return_value = mock_response
     
     # Call extractor
-    extraccion = call_c2_extractor("test aviso with POL-2026-001")
+    extraccion, _usage = call_c2_extractor("test aviso with POL-2026-001")
     
     # Verify campos structure
     assert len(extraccion.campos) == 4
@@ -98,7 +98,7 @@ def test_extractor_ausente_implies_valor_none(mock_anthropic_class):
     mock_client.messages.create.return_value = mock_response
     
     # Call extractor
-    extraccion = call_c2_extractor("test aviso")
+    extraccion, _usage = call_c2_extractor("test aviso")
     
     # Verify ausente=True ⇒ valor=None (fail-closed)
     fecha_campo = next((c for c in extraccion.campos if c.nombre == "fecha_siniestro"), None)
@@ -126,7 +126,7 @@ def test_extractor_preserves_confianza_per_field(mock_anthropic_class):
     mock_client.messages.create.return_value = mock_response
     
     # Call extractor
-    extraccion = call_c2_extractor("test aviso")
+    extraccion, _usage = call_c2_extractor("test aviso")
     
     # Verify confianza per field
     poliza = next((c for c in extraccion.campos if c.nombre == "numero_poliza"), None)

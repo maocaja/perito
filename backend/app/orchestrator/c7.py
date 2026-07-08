@@ -15,6 +15,13 @@ from app.contracts.caso import Caso
 from app.contracts.enums import EstadoCaso, ResultadoCobertura
 from app.contracts.dictamen import Cotas
 from app.observability.tracer import Tracer
+from app.config import settings
+from app.security.redaction import redact_pii_spans_es_co
+from app.llm.extractor import call_c2_extractor
+from app.llm.verifier import call_c3_verifier_capa1, call_c3_verifier_capa2
+from app.policy.lookup import call_c4_policy_lookup
+from app.rules.motor_r1_r5 import motor_cobertura
+from app.fraud.fraude import construir_alerta_fraude
 
 
 def orquestar_fnol(
@@ -103,76 +110,98 @@ def orquestar_fnol(
                 break
             snapshot_previo = snapshot_actual
             
-            # --- C2: Extracción (stub) ---
+            # --- C2: Extracción (real, Haiku) ---
             if caso.extraccion is None:
                 try:
-                    # In real implementation: c2_extraccion(caso.aviso)
-                    # For now: stub (tests will mock)
+                    extraccion, usage = call_c2_extractor(caso.aviso.texto_crudo)
+                    caso = caso.model_copy(update={"extraccion": extraccion})
+                    tokens_usados += usage["tokens_in"] + usage["tokens_out"]
                     if tracer:
-                        tracer.emit("c2_extraccion", "Extracción completada (stub)")
-                    pass
+                        tracer.emit("c2_extraccion", "Extracción completada",
+                                    tokens_in=usage["tokens_in"], tokens_out=usage["tokens_out"])
                 except Exception as e:
                     caso = hitl_service.transicionar(
-                        caso,
-                        EstadoCaso.REQUIERE_REVISION,
-                        actor="SISTEMA",
+                        caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
                         motivo=f"Extracción falló: {str(e)}"
                     )
                     if tracer:
                         tracer.emit("c2_extraccion", "Extracción falló", error=str(e))
                     break
-            
-            # --- C4: Policy Lookup (stub) ---
-            if caso.poliza_match is None:
+
+                # --- C3: Verificación adversarial (Sonnet) + consistencia (determinística) ---
                 try:
-                    # In real implementation: c4_policy_lookup(caso.extraccion)
-                    # For now: stub
+                    texto_red = redact_pii_spans_es_co(caso.aviso.texto_crudo)
+                    verif, usage = call_c3_verifier_capa1(caso.extraccion, texto_red)
+                    # Capa 2 agrega señales determinísticas (confianza baja, inconsistencias, campos)
+                    _consistencia, señales = call_c3_verifier_capa2(caso.extraccion, verif)
+                    tokens_usados += usage["tokens_in"] + usage["tokens_out"]
                     if tracer:
-                        tracer.emit("c4_policy_lookup", "Policy lookup completado (stub)")
-                    pass
+                        tracer.emit("c3_verificador", f"confianza={verif.confianza}, señales={len(señales)}",
+                                    tokens_in=usage["tokens_in"], tokens_out=usage["tokens_out"])
+                    if señales:
+                        caso = hitl_service.transicionar(
+                            caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
+                            motivo=f"Verificación escaló: {señales[0].motivo}"
+                        )
+                        break
                 except Exception as e:
                     caso = hitl_service.transicionar(
-                        caso,
-                        EstadoCaso.REQUIERE_REVISION,
-                        actor="SISTEMA",
+                        caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
+                        motivo=f"Verificación falló: {str(e)}"
+                    )
+                    if tracer:
+                        tracer.emit("c3_verificador", "Verificación falló", error=str(e))
+                    break
+            
+            # --- C4: Policy Lookup (real, determinístico) ---
+            if caso.poliza_match is None:
+                try:
+                    resultado_poliza = call_c4_policy_lookup(caso.extraccion)
+                    caso = caso.model_copy(update={"poliza_match": resultado_poliza})
+                    if tracer:
+                        tracer.emit("c4_policy_lookup", f"encontrada={resultado_poliza.encontrada}")
+                except Exception as e:
+                    caso = hitl_service.transicionar(
+                        caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
                         motivo=f"Póliza lookup falló: {str(e)}"
                     )
                     if tracer:
                         tracer.emit("c4_policy_lookup", "Policy lookup falló", error=str(e))
                     break
             
-            # --- C5: Motor Cobertura (stub) ---
+            # --- C5: Motor Cobertura (real, determinístico R1-R5) ---
             if caso.dictamen is None:
                 try:
-                    # In real implementation: c5_motor_cobertura(caso.extraccion, caso.poliza_match.poliza)
-                    # For now: stub
+                    dictamen = motor_cobertura(caso.extraccion, caso.poliza_match)
+                    caso = caso.model_copy(update={"dictamen": dictamen})
                     if tracer:
-                        tracer.emit("c5_motor_cobertura", "Motor ejecutado (stub)")
-                    pass
+                        tracer.emit("c5_motor_cobertura", f"dictamen={dictamen.resultado.value}")
+                    if dictamen.resultado == ResultadoCobertura.REQUIERE_REVISION:
+                        caso = hitl_service.transicionar(
+                            caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
+                            motivo="Motor escaló (dato faltante o póliza no encontrada)"
+                        )
+                        break
                 except Exception as e:
                     caso = hitl_service.transicionar(
-                        caso,
-                        EstadoCaso.REQUIERE_REVISION,
-                        actor="SISTEMA",
+                        caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
                         motivo=f"Motor falló: {str(e)}"
                     )
                     if tracer:
                         tracer.emit("c5_motor_cobertura", "Motor falló", error=str(e))
                     break
             
-            # --- C6: Fraude (stub) ---
-            if caso.alerta_fraude is None:
+            # --- C6: Fraude (real; informativo, NO escala — P1/P6) ---
+            if caso.alerta_fraude is None and caso.poliza_match and caso.poliza_match.poliza:
                 try:
-                    # In real implementation: c6_fraude(caso.extraccion, caso.poliza_match.poliza)
-                    # For now: stub (AlertaFraude optional, can be None)
+                    alerta = construir_alerta_fraude(caso.extraccion, caso.poliza_match.poliza)
+                    caso = caso.model_copy(update={"alerta_fraude": alerta})
                     if tracer:
-                        tracer.emit("c6_fraude", "Fraude verificado (stub)")
-                    pass
+                        tracer.emit("c6_fraude", "Alerta emitida" if alerta else "Sin inconsistencias")
                 except Exception:
-                    # Fraude failures don't escalate; just continue
+                    # Fraude no escala (informativo); solo se registra
                     if tracer:
-                        tracer.emit("c6_fraude", "Fraude verificación silenciosa (no escalada)", error="pass")
-                    pass
+                        tracer.emit("c6_fraude", "Fraude falló (no escala)")
             
             # --- Decision: LISTO_PARA_APROBAR or continue ---
             if caso.dictamen and caso.dictamen.resultado in {

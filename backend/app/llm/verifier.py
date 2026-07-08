@@ -36,7 +36,7 @@ class VerifierError(Exception):
 FLAT_VERIFICATION_SCHEMA = {
     "type": "object",
     "properties": {
-        "confianza": {"type": "number", "minimum": 0, "maximum": 1},
+        "confianza": {"type": "number", "description": "Confianza 0..1"},
         "inconsistencias": {"type": "array", "items": {"type": "string"}},
         "recomendacion": {"type": "string", "enum": ["ACEPTA", "REVISA", "RECHAZA"]},
     },
@@ -48,7 +48,7 @@ FLAT_VERIFICATION_SCHEMA = {
 def call_c3_verifier_capa1(
     extraccion: ExtraccionValidada,
     texto_redactado: str,
-) -> VerificacionAdversarial:
+) -> tuple[VerificacionAdversarial, dict]:
     """
     C3 Capa 1: Adversarial Verification (Sonnet)
     
@@ -137,7 +137,8 @@ Return JSON with: confianza (0-1), inconsistencias (list of field names), recome
             f"Verification mapped: confianza={verificacion.confianza}, "
             f"inconsistencias={len(verificacion.inconsistencias)}"
         )
-        return verificacion
+        usage = {"tokens_in": response.usage.input_tokens, "tokens_out": response.usage.output_tokens}
+        return verificacion, usage
     
     except Exception as e:
         logger.error(f"Verification mapping failed: {str(e)}")
@@ -213,9 +214,9 @@ def call_c3_verifier_capa2(
         else:
             checks["fecha_siniestro_valid"] = False
         
-        # Field: monto_siniestro (P4 consistency)
-        campo_monto = next((c for c in extraccion.campos if c.nombre == "monto_siniestro"), None)
-        checks["monto_siniestro_positive"] = (
+        # Field: monto_reclamado (P4 consistency)
+        campo_monto = next((c for c in extraccion.campos if c.nombre == "monto_reclamado"), None)
+        checks["monto_reclamado_positive"] = (
             campo_monto is not None 
             and not campo_monto.ausente
             and campo_monto.valor is not None 

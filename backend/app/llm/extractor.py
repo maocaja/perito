@@ -34,20 +34,20 @@ FLAT_EXTRACTION_SCHEMA = {
     "properties": {
         "numero_poliza": {"type": ["string", "null"], "description": "Policy number"},
         "fecha_siniestro": {"type": ["string", "null"], "description": "Claim date (YYYY-MM-DD)"},
-        "monto_siniestro": {"type": ["string", "number", "null"], "description": "Claim amount"},
+        "monto_reclamado": {"type": ["string", "number", "null"], "description": "Claim amount"},
         "tipo_siniestro": {"type": ["string", "null"], "description": "Claim type"},
         "ausentes": {"type": "array", "items": {"type": "string"}, "description": "Fields not found"},
-        "numero_poliza_confianza": {"type": "number", "minimum": 0, "maximum": 1},
-        "fecha_siniestro_confianza": {"type": "number", "minimum": 0, "maximum": 1},
-        "monto_siniestro_confianza": {"type": "number", "minimum": 0, "maximum": 1},
-        "tipo_siniestro_confianza": {"type": "number", "minimum": 0, "maximum": 1},
+        "numero_poliza_confianza": {"type": "number", "description": "Confianza 0..1"},
+        "fecha_siniestro_confianza": {"type": "number", "description": "Confianza 0..1"},
+        "monto_reclamado_confianza": {"type": "number", "description": "Confianza 0..1"},
+        "tipo_siniestro_confianza": {"type": "number", "description": "Confianza 0..1"},
     },
     "required": ["ausentes"],
     "additionalProperties": False,
 }
 
 
-def call_c2_extractor(texto_crudo: str) -> ExtraccionValidada:
+def call_c2_extractor(texto_crudo: str) -> tuple[ExtraccionValidada, dict]:
     """
     C2 Extractor: Extract structured data from insurance claim.
     
@@ -132,7 +132,7 @@ def call_c2_extractor(texto_crudo: str) -> ExtraccionValidada:
         ausentes = set(data.get("ausentes", []))
         campos = []
         
-        for nombre in ("numero_poliza", "fecha_siniestro", "monto_siniestro", "tipo_siniestro"):
+        for nombre in ("numero_poliza", "fecha_siniestro", "monto_reclamado", "tipo_siniestro"):
             valor_raw = data.get(nombre)
             esta_ausente = (nombre in ausentes) or (valor_raw is None)
             
@@ -173,7 +173,8 @@ def call_c2_extractor(texto_crudo: str) -> ExtraccionValidada:
     try:
         extraccion = ExtraccionValidada.model_validate(extraccion.model_dump())
         logger.info(f"Extraction validated: {len(extraccion.campos)} campos")
-        return extraccion
+        usage = {"tokens_in": response.usage.input_tokens, "tokens_out": response.usage.output_tokens}
+        return extraccion, usage
     except Exception as e:
         logger.error(f"Final validation failed: {str(e)}")
         raise ExtractorError(f"Validation failed: {str(e)}") from e
