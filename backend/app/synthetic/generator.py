@@ -20,6 +20,7 @@ from app.contracts.enums import (
     CalidadDoc,
     RolUsuario,
     TipoClausula,
+    TipoOrigen,
 )
 from app.contracts.extraccion import AvisoNormalizado, CampoExtraido, ExtraccionValidada, EvidenciaOrigen
 from app.contracts.poliza import Poliza, Clausula, ResultadoPoliza, RangoFechas
@@ -59,7 +60,7 @@ class SyntheticCaseGenerator:
             # RULE-GEN-02: fraude EXIGE inconsistencia encodada en los datos
             # Ejemplo: fecha de siniestro antes de vigencia, o monto > suma_asegurada
             inconsistencia_esperada = EvidenciaOrigen(
-                tipo="SPAN",
+                tipo=TipoOrigen.SPAN,
                 referencia="Fecha siniestro 2023-01-01 es anterior a vigencia 2024-01-01",
             )
 
