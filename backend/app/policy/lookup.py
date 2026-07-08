@@ -14,6 +14,7 @@ import logging
 from typing import Optional
 from difflib import SequenceMatcher
 
+from app.config import settings
 from app.contracts.extraccion import ExtraccionValidada
 from app.contracts.poliza import Poliza, ResultadoPoliza
 
@@ -32,9 +33,32 @@ _POLIZA_STORE: dict[str, Poliza] = {}
 
 
 def set_poliza_store(store: dict[str, Poliza]) -> None:
-    """Set the Poliza repository (for testing with mock data)."""
+    """Setea el repositorio de pólizas. En 'memory' → dict; en 'postgres' → tabla polizas."""
     global _POLIZA_STORE
-    _POLIZA_STORE = store
+    if settings.persistence == "postgres":
+        from sqlalchemy import delete, insert
+        from app.persistence.db import get_engine, init_db, polizas_table
+        eng = get_engine()
+        init_db(eng)
+        with eng.begin() as conn:
+            conn.execute(delete(polizas_table))
+            for numero, p in store.items():
+                conn.execute(insert(polizas_table).values(numero=numero, data=p.model_dump_json()))
+    else:
+        _POLIZA_STORE = store
+
+
+def _polizas_source() -> dict[str, Poliza]:
+    """Fuente activa de pólizas (memoria o Postgres, según settings.persistence). Lógica de lookup intacta."""
+    if settings.persistence == "postgres":
+        from sqlalchemy import select
+        from app.persistence.db import get_engine, init_db, polizas_table
+        eng = get_engine()
+        init_db(eng)
+        with eng.connect() as conn:
+            rows = conn.execute(select(polizas_table.c.data)).all()
+        return {p.numero: p for p in (Poliza.model_validate_json(r[0]) for r in rows)}
+    return _POLIZA_STORE
 
 
 def call_c4_policy_lookup(extraccion: ExtraccionValidada) -> ResultadoPoliza:
@@ -112,7 +136,7 @@ def _lookup_exact(numero_poliza: str) -> Optional[Poliza]:
     In production, replace with:
         SELECT * FROM polizas WHERE numero = %s LIMIT 1
     """
-    return _POLIZA_STORE.get(numero_poliza)
+    return _polizas_source().get(numero_poliza)
 
 
 def _lookup_candidates(numero_poliza: str, limit: int = 5) -> list[Poliza]:
@@ -122,12 +146,13 @@ def _lookup_candidates(numero_poliza: str, limit: int = 5) -> list[Poliza]:
     Deterministic similarity score: SequenceMatcher ratio.
     Returns sorted list, but does NOT promote any to poliza= (Trap 3).
     """
-    if not numero_poliza or not _POLIZA_STORE:
+    polizas = _polizas_source()
+    if not numero_poliza or not polizas:
         return []
 
     # Calculate similarity scores
     scored = []
-    for stored_numero, poliza in _POLIZA_STORE.items():
+    for stored_numero, poliza in polizas.items():
         ratio = SequenceMatcher(None, numero_poliza, stored_numero).ratio()
         if ratio > 0.6:  # Threshold for relevance
             scored.append((ratio, poliza))

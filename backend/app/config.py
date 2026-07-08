@@ -11,6 +11,10 @@ class Settings(BaseSettings):
 
     # U1 Fields (optional for testing)
     database_url: str = Field(default="postgresql://localhost:5432/perito_test")
+
+    # Persistencia (C1) — "memory" (default: tests/demo in-memory) | "postgres" (real, gated).
+    # Con "postgres" el database_url debe incluir sslmode=require (TLS, RNF-15).
+    persistence: str = Field(default="memory")
     faker_locale: str = "es_CO"
     embedding_dim: int | None = Field(default=None, gt=0)
 
