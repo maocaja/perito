@@ -3,23 +3,80 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Perito — {% block title %}Dashboard{% endblock %}</title>
+  <title>Perito · {% block title %}Dashboard{% endblock %}</title>
+  <script>document.documentElement.dataset.theme = localStorage.getItem('perito-theme') || 'light';</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1>Perito · Triage FNOL</h1>
-    <nav>
-      <a href="/casos?rol={{ rol }}">Bandeja</a>
-      <a href="/nuevo?rol={{ rol }}">Nuevo aviso</a>
-      <a href="/panel?rol=CUMPLIMIENTO">Panel de cumplimiento</a>
-      <span class="rol">Rol: <strong>{{ rol }}</strong> <em>(stub, sin auth real — RNF-14)</em></span>
+{% set rol_val = rol|default('ANALISTA') %}
+{% set path = request.url.path %}
+{% set is_bandeja = (path == '/' or path.startswith('/casos')) %}
+{% set is_nuevo = path.startswith('/nuevo') %}
+{% set is_panel = path.startswith('/panel') %}
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="logo">P</div>
+      <div>
+        <div class="brand-name">Perito</div>
+        <div class="brand-sub">Admisión de siniestros</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-group">Operación</div>
+      <a class="nav-item {{ 'active' if is_bandeja }}" href="/casos?rol={{ rol_val }}">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Bandeja de casos
+        {% if nav_total is defined %}<span class="nav-count">{{ nav_total }}</span>{% endif %}
+      </a>
+      <a class="nav-item {{ 'active' if is_nuevo }}" href="/nuevo?rol={{ rol_val }}">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Nuevo aviso
+      </a>
+      <div class="nav-group">Cumplimiento</div>
+      <a class="nav-item {{ 'active' if is_panel }}" href="/panel?rol=CUMPLIMIENTO">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Panel de trazas
+      </a>
     </nav>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  <footer><small>Demo-grade · datos en memoria · sin auth · vitrina de portafolio (P7)</small></footer>
+    <div class="sidebar-foot">
+      <div class="user">
+        <div class="avatar">{{ 'VR' if rol_val == 'ANALISTA' else 'OP' }}</div>
+        <div style="min-width:0">
+          <div style="font-size:12.5px;font-weight:600">{{ 'Valentina Ríos' if rol_val == 'ANALISTA' else 'Óscar Peña' }}</div>
+          <div style="font-size:11px;color:var(--text-3)">Rol · {{ rol_val|capitalize }}</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb"><span class="dim">Perito</span><span class="sep">/</span><span>{% block crumb %}{{ self.title() }}{% endblock %}</span></div>
+      <div class="topbar-right">
+        <div class="pill-status"><span class="dot" style="background:var(--ok)"></span>API · en línea</div>
+        <div class="seg">
+          <a class="{{ 'active' if rol_val == 'ANALISTA' }}" href="/casos?rol=ANALISTA">Analista</a>
+          <a class="{{ 'active' if rol_val == 'CUMPLIMIENTO' }}" href="/panel?rol=CUMPLIMIENTO">Cumplimiento</a>
+        </div>
+        <button class="icon-btn" type="button" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema (claro/oscuro)"><span id="theme-icon" aria-hidden="true">☾</span></button>
+      </div>
+    </header>
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleTheme(){
+    var r=document.documentElement, t=(r.dataset.theme==='dark')?'light':'dark';
+    r.dataset.theme=t; localStorage.setItem('perito-theme',t);
+    document.getElementById('theme-icon').textContent=(t==='dark')?'☀':'☾';
+  }
+  document.getElementById('theme-icon').textContent=(document.documentElement.dataset.theme==='dark')?'☀':'☾';
+</script>
 </body>
 </html>

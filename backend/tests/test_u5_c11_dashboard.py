@@ -120,7 +120,7 @@ def test_p1_rechazar_ok(client):
 def test_panel_200_con_trazas(client):
     r = client.get("/panel")
     assert r.status_code == 200
-    assert r.text.count("export JSON") >= 4   # una traza por caso sembrado
+    assert r.text.count("/panel/export/") >= 4   # un enlace de export por caso sembrado
 
 def test_export_pia_json(client):
     cid = get_caso_repository().list()[0].id

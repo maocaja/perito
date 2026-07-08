@@ -50,13 +50,29 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
             filtro = EstadoCaso(estado)
         except ValueError:
             filtro = None
-    casos = get_caso_repository().list(estado=filtro)
+    repo = get_caso_repository()
+    todos = repo.list()
+    casos = repo.list(estado=filtro)
+
+    # Conteos para los KPIs y los chips (agregación de presentación, no lógica de dominio).
+    def _n(e):
+        return sum(1 for c in todos if c.estado == e)
+    counts = {
+        "total": len(todos),
+        "LISTO_PARA_APROBAR": _n(EstadoCaso.LISTO_PARA_APROBAR),
+        "REQUIERE_REVISION": _n(EstadoCaso.REQUIERE_REVISION),
+        "APROBADO": _n(EstadoCaso.APROBADO),
+        "RECHAZADO": _n(EstadoCaso.RECHAZADO),
+        "fraude_alta": sum(1 for c in todos if c.alerta_fraude and c.alerta_fraude.severidad == "ALTA"),
+    }
+    counts["resueltos"] = counts["APROBADO"] + counts["RECHAZADO"]
+
     return _TEMPLATES.TemplateResponse(request, "bandeja.html", {
         "casos": casos,
-        "estados": [e.value for e in EstadoCaso],
+        "counts": counts,
+        "nav_total": counts["total"],
         "estado_actual": estado or "",
         "rol": rol,
-        "roles": [r.value for r in RolUsuario],
     })
 
 

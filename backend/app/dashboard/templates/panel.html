@@ -1,26 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Panel de cumplimiento{% endblock %}
+{% import "_macros.html" as ui %}
+{% block title %}Panel de trazas{% endblock %}
 {% block content %}
-<h2>Panel de cumplimiento <small>(rol {{ rol }})</small></h2>
-<p><small>Trazas por nodo + costo/tokens desde C9. Métricas agregadas del día: diferidas (Should).</small></p>
-{% for r in replays %}
-<section class="replay">
-  <h3>Caso <code>{{ r.caso_id[:8] }}</code> — {{ r.caso_estado }}
-    · <a href="/panel/export/{{ r.caso_id }}">export JSON (PIA)</a></h3>
-  {% if r.motivo_escalamiento %}<p>Motivo: {{ r.motivo_escalamiento }}</p>{% endif %}
-  <p>Tokens: <strong>{{ r.token_summary.tokens_total }}</strong>
-     (in {{ r.token_summary.tokens_in }} / out {{ r.token_summary.tokens_out }})</p>
-  <table>
-    <thead><tr><th>Nodo</th><th>Resultado</th><th>Tokens (in/out)</th><th>Latencia (ms)</th></tr></thead>
-    <tbody>
-    {% for ev in r.trace_events %}
-      <tr><td>{{ ev.nodo }}</td><td>{{ ev.resultado }}</td>
-          <td>{{ ev.tokens_in }}/{{ ev.tokens_out }}</td><td>{{ ev.latencia_ms }}</td></tr>
+<div class="page-head">
+  <div>
+    <h1 class="title">Panel de trazas</h1>
+    <p class="subtitle">Ejecución del pipeline agéntico por caso · consumo, tokens y guardrails (rol Cumplimiento).</p>
+  </div>
+</div>
+
+{% set ns = namespace(tokens=0, nodos=0) %}
+{% for r in replays %}{% set ns.tokens = ns.tokens + r.token_summary.tokens_total %}{% set ns.nodos = ns.nodos + r.trace_events|length %}{% endfor %}
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Casos trazados</div><div class="kpi-value">{{ replays|length }}</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Tokens consumidos</div><div class="kpi-value">{{ "{:,}".format(ns.tokens) }}</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Nodos ejecutados</div><div class="kpi-value">{{ ns.nodos }}</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Guardrails activos</div><div class="kpi-value">5</div></div>
+</div>
+
+<div class="card" style="padding:15px 18px;margin-bottom:18px">
+  <div class="section-label">Guardrails no negociables</div>
+  <div class="guardrails">
+    {% for g in ['Human-in-the-Loop','Cobertura por reglas (sin LLM)','PII minimizada','Terminación acotada','Trazabilidad completa'] %}
+    <span class="badge k-ok" style="padding:5px 12px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>{{ g }}</span>
     {% endfor %}
-    </tbody>
-  </table>
-</section>
+  </div>
+</div>
+
+{% for r in replays %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head">
+    <span class="mono" style="font-weight:600;font-size:13px">#{{ r.caso_id[:8] }}</span>
+    {{ ui.estado_badge(r.caso_estado) }}
+    <span class="spacer mono" style="font-size:11.5px;color:var(--text-3)">{{ r.token_summary.tokens_total }} tok · in {{ r.token_summary.tokens_in }} / out {{ r.token_summary.tokens_out }}</span>
+    <a class="btn" style="padding:5px 11px;font-size:12px" href="/panel/export/{{ r.caso_id }}">Export JSON (PIA)</a>
+  </div>
+  <div class="tr thead" style="grid-template-columns:34px 1.5fr 1.4fr 120px 90px">
+    <div>#</div><div>Nodo</div><div>Resultado</div><div>Tokens (in/out)</div><div style="text-align:right">Latencia</div>
+  </div>
+  {% for ev in r.trace_events %}
+  <div class="tr" style="grid-template-columns:34px 1.5fr 1.4fr 120px 90px">
+    <div class="mono" style="color:var(--text-3);font-size:12px">{{ loop.index }}</div>
+    <div style="font-weight:600">{{ ev.nodo }}</div>
+    <div class="muted" style="font-size:12.5px">{{ ev.resultado }}</div>
+    <div class="mono muted" style="font-size:12.5px">{{ ev.tokens_in }} / {{ ev.tokens_out }}</div>
+    <div class="mono cell-num" style="color:var(--text-2)">{{ ev.latencia_ms }} ms</div>
+  </div>
+  {% endfor %}
+</div>
 {% else %}
-<p>No hay trazas todavía.</p>
+<div class="card"><div class="card-body muted">No hay trazas todavía.</div></div>
 {% endfor %}
 {% endblock %}
