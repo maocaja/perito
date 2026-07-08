@@ -1,0 +1,146 @@
+"""Tests C11 Dashboard — bandeja, detalle, acciones HITL, panel.
+
+Invariantes verificados: P1 (usuario obligatorio, delega en HITL, terminal solo
+con firma), P5 (aviso redactado en el detalle), estructural (dashboard/ no importa
+rules/orchestrator, no muta caso.estado).
+"""
+
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+import app.dashboard as dashboard_pkg
+from app.main import app
+from app.demo.seed import seed_demo_casos
+from app.dashboard.store import get_caso_repository
+from app.contracts.enums import EstadoCaso
+
+
+@pytest.fixture
+def client():
+    """Re-siembra limpio (store + replay) antes de cada test → aislamiento."""
+    seed_demo_casos()
+    return TestClient(app)
+
+
+def _caso_pendiente():
+    for c in get_caso_repository().list():
+        if c.estado == EstadoCaso.LISTO_PARA_APROBAR:
+            return c
+    raise AssertionError("no hay caso LISTO_PARA_APROBAR sembrado")
+
+
+def _caso_con_pii():
+    for c in get_caso_repository().list():
+        if "1.098.765.432" in c.aviso.texto_crudo:
+            return c
+    raise AssertionError("no hay caso con PII sembrado")
+
+
+# ---------- H-19 Bandeja ----------
+
+def test_bandeja_lista_casos(client):
+    r = client.get("/casos")
+    assert r.status_code == 200
+    assert r.text.count("/casos/") >= 4  # un enlace de detalle por caso
+
+def test_bandeja_filtro_por_estado(client):
+    r = client.get("/casos", params={"estado": "REQUIERE_REVISION"})
+    assert r.status_code == 200
+    assert "REQUIERE_REVISION" in r.text
+
+
+# ---------- H-20 Detalle ----------
+
+def test_detalle_200(client):
+    cid = get_caso_repository().list()[0].id
+    assert client.get(f"/casos/{cid}").status_code == 200
+
+def test_detalle_404_caso_inexistente(client):
+    assert client.get("/casos/no-existe").status_code == 404
+
+def test_detalle_muestra_dictamen_con_clausula(client):
+    """P3: el detalle cita la cláusula del dictamen."""
+    pendiente = _caso_pendiente()
+    html = client.get(f"/casos/{pendiente.id}").text
+    if pendiente.dictamen and pendiente.dictamen.clausula:
+        assert pendiente.dictamen.clausula.id in html
+
+
+# ---------- P5: aviso redactado ----------
+
+def test_p5_aviso_redactado_en_detalle(client):
+    """P5 fail-closed: la cédula cruda NO aparece en el HTML; sí el marcador [REDACTED]."""
+    caso = _caso_con_pii()
+    html = client.get(f"/casos/{caso.id}").text
+    assert "1.098.765.432" not in html   # cédula cruda NO se filtra
+    assert "3115551234" not in html      # celular crudo NO se filtra
+    assert "[REDACTED]" in html          # sí hay redacción
+
+
+# ---------- P1: HITL (usuario obligatorio, delega, terminal con firma) ----------
+
+def test_p1_aprobar_sin_usuario_400(client):
+    cid = _caso_pendiente().id
+    assert client.post(f"/casos/{cid}/aprobar", data={}).status_code == 400
+
+def test_p1_aprobar_usuario_solo_espacios_400(client):
+    """Firma inválida: usuario='   ' (solo espacios) debe rechazarse (P1)."""
+    cid = _caso_pendiente().id
+    assert client.post(f"/casos/{cid}/aprobar", data={"usuario": "   "}).status_code == 400
+
+def test_p1_aprobar_con_usuario_alcanza_terminal(client):
+    cid = _caso_pendiente().id
+    r = client.post(f"/casos/{cid}/aprobar", data={"usuario": "diana.analista"})
+    assert r.status_code == 200
+    caso = get_caso_repository().get(cid)
+    assert caso.estado == EstadoCaso.APROBADO
+    assert caso.aprobado_por == "diana.analista"   # firma humana registrada (P1)
+
+def test_p1_rechazar_sin_usuario_400(client):
+    cid = _caso_pendiente().id
+    assert client.post(f"/casos/{cid}/rechazar", data={"motivo": "x"}).status_code == 400
+
+def test_p1_rechazar_sin_motivo_400(client):
+    cid = _caso_pendiente().id
+    assert client.post(f"/casos/{cid}/rechazar", data={"usuario": "u"}).status_code == 400
+
+def test_p1_rechazar_ok(client):
+    cid = _caso_pendiente().id
+    r = client.post(f"/casos/{cid}/rechazar", data={"usuario": "andres", "motivo": "documentación insuficiente"})
+    assert r.status_code == 200
+    caso = get_caso_repository().get(cid)
+    assert caso.estado == EstadoCaso.RECHAZADO
+    assert caso.aprobado_por == "andres"
+
+
+# ---------- H-21 Panel + export ----------
+
+def test_panel_200_con_trazas(client):
+    r = client.get("/panel")
+    assert r.status_code == 200
+    assert r.text.count("export JSON") >= 4   # una traza por caso sembrado
+
+def test_export_pia_json(client):
+    cid = get_caso_repository().list()[0].id
+    r = client.get(f"/panel/export/{cid}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["caso_id"] == cid
+    assert "trace_events" in body and "token_summary" in body
+
+
+# ---------- Estructural (P1/P2): dashboard passive ----------
+
+def test_dashboard_no_importa_rules_ni_orchestrator():
+    dash_dir = Path(dashboard_pkg.__file__).parent
+    for py in dash_dir.glob("*.py"):
+        src = py.read_text()
+        assert "app.rules" not in src, f"{py.name} importa rules/"
+        assert "app.orchestrator" not in src, f"{py.name} importa orchestrator/"
+
+def test_dashboard_no_muta_estado_directo():
+    dash_dir = Path(dashboard_pkg.__file__).parent
+    for py in dash_dir.glob("*.py"):
+        assert "caso.estado =" not in py.read_text(), f"{py.name} muta caso.estado directo"

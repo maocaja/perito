@@ -1,0 +1,32 @@
+[project]
+name = "perito-backend"
+version = "0.1.0"
+description = "Perito — copiloto agéntico de admisión FNOL (backend). U1: Fundaciones & Contratos."
+requires-python = ">=3.12"
+
+# Dependencias — TODAS confirmadas en Inception (RES-04) / tech-stack-decisions de U1.
+# No se introduce ninguna dep nueva fuera de las aprobadas.
+dependencies = [
+    "pydantic>=2.7",        # contratos tipados strict (H-17, RNF-13)
+    "faker>=25.0",          # generador sintético es_CO (H-16) — SOLO en synthetic/, nunca en tests Hypothesis
+    "psycopg[binary]>=3.1", # driver PostgreSQL
+    "pgvector>=0.2",        # adaptador cliente de la extensión pgvector (RAG, M10)
+    "fastapi>=0.110",       # scaffold API (superficie real en U4)
+    "uvicorn>=0.29",        # server de dev
+    # langfuse: DIFERIDO a U5 — U1 no instrumenta nada; el contenedor va en docker-compose,
+    #           pero el SDK Python no se requiere todavía.
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",          # tests deterministas (rules/testing.md)
+    "hypothesis>=6.100",    # property-based testing (PBT-09, RNF-27)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.hypothesis]
+# Reproducibilidad: seed logueado en fallo (PBT-08 / RNF-26).
+# El perfil de CI se ajusta en U5 (Build & Test).

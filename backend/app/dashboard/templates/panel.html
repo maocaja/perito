@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Panel de cumplimiento{% endblock %}
+{% block content %}
+<h2>Panel de cumplimiento <small>(rol {{ rol }})</small></h2>
+<p><small>Trazas por nodo + costo/tokens desde C9. Métricas agregadas del día: diferidas (Should).</small></p>
+{% for r in replays %}
+<section class="replay">
+  <h3>Caso <code>{{ r.caso_id[:8] }}</code> — {{ r.caso_estado }}
+    · <a href="/panel/export/{{ r.caso_id }}">export JSON (PIA)</a></h3>
+  {% if r.motivo_escalamiento %}<p>Motivo: {{ r.motivo_escalamiento }}</p>{% endif %}
+  <p>Tokens: <strong>{{ r.token_summary.tokens_total }}</strong>
+     (in {{ r.token_summary.tokens_in }} / out {{ r.token_summary.tokens_out }})</p>
+  <table>
+    <thead><tr><th>Nodo</th><th>Resultado</th><th>Tokens (in/out)</th><th>Latencia (ms)</th></tr></thead>
+    <tbody>
+    {% for ev in r.trace_events %}
+      <tr><td>{{ ev.nodo }}</td><td>{{ ev.resultado }}</td>
+          <td>{{ ev.tokens_in }}/{{ ev.tokens_out }}</td><td>{{ ev.latencia_ms }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<p>No hay trazas todavía.</p>
+{% endfor %}
+{% endblock %}
