@@ -9,24 +9,62 @@
   </div>
 </div>
 
-{% set ns = namespace(tokens=0, nodos=0) %}
-{% for r in replays %}{% set ns.tokens = ns.tokens + r.token_summary.tokens_total %}{% set ns.nodos = ns.nodos + r.trace_events|length %}{% endfor %}
+{% set m = metricas %}
+{% set ns = namespace(nodos=0) %}
+{% for r in replays %}{% set ns.nodos = ns.nodos + r.trace_events|length %}{% endfor %}
 
+<!-- MÉTRICAS MEDIDAS (operación) -->
+<div class="section-label" style="margin-bottom:10px">Métricas de operación (medidas)</div>
 <div class="kpi-grid">
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Casos trazados</div><div class="kpi-value">{{ replays|length }}</div></div>
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Tokens consumidos</div><div class="kpi-value">{{ "{:,}".format(ns.tokens) }}</div></div>
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Nodos ejecutados</div><div class="kpi-value">{{ ns.nodos }}</div></div>
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Guardrails activos</div><div class="kpi-value">5</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Casos totales</div><div class="kpi-value">{{ m.total }}</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">% escalado a humano</div><div class="kpi-value">{{ m.pct_escalado }}%</div><div class="kpi-sub">{{ m.escalado }} en REQUIERE_REVISION</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Tokens consumidos</div><div class="kpi-value">{{ "{:,}".format(m.tokens) }}</div><div class="kpi-sub">{{ ns.nodos }} nodos ejecutados</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Costo estimado</div><div class="kpi-value">${{ m.costo_estimado }}</div><div class="kpi-sub">estimado · no facturable</div></div>
 </div>
 
+<!-- DISTRIBUCIÓN -->
 <div class="card" style="padding:15px 18px;margin-bottom:18px">
-  <div class="section-label">Guardrails no negociables</div>
+  <div class="section-label">Distribución</div>
+  <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+    <div>
+      <div class="cell-sub" style="margin-bottom:7px">Por estado</div>
+      <div class="guardrails">
+        {% for est, n in m.por_estado.items() if n > 0 %}<span style="display:inline-flex;align-items:center;gap:5px">{{ ui.estado_badge(est) }}<span class="mono cell-sub">{{ n }}</span></span>{% endfor %}
+      </div>
+    </div>
+    <div>
+      <div class="cell-sub" style="margin-bottom:7px">Por dictamen</div>
+      <div class="guardrails">
+        {% for d, n in m.por_dictamen.items() %}<span style="display:inline-flex;align-items:center;gap:5px">{{ ui.dict_badge(d) }}<span class="mono cell-sub">{{ n }}</span></span>{% else %}<span class="cell-sub">—</span>{% endfor %}
+      </div>
+    </div>
+    <div>
+      <div class="cell-sub" style="margin-bottom:7px">Fraude</div>
+      <div class="guardrails">
+        {% for sev, n in m.fraude.items() %}<span style="display:inline-flex;align-items:center;gap:5px">{{ ui.fraude_badge(sev) }}<span class="mono cell-sub">{{ n }}</span></span>{% else %}<span class="cell-sub">sin alertas</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GARANTÍAS (invariantes, NO métricas medidas) -->
+<div class="card" style="padding:15px 18px;margin-bottom:18px">
+  <div class="section-label">Garantías (invariantes verificadas por validador/tests — no medición)</div>
   <div class="guardrails">
-    {% for g in ['Human-in-the-Loop','Cobertura por reglas (sin LLM)','PII minimizada','Terminación acotada','Trazabilidad completa'] %}
-    <span class="badge k-ok" style="padding:5px 12px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>{{ g }}</span>
+    {% set sellos = [
+      'Dictámenes terminales con cláusula: ' ~ m.clausula_ok ~ '/' ~ m.clausula_total ~ ' (RULE-CTR-03)',
+      'Terminación dentro de cotas (P4) — aserción en evals (RNF-09)',
+      'Human-in-the-Loop, decide el humano (P1)',
+      'Cobertura por reglas, no LLM (P2)',
+      'PII minimizada (P5)',
+    ] %}
+    {% for s in sellos %}
+    <span class="badge k-ok" style="padding:5px 12px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>{{ s }}</span>
     {% endfor %}
   </div>
 </div>
+
+<div class="section-label" style="margin-bottom:10px">Trazas por caso</div>
 
 {% for r in replays %}
 <div class="card" style="margin-bottom:16px">
