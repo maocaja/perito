@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from app.contracts.enums import EstadoCaso, RolUsuario
+from app.contracts.enums import EstadoCaso, ResultadoCobertura, RolUsuario
 from app.security.redaction import redact_pii_spans_es_co
 from app.hitl.c8 import aprobar as hitl_aprobar, rechazar as hitl_rechazar
 from app.observability.replay import get_replay_store
@@ -22,6 +22,49 @@ from app.dashboard.store import get_caso_repository
 
 router = APIRouter(tags=["dashboard"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# Tasa blended ESTIMADA (Haiku ~$1/$5, Sonnet ~$3/$15 in/out por 1M) — NO facturable, solo orientativa.
+COSTO_USD_POR_1M_TOKENS = 8.0
+_TERMINAL_COBERTURA = {ResultadoCobertura.CUBIERTO, ResultadoCobertura.CUBIERTO_PARCIAL, ResultadoCobertura.NO_CUBIERTO}
+
+
+def _calcular_metricas(casos, replays) -> dict:
+    """Agregación de presentación (H-21) — cuenta campos YA calculados (passive, cero dominio, cero PII).
+
+    Separa MÉTRICAS MEDIDAS (operación) de GARANTÍAS (invariantes verificadas por validador/tests).
+    Robusto ante 0 casos (sin división por cero).
+    """
+    total = len(casos)
+    por_estado = {e.value: sum(1 for c in casos if c.estado == e) for e in EstadoCaso}
+    por_dictamen: dict[str, int] = {}
+    for c in casos:
+        if c.dictamen:
+            k = c.dictamen.resultado.value
+            por_dictamen[k] = por_dictamen.get(k, 0) + 1
+    fraude: dict[str, int] = {}
+    for c in casos:
+        if c.alerta_fraude:
+            fraude[c.alerta_fraude.severidad] = fraude.get(c.alerta_fraude.severidad, 0) + 1
+
+    escalado = por_estado.get(EstadoCaso.REQUIERE_REVISION.value, 0)
+    tokens = sum((r.get("token_summary") or {}).get("tokens_total", 0) for r in replays)
+
+    # GARANTÍA (no métrica): dictámenes terminales de cobertura que citan cláusula (RULE-CTR-03).
+    terminales = [c for c in casos if c.dictamen and c.dictamen.resultado in _TERMINAL_COBERTURA]
+    clausula_ok = sum(1 for c in terminales if c.dictamen.clausula is not None)
+
+    return {
+        "total": total,
+        "por_estado": por_estado,
+        "por_dictamen": por_dictamen,
+        "fraude": fraude,
+        "escalado": escalado,
+        "pct_escalado": round(100 * escalado / total) if total else 0,
+        "tokens": tokens,
+        "costo_estimado": round(tokens / 1_000_000 * COSTO_USD_POR_1M_TOKENS, 4),
+        "clausula_ok": clausula_ok,
+        "clausula_total": len(terminales),
+    }
 
 
 def _detalle_context(caso, rol: str) -> dict:
@@ -115,11 +158,11 @@ def rechazar(request: Request, caso_id: str, usuario: Optional[str] = Form(None)
 
 @router.get("/panel", response_class=HTMLResponse)
 def panel(request: Request, rol: str = Query(RolUsuario.CUMPLIMIENTO.value)):
-    """H-21 básico: trazas por nodo + tokens/costo desde C9 (ReplayStore)."""
+    """H-21: métricas agregadas de cumplimiento + trazas por nodo/tokens desde C9 (ReplayStore)."""
     store = get_replay_store()
-    replays = [store.load(cid) for cid in store.get_all_cases()]
-    replays = [r for r in replays if r is not None]
-    return _TEMPLATES.TemplateResponse(request, "panel.html", {"replays": replays, "rol": rol})
+    replays = [r for r in (store.load(cid) for cid in store.get_all_cases()) if r is not None]
+    metricas = _calcular_metricas(get_caso_repository().list(), replays)
+    return _TEMPLATES.TemplateResponse(request, "panel.html", {"replays": replays, "rol": rol, "metricas": metricas})
 
 
 @router.get("/panel/export/{caso_id}")

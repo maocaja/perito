@@ -131,6 +131,27 @@ def test_export_pia_json(client):
     assert "trace_events" in body and "token_summary" in body
 
 
+# ---------- F2 Métricas del panel (H-21) ----------
+
+def test_panel_metricas_render(client):
+    """El panel muestra las métricas de operación + las garantías (separadas, P7)."""
+    r = client.get("/panel")
+    assert r.status_code == 200
+    assert "Métricas de operación" in r.text
+    assert "Garantías" in r.text and "RULE-CTR-03" in r.text
+    assert "estimado" in r.text  # costo rotulado como estimado (no facturable)
+    total = len(get_caso_repository().list())
+    assert str(total) in r.text  # el KPI de casos totales
+
+
+def test_panel_metricas_cero_casos_no_rompe(client):
+    """H-21 robustez: con 0 casos el panel NO rompe (sin ZeroDivisionError)."""
+    get_caso_repository().clear()
+    r = client.get("/panel")
+    assert r.status_code == 200
+    assert "0%" in r.text  # pct_escalado con 0 casos, sin crash
+
+
 # ---------- Estructural (P1/P2): dashboard passive ----------
 
 def test_dashboard_no_importa_rules_ni_orchestrator():
