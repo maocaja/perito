@@ -27,6 +27,15 @@ dist/
 *.log
 .langfuse/
 
+# Agent skills instalados por npx (tooling local, no producto — re-instalar con
+# `npx skills add vercel-labs/agent-skills`). No vendorizar en el repo.
+.agents/
+skills-lock.json
+.claude/skills/vercel-*
+.claude/skills/web-design-guidelines
+.claude/skills/writing-guidelines
+.claude/skills/deploy-to-vercel
+
 # OS / IDE
 .DS_Store
 .idea/
