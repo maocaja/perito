@@ -1,70 +1,127 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
 {% block title %}Caso {{ caso.id[:8] }}{% endblock %}
 {% block content %}
-<a href="/casos?rol={{ rol }}">← Bandeja</a>
-<h2>Caso <code>{{ caso.id[:8] }}</code> — <span class="estado estado-{{ caso.estado.value }}">{{ caso.estado.value }}</span></h2>
+<a class="btn-back" href="/casos?rol={{ rol }}">← Volver a la bandeja</a>
 
-<section>
-  <h3>Aviso <small>(redactado — P5)</small></h3>
-  <p class="aviso">{{ aviso_redactado }}</p>
-  <small>Calidad: {{ caso.aviso.calidad.value }}</small>
-</section>
+<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+  <div>
+    <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+      <h1 class="title mono">#{{ caso.id[:8] }}</h1>
+      {{ ui.estado_badge(caso.estado.value, lg=true) }}
+    </div>
+    <p class="subtitle">{{ ui.campo_valor(caso.extraccion,'tipo_siniestro') }} · Póliza
+      <span class="mono" style="color:var(--text)">{{ ui.campo_valor(caso.extraccion,'numero_poliza') }}</span>
+      · actualizado {{ caso.timestamp_actualizacion.strftime("%d/%m/%Y %H:%M") }}</p>
+  </div>
+</div>
 
-{% if caso.extraccion %}
-<section>
-  <h3>Extracción <small>(campo → origen — P3)</small></h3>
-  <table>
-    <thead><tr><th>Campo</th><th>Valor</th><th>Origen</th><th>Confianza</th></tr></thead>
-    <tbody>
-    {% for cx in caso.extraccion.campos %}
-      <tr>
-        <td>{{ cx.nombre }}</td>
-        <td>{% if cx.ausente %}<em>ausente</em>{% else %}{{ cx.valor }}{% endif %}</td>
-        <td>{% if cx.origen %}<code>{{ cx.origen.tipo.value }}:{{ cx.origen.referencia }}</code>{% else %}—{% endif %}</td>
-        <td>{{ cx.confianza if cx.confianza is not none else "—" }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</section>
-{% endif %}
+<div class="detalle-grid">
+  <!-- COLUMNA IZQUIERDA -->
+  <div class="col">
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--text-3);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+        <h2>Aviso recibido</h2>
+        <span class="redacted-tag spacer">PII redactada (P5)</span>
+        <span class="mono" style="font-size:11.5px;color:var(--text-3)">calidad: {{ caso.aviso.calidad.value }}</span>
+      </div>
+      <div class="aviso-text">{{ aviso_redactado }}</div>
+    </section>
 
-{% if caso.dictamen %}
-<section>
-  <h3>Dictamen de cobertura</h3>
-  <p><strong>{{ caso.dictamen.resultado.value }}</strong> · regla {{ caso.dictamen.regla_aplicada }}
-     · deducible calculado {{ caso.dictamen.deducible_calculado }}</p>
-  {% if caso.dictamen.clausula %}
-  <p>Cláusula citada: <code>{{ caso.dictamen.clausula.id }}</code> — {{ caso.dictamen.clausula.texto }}
-     ({{ caso.dictamen.clausula.referencia }})</p>
-  {% endif %}
-</section>
-{% endif %}
+    {% if caso.extraccion %}
+    <section class="card accent">
+      <div class="card-head brand">
+        <span style="color:var(--brand);display:flex"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
+        <h2 style="color:var(--brand-strong)">Extracción verificable · campo → origen</h2>
+      </div>
+      <div class="ex-head"><div>Campo extraído</div><div>Evidencia en el aviso</div><div style="text-align:right">Confianza</div></div>
+      {% for cx in caso.extraccion.campos %}
+      <div class="ex-row">
+        <div><div class="ex-campo">{{ cx.nombre }}</div><div class="ex-valor">{% if cx.ausente %}<span class="muted" style="font-style:italic">ausente</span>{% else %}{{ cx.valor }}{% endif %}</div></div>
+        <div class="ex-origen">{% if cx.origen %}“{{ cx.origen.referencia }}”{% else %}<span class="muted" style="font-style:normal">sin origen (campo ausente)</span>{% endif %}</div>
+        <div>
+          {% if cx.confianza is not none %}
+          {% set pct = (cx.confianza * 100)|round|int %}
+          {% set ck = 'ok' if cx.confianza >= 0.9 else ('warn' if cx.confianza >= 0.7 else 'bad') %}
+          <div class="conf" style="color:var(--{{ ck }})">{{ "%.2f"|format(cx.confianza) }}</div>
+          <div class="conf-bar"><span style="width:{{ pct }}%;background:var(--{{ ck }})"></span></div>
+          {% else %}<div class="conf muted">—</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      <div class="card-foot">Cada campo enlaza a su fragmento de origen (P3). Un segundo modelo verifica concordancia antes de habilitar la decisión.</div>
+    </section>
+    {% endif %}
+  </div>
 
-{% if caso.alerta_fraude %}
-<section class="alerta">
-  <h3>⚠ Alerta de fraude — severidad {{ caso.alerta_fraude.severidad }}</h3>
-  <p>{{ caso.alerta_fraude.explicacion }}</p>
-  <ul>{% for inc in caso.alerta_fraude.inconsistencias %}<li>{{ inc.tipo.value }}: {{ inc.referencia }}</li>{% endfor %}</ul>
-</section>
-{% endif %}
+  <!-- COLUMNA DERECHA -->
+  <div class="col">
+    {% if caso.dictamen %}
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--text-3);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg></span>
+        <h2>Dictamen de cobertura</h2>
+        <span class="tag spacer">motor de reglas · {{ caso.dictamen.regla_aplicada }}</span>
+      </div>
+      <div class="card-body">
+        {{ ui.dict_badge(caso.dictamen.resultado.value, lg=true) }}
+        {% if caso.dictamen.clausula %}
+        <div class="clausula-box">
+          <div class="clausula-label">Cláusula citada</div>
+          <div style="font-size:12.5px;line-height:1.6;color:var(--text-2)"><span class="mono" style="color:var(--text);font-weight:600">{{ caso.dictamen.clausula.id }} · {{ caso.dictamen.clausula.texto }}.</span> {{ caso.dictamen.clausula.referencia }}</div>
+        </div>
+        {% endif %}
+        <div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">Deducible calculado: <span class="mono" style="color:var(--text)">{{ caso.dictamen.deducible_calculado }}</span></div>
+      </div>
+    </section>
+    {% endif %}
 
-{% if caso.motivo_escalamiento %}<p class="motivo">Motivo de escalamiento: {{ caso.motivo_escalamiento }}</p>{% endif %}
-{% if caso.aprobado_por %}<p class="firma">Decisión registrada por: <strong>{{ caso.aprobado_por }}</strong></p>{% endif %}
+    {% if caso.alerta_fraude %}
+    <section class="card warnborder">
+      <div class="card-head">
+        <span style="color:var(--warn);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+        <h2>Alerta de fraude</h2>
+        <span class="spacer">{{ ui.fraude_badge(caso.alerta_fraude.severidad) }}</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:12.5px;color:var(--text-2);margin-bottom:10px">{{ caso.alerta_fraude.explicacion }}</p>
+        <div class="stack">
+          {% for inc in caso.alerta_fraude.inconsistencias %}
+          <div class="line"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span style="color:var(--text-2)">{{ inc.referencia }}</span></div>
+          {% endfor %}
+        </div>
+        <p class="hint" style="margin-top:10px">El fraude solo sugiere revisión (P6) — nunca bloquea ni decide.</p>
+      </div>
+    </section>
+    {% endif %}
 
-{% if caso.estado.value not in ["APROBADO", "RECHAZADO"] %}
-<section class="acciones">
-  <h3>Decisión humana <small>(P1 — el sistema no decide, solo prepara)</small></h3>
-  <form method="post" action="/casos/{{ caso.id }}/aprobar">
-    <input type="text" name="usuario" placeholder="usuario (firma)" required>
-    <button type="submit">Aprobar</button>
-  </form>
-  <form method="post" action="/casos/{{ caso.id }}/rechazar">
-    <input type="text" name="usuario" placeholder="usuario (firma)" required>
-    <input type="text" name="motivo" placeholder="motivo" required>
-    <button type="submit">Rechazar</button>
-  </form>
-  <p><small>"Corregir" diferido (Should).</small></p>
-</section>
-{% endif %}
+    <section class="card accent">
+      <div class="card-head brand">
+        <span style="color:var(--brand);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg></span>
+        <span style="font-size:12px;font-weight:600;color:var(--brand-strong)">Decisión humana requerida</span>
+      </div>
+      <div class="card-body">
+        {% if caso.aprobado_por %}
+        <p style="font-size:12.5px;color:var(--text-2)">Decisión registrada por
+          <strong class="mono" style="color:var(--text)">{{ caso.aprobado_por }}</strong>.</p>
+        {% if caso.motivo_escalamiento %}<p class="hint" style="margin-top:8px">{{ caso.motivo_escalamiento }}</p>{% endif %}
+        {% elif caso.estado.value in ['APROBADO','RECHAZADO'] %}
+        <p class="hint">Caso {{ caso.estado.value|lower }}.</p>
+        {% else %}
+        <p class="hint" style="margin-bottom:14px">El copiloto preparó el caso pero <strong style="color:var(--text-2)">no decide</strong>. La aprobación o el rechazo es responsabilidad del analista (firma obligatoria, P1).</p>
+        <form method="post" action="/casos/{{ caso.id }}/aprobar">
+          <input class="input" type="text" name="usuario" placeholder="Tu usuario (firma)" aria-label="Tu usuario (firma) para aprobar" autocomplete="username" required>
+          <button class="btn btn-ok btn-block" style="margin-top:9px" type="submit">Aprobar dictamen</button>
+        </form>
+        <form method="post" action="/casos/{{ caso.id }}/rechazar" style="margin-top:12px">
+          <input class="input" type="text" name="usuario" placeholder="Tu usuario (firma)" aria-label="Tu usuario (firma) para rechazar" autocomplete="username" required style="margin-bottom:8px">
+          <input class="input" type="text" name="motivo" placeholder="Motivo del rechazo" aria-label="Motivo del rechazo" required>
+          <button class="btn btn-danger btn-block" style="margin-top:9px" type="submit">Rechazar</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
 {% endblock %}

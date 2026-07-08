@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Nuevo aviso{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="title">Nuevo aviso de siniestro</h1>
+    <p class="subtitle">Ingresa un aviso o carga un escenario de demostración para iniciar el análisis agéntico.</p>
+  </div>
+</div>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<div style="max-width:820px">
+  <div style="margin-bottom:18px">
+    <div class="section-label">Escenarios de demostración · determinísticos, sin LLM</div>
+    <div class="presets">
+      {% set dots = {'feliz':'info','fraude':'bad','cobertura-negativa':'warn','no-encontrada':'neutral'} %}
+      {% for esc, label in presets.items() %}
+      <form method="post" action="/nuevo/preset/{{ esc }}" style="display:inline">
+        <input type="hidden" name="rol" value="{{ rol }}">
+        <button class="preset" type="submit"><span class="sq" style="background:var(--{{ dots.get(esc,'neutral') }})"></span>{{ label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+
+  <form method="post" action="/nuevo" class="card" style="padding:20px">
+    <input type="hidden" name="rol" value="{{ rol }}">
+    <label class="field-label" for="aviso_texto">Texto del aviso <span class="hint" style="font-weight:400">· procesado por los agentes reales (Haiku + Sonnet)</span></label>
+    <textarea class="textarea" id="aviso_texto" name="aviso_texto" maxlength="{{ max_chars }}"
+      placeholder="Ej: Choque AUTO_COLISION, póliza POL-100, fecha 2025-06-15, daños por $5.000.000."></textarea>
+    <div class="form-actions">
+      <span class="hint">Requiere <code>ANTHROPIC_API_KEY</code> en el server · ~10s · máx {{ max_chars }} caracteres · la cobertura la decide el motor (P2), nunca el LLM.</span>
+      <button class="btn btn-primary" type="submit" style="margin-left:auto"><span class="dot" style="background:#fff;opacity:.9"></span>Iniciar análisis agéntico</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.dashboard.c11 import router as dashboard_router
+from app.api.ingest import router as ingest_router
 from app.demo.seed import seed_demo_casos
 
 _STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
     app.include_router(dashboard_router)
+    app.include_router(ingest_router)
 
     @app.get("/health", tags=["system"])
     def health_check() -> dict[str, str]:

@@ -1,33 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Bandeja{% endblock %}
+{% import "_macros.html" as ui %}
+{% block title %}Bandeja de casos{% endblock %}
 {% block content %}
-<h2>Bandeja de casos</h2>
-<form method="get" action="/casos">
-  <input type="hidden" name="rol" value="{{ rol }}">
-  <label>Filtrar por estado:
-    <select name="estado" onchange="this.form.submit()">
-      <option value="">— todos —</option>
-      {% for e in estados %}
-      <option value="{{ e }}" {% if e == estado_actual %}selected{% endif %}>{{ e }}</option>
-      {% endfor %}
-    </select>
-  </label>
-</form>
-<table>
-  <thead><tr><th>ID</th><th>Estado</th><th>Dictamen</th><th>Fraude</th><th>Actualizado</th><th></th></tr></thead>
-  <tbody>
-  {% for c in casos %}
-    <tr>
-      <td><code>{{ c.id[:8] }}</code></td>
-      <td><span class="estado estado-{{ c.estado.value }}">{{ c.estado.value }}</span></td>
-      <td>{{ c.dictamen.resultado.value if c.dictamen else "—" }}</td>
-      <td>{{ "⚠" if c.alerta_fraude else "" }}</td>
-      <td>{{ c.timestamp_actualizacion.strftime("%Y-%m-%d %H:%M") }}</td>
-      <td><a href="/casos/{{ c.id }}?rol={{ rol }}">Ver</a></td>
-    </tr>
-  {% else %}
-    <tr><td colspan="6">No hay casos.</td></tr>
+<div class="page-head">
+  <div>
+    <h1 class="title">Bandeja de casos</h1>
+    <p class="subtitle">Siniestros procesados por el copiloto, listos para decisión humana.</p>
+  </div>
+  <a class="btn btn-primary" href="/nuevo?rol={{ rol }}" style="margin-left:auto"><span style="font-size:16px;line-height:1">+</span>Nuevo aviso</a>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-top"><span class="kpi-label">Listos para aprobar</span><span class="kpi-icon k-info"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span></div>
+    <div class="kpi-value">{{ counts.LISTO_PARA_APROBAR }}</div><div class="kpi-sub">esperan decisión</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-top"><span class="kpi-label">Requieren revisión</span><span class="kpi-icon k-warn"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
+    <div class="kpi-value">{{ counts.REQUIERE_REVISION }}</div><div class="kpi-sub">datos incompletos</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-top"><span class="kpi-label">Fraude alta</span><span class="kpi-icon k-bad"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><line x1="12" y1="9" x2="12" y2="12.5"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
+    <div class="kpi-value">{{ counts.fraude_alta }}</div><div class="kpi-sub">señales críticas</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-top"><span class="kpi-label">Resueltos</span><span class="kpi-icon k-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg></span></div>
+    <div class="kpi-value">{{ counts.resueltos }}</div><div class="kpi-sub">aprobados o rechazados</div>
+  </div>
+</div>
+
+<div class="chips">
+  <span class="chips-label">Estado</span>
+  <a class="chip {{ 'active' if not estado_actual }}" href="/casos?rol={{ rol }}">Todos <span class="n">{{ counts.total }}</span></a>
+  {% for est, lbl in [('LISTO_PARA_APROBAR','Listo p/ aprobar'),('REQUIERE_REVISION','Requiere revisión'),('APROBADO','Aprobado'),('RECHAZADO','Rechazado')] %}
+  <a class="chip {{ 'active' if estado_actual == est }}" href="/casos?estado={{ est }}&rol={{ rol }}">{{ lbl }} <span class="n">{{ counts[est] }}</span></a>
   {% endfor %}
-  </tbody>
-</table>
+</div>
+
+<div class="table">
+  <div class="tr thead grid-bandeja">
+    <div>Caso</div><div>Siniestro</div><div>Póliza</div><div>Estado</div><div>Dictamen</div><div>Fraude</div><div style="text-align:right">Monto</div>
+  </div>
+  {% for c in casos %}
+  <a class="tr row-link grid-bandeja" href="/casos/{{ c.id }}?rol={{ rol }}">
+    <div class="cell-id">#{{ c.id[:8] }}</div>
+    <div style="min-width:0">
+      <div class="cell-strong">{{ ui.campo_valor(c.extraccion,'tipo_siniestro') }}</div>
+      <div class="cell-sub">{{ ui.campo_valor(c.extraccion,'fecha_siniestro') }}</div>
+    </div>
+    <div class="muted mono" style="font-size:12px">{{ ui.campo_valor(c.extraccion,'numero_poliza') }}</div>
+    <div>{{ ui.estado_badge(c.estado.value) }}</div>
+    <div>{% if c.dictamen %}{{ ui.dict_badge(c.dictamen.resultado.value) }}{% else %}<span class="cell-sub">—</span>{% endif %}</div>
+    <div>{% if c.alerta_fraude %}{{ ui.fraude_badge(c.alerta_fraude.severidad) }}{% else %}<span class="cell-sub">—</span>{% endif %}</div>
+    <div class="cell-num">${{ ui.campo_valor(c.extraccion,'monto_reclamado') }}</div>
+  </a>
+  {% else %}
+  <div class="tr"><div class="muted" style="padding:8px 0">No hay casos en este filtro.</div></div>
+  {% endfor %}
+</div>
 {% endblock %}

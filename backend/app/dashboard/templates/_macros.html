@@ -1,0 +1,24 @@
+{# Badges semánticos — mapean estado/dictamen/fraude a los kinds del design system
+   (equivalente a estadoMeta/dictMeta/fraudeMeta del diseño original). #}
+
+{% macro estado_badge(estado, lg=false) %}
+{%- set k = {'LISTO_PARA_APROBAR':'info','REQUIERE_REVISION':'warn','APROBADO':'ok','RECHAZADO':'bad','RECIBIDO':'neutral','EN_PROCESO':'neutral'}.get(estado,'neutral') -%}
+{%- set l = {'LISTO_PARA_APROBAR':'Listo p/ aprobar','REQUIERE_REVISION':'Requiere revisión','APROBADO':'Aprobado','RECHAZADO':'Rechazado','RECIBIDO':'Recibido','EN_PROCESO':'En proceso'}.get(estado,estado) -%}
+<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ l }}</span>
+{%- endmacro %}
+
+{% macro dict_badge(resultado, lg=false) %}
+{%- set k = {'CUBIERTO':'ok','CUBIERTO_PARCIAL':'warn','NO_CUBIERTO':'bad','REQUIERE_REVISION':'warn'}.get(resultado,'neutral') -%}
+{%- set l = {'CUBIERTO':'Cubierto','CUBIERTO_PARCIAL':'Cubierto parcial','NO_CUBIERTO':'No cubierto','REQUIERE_REVISION':'Requiere revisión'}.get(resultado,resultado) -%}
+<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ l }}</span>
+{%- endmacro %}
+
+{% macro fraude_badge(severidad) %}
+{%- set k = {'BAJA':'neutral','MEDIA':'warn','ALTA':'bad'}.get(severidad,'neutral') -%}
+<span class="badge k-{{ k }}"><span class="dot"></span>{{ severidad|capitalize }}</span>
+{%- endmacro %}
+
+{# Extrae el valor de un campo de la extracción por nombre. #}
+{% macro campo_valor(extraccion, nombre) %}
+{%- if extraccion -%}{%- for c in extraccion.campos -%}{%- if c.nombre == nombre -%}{{ c.valor if c.valor is not none else '—' }}{%- endif -%}{%- endfor -%}{%- else -%}—{%- endif -%}
+{%- endmacro %}
