@@ -59,7 +59,7 @@ def _poliza(numero, coberturas=("AUTO_COLISION",), suma="100000000", deducible="
 # Pólizas sembradas — POL-999 NO se siembra a propósito (escenario "no encontrada").
 set_poliza_store({
     "POL-100": _poliza("POL-100"),
-    "POL-200": _poliza("POL-200"),
+    "POL-200": _poliza("POL-200", suma="10000000"),  # suma 10M → el reclamo de 15M la excede (fraude)
     "POL-300": _poliza("POL-300", coberturas=("AUTO_COLISION",)),  # NO cubre HOGAR_AGUA
 })
 
@@ -68,7 +68,7 @@ ESCENARIOS = [
      f"Reporto un choque AUTO_COLISION. Poliza POL-100. Fecha del siniestro {FECHA}. Danos por 5000000 pesos.",
      "P2/P3: el motor dictamina y cita regla + cláusula · P1: el caso NO se cierra solo"),
     ("FRAUDE — monto excede la suma asegurada",
-     f"Choque AUTO_COLISION. Poliza POL-200. Fecha del siniestro {FECHA}. Reclamo danos por 150000000 pesos.",
+     f"Choque AUTO_COLISION. Poliza POL-200. Fecha del siniestro {FECHA}. Reclamo danos por 15000000 pesos.",
      "P6: fraude detectado y explicable (monto excede suma) · solo sugiere, decide el humano"),
     ("COBERTURA NEGATIVA — tipo no contratado",
      f"Dano por agua en la vivienda, tipo HOGAR_AGUA. Poliza POL-300. Fecha del siniestro {FECHA}. Danos por 3000000 pesos.",
