@@ -25,10 +25,19 @@ dev = [
 obs = [
     "langfuse>=4.13",       # observabilidad real (B1, Must #10); opcional — solo si se activan las keys
 ]
+evals = [
+    "deepeval>=4.0",        # evals agénticos con Claude-as-judge (D, RF-27); solo para `pytest -m agentic`
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+# Los evals agénticos (pipeline real + juez Claude) son caros y no deterministas → EXCLUIDOS por
+# default. Correrlos a demanda con: pytest -m agentic  (requiere ANTHROPIC_API_KEY real + deepeval).
+markers = [
+    "agentic: eval agéntico con pipeline real + Claude-as-judge (caro, no-determinista, fuera del CI)",
+]
+addopts = "-m 'not agentic'"
 
 [tool.hypothesis]
 # Reproducibilidad: seed logueado en fallo (PBT-08 / RNF-26).
