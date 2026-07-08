@@ -14,7 +14,7 @@ import app.dashboard as dashboard_pkg
 from app.main import app
 from app.demo.seed import seed_demo_casos
 from app.dashboard.store import get_caso_repository
-from app.contracts.enums import EstadoCaso
+from app.contracts.enums import EstadoCaso, ResultadoCobertura
 
 
 @pytest.fixture
@@ -150,6 +150,45 @@ def test_panel_metricas_cero_casos_no_rompe(client):
     r = client.get("/panel")
     assert r.status_code == 200
     assert "0%" in r.text  # pct_escalado con 0 casos, sin crash
+
+
+# ---------- F1 HITL Corregir (H-20) ----------
+
+def _caso_no_cubierto():
+    for c in get_caso_repository().list():
+        if c.dictamen and c.dictamen.resultado == ResultadoCobertura.NO_CUBIERTO:
+            return c
+    raise AssertionError("no hay caso NO_CUBIERTO sembrado")
+
+
+def test_corregir_cambia_dictamen_y_marca_origen_humano(client):
+    """Corregir tipo mal (HOGAR_AGUA→AUTO_COLISION) → re-dictamen ≠ NO_CUBIERTO, no terminal, origen HUMANO (P3)."""
+    caso = _caso_no_cubierto()
+    r = client.post(f"/casos/{caso.id}/corregir",
+                    data={"usuario": "diana.analista", "tipo_siniestro": "AUTO_COLISION"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    act = get_caso_repository().get(caso.id)
+    assert act.dictamen.resultado != ResultadoCobertura.NO_CUBIERTO   # el dictamen cambió (P2, motor re-decide)
+    assert act.estado not in {EstadoCaso.APROBADO, EstadoCaso.RECHAZADO}  # nunca terminal (P1)
+    tipo = next(c for c in act.extraccion.campos if c.nombre == "tipo_siniestro")
+    assert tipo.valor == "AUTO_COLISION"
+    assert tipo.origen.tipo.value == "HUMANO"   # auditable (P3)
+
+
+def test_corregir_sin_usuario_400(client):
+    cid = _caso_no_cubierto().id
+    r = client.post(f"/casos/{cid}/corregir", data={"tipo_siniestro": "AUTO_COLISION"}, follow_redirects=False)
+    assert r.status_code == 400   # firma obligatoria (P1)
+
+
+def test_corregir_caso_terminal_409(client):
+    """P1 integridad: un caso ya decidido (APROBADO) NO se puede corregir → 409."""
+    cid = _caso_pendiente().id
+    assert client.post(f"/casos/{cid}/aprobar", data={"usuario": "diana"}).status_code == 200
+    assert get_caso_repository().get(cid).estado == EstadoCaso.APROBADO  # pre-condición verificada
+    r = client.post(f"/casos/{cid}/corregir", data={"usuario": "diana", "tipo_siniestro": "AUTO_COLISION"}, follow_redirects=False)
+    assert r.status_code == 409
 
 
 # ---------- Estructural (P1/P2): dashboard passive ----------
