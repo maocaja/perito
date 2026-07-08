@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Nuevo aviso{% endblock %}
+{% block content %}
+<h2>Nuevo aviso FNOL</h2>
+
+{% if error %}<p class="error" style="color:#b00">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h3>Escenarios de demostración <small>(determinísticos, instantáneos, sin LLM)</small></h3>
+  <div class="presets">
+    {% for esc, label in presets.items() %}
+    <form method="post" action="/nuevo/preset/{{ esc }}" style="display:inline-block; margin:0 .4rem .4rem 0">
+      <input type="hidden" name="rol" value="{{ rol }}">
+      <button type="submit">{{ label }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h3>Procesar con los agentes reales <small>(Haiku + Sonnet)</small></h3>
+  <form method="post" action="/nuevo">
+    <input type="hidden" name="rol" value="{{ rol }}">
+    <textarea name="aviso_texto" rows="5" maxlength="{{ max_chars }}" style="width:100%"
+      placeholder="Ej: Choque AUTO_COLISION, póliza POL-100, fecha 2025-06-15, daños por $5.000.000."></textarea>
+    <button type="submit">Procesar con agentes reales</button>
+    <p><small>Requiere <code>ANTHROPIC_API_KEY</code> en el server · tarda ~10s · máx {{ max_chars }} caracteres ·
+      la cobertura la decide el motor (P2), nunca el LLM.</small></p>
+  </form>
+</section>
+{% endblock %}
