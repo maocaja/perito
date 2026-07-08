@@ -27,6 +27,11 @@ dist/
 *.log
 .langfuse/
 
+# Eval runs agénticos (D) — artefactos generados por corrida (sin PII); no versionar en git.
+backend/tests/evals/runs/
+backend/.deepeval/
+.deepeval/
+
 # Agent skills instalados por npx (tooling local, no producto — re-instalar con
 # `npx skills add vercel-labs/agent-skills`). No vendorizar en el repo.
 .agents/
