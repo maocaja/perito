@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perito — {% block title %}Dashboard{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Perito · Triage FNOL</h1>
+    <nav>
+      <a href="/casos?rol={{ rol }}">Bandeja</a>
+      <a href="/panel?rol=CUMPLIMIENTO">Panel de cumplimiento</a>
+      <span class="rol">Rol: <strong>{{ rol }}</strong> <em>(stub, sin auth real — RNF-14)</em></span>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer><small>Demo-grade · datos en memoria · sin auth · vitrina de portafolio (P7)</small></footer>
+</body>
+</html>

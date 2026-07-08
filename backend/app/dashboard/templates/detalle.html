@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Caso {{ caso.id[:8] }}{% endblock %}
+{% block content %}
+<a href="/casos?rol={{ rol }}">← Bandeja</a>
+<h2>Caso <code>{{ caso.id[:8] }}</code> — <span class="estado estado-{{ caso.estado.value }}">{{ caso.estado.value }}</span></h2>
+
+<section>
+  <h3>Aviso <small>(redactado — P5)</small></h3>
+  <p class="aviso">{{ aviso_redactado }}</p>
+  <small>Calidad: {{ caso.aviso.calidad.value }}</small>
+</section>
+
+{% if caso.extraccion %}
+<section>
+  <h3>Extracción <small>(campo → origen — P3)</small></h3>
+  <table>
+    <thead><tr><th>Campo</th><th>Valor</th><th>Origen</th><th>Confianza</th></tr></thead>
+    <tbody>
+    {% for cx in caso.extraccion.campos %}
+      <tr>
+        <td>{{ cx.nombre }}</td>
+        <td>{% if cx.ausente %}<em>ausente</em>{% else %}{{ cx.valor }}{% endif %}</td>
+        <td>{% if cx.origen %}<code>{{ cx.origen.tipo.value }}:{{ cx.origen.referencia }}</code>{% else %}—{% endif %}</td>
+        <td>{{ cx.confianza if cx.confianza is not none else "—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if caso.dictamen %}
+<section>
+  <h3>Dictamen de cobertura</h3>
+  <p><strong>{{ caso.dictamen.resultado.value }}</strong> · regla {{ caso.dictamen.regla_aplicada }}
+     · deducible calculado {{ caso.dictamen.deducible_calculado }}</p>
+  {% if caso.dictamen.clausula %}
+  <p>Cláusula citada: <code>{{ caso.dictamen.clausula.id }}</code> — {{ caso.dictamen.clausula.texto }}
+     ({{ caso.dictamen.clausula.referencia }})</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if caso.alerta_fraude %}
+<section class="alerta">
+  <h3>⚠ Alerta de fraude — severidad {{ caso.alerta_fraude.severidad }}</h3>
+  <p>{{ caso.alerta_fraude.explicacion }}</p>
+  <ul>{% for inc in caso.alerta_fraude.inconsistencias %}<li>{{ inc.tipo.value }}: {{ inc.referencia }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if caso.motivo_escalamiento %}<p class="motivo">Motivo de escalamiento: {{ caso.motivo_escalamiento }}</p>{% endif %}
+{% if caso.aprobado_por %}<p class="firma">Decisión registrada por: <strong>{{ caso.aprobado_por }}</strong></p>{% endif %}
+
+{% if caso.estado.value not in ["APROBADO", "RECHAZADO"] %}
+<section class="acciones">
+  <h3>Decisión humana <small>(P1 — el sistema no decide, solo prepara)</small></h3>
+  <form method="post" action="/casos/{{ caso.id }}/aprobar">
+    <input type="text" name="usuario" placeholder="usuario (firma)" required>
+    <button type="submit">Aprobar</button>
+  </form>
+  <form method="post" action="/casos/{{ caso.id }}/rechazar">
+    <input type="text" name="usuario" placeholder="usuario (firma)" required>
+    <input type="text" name="motivo" placeholder="motivo" required>
+    <button type="submit">Rechazar</button>
+  </form>
+  <p><small>"Corregir" diferido (Should).</small></p>
+</section>
+{% endif %}
+{% endblock %}

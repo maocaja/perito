@@ -1,0 +1,25 @@
+/* C11 dashboard — CSS mínimo demo-grade. */
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a2e; background: #f5f6fa; }
+header { background: #16213e; color: #fff; padding: 0.6rem 1.2rem; }
+header h1 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+nav { display: flex; gap: 1rem; align-items: center; font-size: 0.9rem; }
+nav a { color: #9ad; text-decoration: none; }
+nav .rol { margin-left: auto; color: #cde; }
+main { max-width: 900px; margin: 1rem auto; padding: 0 1rem; }
+footer { text-align: center; color: #888; padding: 1rem; font-size: 0.8rem; }
+table { border-collapse: collapse; width: 100%; background: #fff; margin: 0.5rem 0; }
+th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; font-size: 0.9rem; }
+th { background: #eef; }
+section { background: #fff; border: 1px solid #e3e3ef; border-radius: 6px; padding: 0.8rem 1rem; margin: 0.8rem 0; }
+.estado { padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.8rem; background: #ddd; }
+.estado-LISTO_PARA_APROBAR { background: #cfe9cf; }
+.estado-REQUIERE_REVISION { background: #ffe3b3; }
+.estado-APROBADO { background: #b7e4c7; }
+.estado-RECHAZADO { background: #f5c2c7; }
+.alerta { border-color: #e0a800; background: #fff8e8; }
+.aviso { background: #f0f0f5; padding: 0.6rem; border-radius: 4px; font-family: monospace; }
+.acciones form { display: inline-flex; gap: 0.4rem; margin-right: 1rem; }
+.firma { color: #2a7; font-weight: 600; }
+.motivo { color: #b5651d; }
+button { cursor: pointer; padding: 0.3rem 0.8rem; }
