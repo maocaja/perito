@@ -13,14 +13,16 @@ dependencies = [
     "pgvector>=0.2",        # adaptador cliente de la extensión pgvector (RAG, M10)
     "fastapi>=0.110",       # scaffold API (superficie real en U4)
     "uvicorn>=0.29",        # server de dev
-    # langfuse: DIFERIDO a U5 — U1 no instrumenta nada; el contenedor va en docker-compose,
-    #           pero el SDK Python no se requiere todavía.
+    # langfuse: opcional (extra "obs" abajo) — solo se requiere si se configuran las keys de Langfuse (B1).
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",          # tests deterministas (rules/testing.md)
     "hypothesis>=6.100",    # property-based testing (PBT-09, RNF-27)
+]
+obs = [
+    "langfuse>=4.13",       # observabilidad real (B1, Must #10); opcional — solo si se activan las keys
 ]
 
 [tool.pytest.ini_options]
