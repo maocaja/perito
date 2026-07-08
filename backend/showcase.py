@@ -44,9 +44,13 @@ def _clausulas():
                          ("LIM", TipoClausula.LIMITE), ("DED", TipoClausula.DEDUCIBLE)]]
 
 
+# Fecha de siniestro pre-corte de conocimiento del LLM (para que C3 no la marque "futura").
+FECHA = "2025-06-15"
+
+
 def _poliza(numero, coberturas=("AUTO_COLISION",), suma="100000000", deducible="500000"):
     return Poliza(numero=numero,
-                  vigencia=RangoFechas(desde=hoy - timedelta(days=365), hasta=hoy + timedelta(days=365)),
+                  vigencia=RangoFechas(desde=date(2024, 1, 1), hasta=date(2027, 12, 31)),
                   coberturas_contratadas=list(coberturas), exclusiones=[],
                   suma_asegurada=Decimal(suma), deducible=Decimal(deducible), es_soat=False,
                   clausulas=_clausulas())
@@ -61,16 +65,16 @@ set_poliza_store({
 
 ESCENARIOS = [
     ("FELIZ — cobertura OK",
-     f"Reporto un choque AUTO_COLISION. Poliza POL-100. Fecha del siniestro {hoy}. Danos por 5000000 pesos.",
+     f"Reporto un choque AUTO_COLISION. Poliza POL-100. Fecha del siniestro {FECHA}. Danos por 5000000 pesos.",
      "P2/P3: el motor dictamina y cita regla + cláusula · P1: el caso NO se cierra solo"),
-    ("FRAUDE — monto anómalo",
-     f"Choque AUTO_COLISION. Poliza POL-200. Fecha {hoy}. Reclamo danos por 500000000 pesos.",
+    ("FRAUDE — monto excede la suma asegurada",
+     f"Choque AUTO_COLISION. Poliza POL-200. Fecha del siniestro {FECHA}. Reclamo danos por 150000000 pesos.",
      "P6: fraude detectado y explicable (monto excede suma) · solo sugiere, decide el humano"),
     ("COBERTURA NEGATIVA — tipo no contratado",
-     f"Dano por agua en la vivienda, tipo HOGAR_AGUA. Poliza POL-300. Fecha {hoy}. Danos por 3000000 pesos.",
+     f"Dano por agua en la vivienda, tipo HOGAR_AGUA. Poliza POL-300. Fecha del siniestro {FECHA}. Danos por 3000000 pesos.",
      "P2: NO_CUBIERTO citando la regla R2 · lo decide el motor determinístico, NO el LLM"),
     ("PÓLIZA NO ENCONTRADA — escala",
-     f"Choque AUTO_COLISION. Poliza POL-999-INEXISTENTE. Fecha {hoy}. Danos por 4000000 pesos.",
+     f"Choque AUTO_COLISION. Poliza POL-500. Fecha del siniestro {FECHA}. Danos por 4000000 pesos.",
      "P4: escala a REQUIERE_REVISION — NO inventa una póliza ni cierra el caso"),
 ]
 
