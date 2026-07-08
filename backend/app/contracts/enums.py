@@ -56,6 +56,7 @@ class TipoOrigen(str, Enum):
     SPAN = "SPAN"
     PAGINA = "PAGINA"
     REGION = "REGION"
+    HUMANO = "HUMANO"  # corrección hecha por un humano (F1 / H-20) — no proviene del LLM (P3)
 
 
 class TipoClausula(str, Enum):
