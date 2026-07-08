@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.7",        # contratos tipados strict (H-17, RNF-13)
     "faker>=25.0",          # generador sintético es_CO (H-16) — SOLO en synthetic/, nunca en tests Hypothesis
     "psycopg[binary]>=3.1", # driver PostgreSQL
+    "sqlalchemy>=2.0",      # Core: engine + tablas para persistencia (C1); antes transitivo vía pgvector
     "pgvector>=0.2",        # adaptador cliente de la extensión pgvector (RAG, M10)
     "fastapi>=0.110",       # scaffold API (superficie real en U4)
     "uvicorn>=0.29",        # server de dev
