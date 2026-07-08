@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     database_url: str = Field(default="postgresql://localhost:5432/perito_test")
     faker_locale: str = "es_CO"
     embedding_dim: int | None = Field(default=None, gt=0)
+
+    # Observabilidad — Langfuse (B1, Must #10). Sin keys → sink desactivado (solo floor JSON).
+    # Si se activan las keys, requiere el SDK: pip install "perito-backend[obs]" (o pip install langfuse).
     langfuse_host: str | None = None
+    langfuse_public_key: str = Field(default="")
+    langfuse_secret_key: str = Field(default="")
 
     # U2 LLM MODELS
     extractor_model: str = "claude-haiku-4-5"

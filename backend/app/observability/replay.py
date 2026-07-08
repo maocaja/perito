@@ -6,7 +6,10 @@ Demo-grade: permite reconstruir/inspeccionar una corrida.
 from typing import Dict, List, Optional
 from app.observability.tracer import Tracer
 import json
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 
 class ReplayStore:
@@ -23,7 +26,7 @@ class ReplayStore:
             caso_estado: estado final (RECIBIDO, EN_PROCESO, LISTO_PARA_APROBAR, etc.)
             motivo: motivo si escaló (opcional)
         """
-        self.cases[tracer.caso_id] = {
+        record = {
             "caso_id": tracer.caso_id,
             "timestamp_saved": datetime.now(timezone.utc).isoformat(),
             "caso_estado": caso_estado,
@@ -31,6 +34,21 @@ class ReplayStore:
             "trace_events": tracer.get_trace_log(),
             "token_summary": tracer.get_token_summary()
         }
+        self.cases[tracer.caso_id] = record
+
+        # Target real (Must #10): emitir también a Langfuse. FAIL-OPEN: una traza perdida no rompe
+        # el floor JSON ni el caso (emit_trace ya captura todo; el try es belt-and-suspenders).
+        try:
+            from app.observability import langfuse_sink
+            langfuse_sink.emit_trace(
+                caso_id=tracer.caso_id,
+                caso_estado=caso_estado,
+                motivo=motivo,
+                trace_events=record["trace_events"],
+                token_summary=record["token_summary"],
+            )
+        except Exception:
+            logger.warning("langfuse_sink.emit_trace lanzó (fail-open) caso=%s", tracer.caso_id, exc_info=True)
     
     def load(self, caso_id: str) -> Optional[Dict]:
         """Carga el replay de un caso."""
