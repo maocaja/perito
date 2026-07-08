@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Bandeja{% endblock %}
+{% block content %}
+<h2>Bandeja de casos</h2>
+<form method="get" action="/casos">
+  <input type="hidden" name="rol" value="{{ rol }}">
+  <label>Filtrar por estado:
+    <select name="estado" onchange="this.form.submit()">
+      <option value="">— todos —</option>
+      {% for e in estados %}
+      <option value="{{ e }}" {% if e == estado_actual %}selected{% endif %}>{{ e }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+<table>
+  <thead><tr><th>ID</th><th>Estado</th><th>Dictamen</th><th>Fraude</th><th>Actualizado</th><th></th></tr></thead>
+  <tbody>
+  {% for c in casos %}
+    <tr>
+      <td><code>{{ c.id[:8] }}</code></td>
+      <td><span class="estado estado-{{ c.estado.value }}">{{ c.estado.value }}</span></td>
+      <td>{{ c.dictamen.resultado.value if c.dictamen else "—" }}</td>
+      <td>{{ "⚠" if c.alerta_fraude else "" }}</td>
+      <td>{{ c.timestamp_actualizacion.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td><a href="/casos/{{ c.id }}?rol={{ rol }}">Ver</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">No hay casos.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

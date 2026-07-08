@@ -44,6 +44,10 @@ class ReplayStore:
         """Retorna lista de caso_ids guardados."""
         return list(self.cases.keys())
 
+    def clear(self) -> None:
+        """Vacía el store (útil en tests/seed demo)."""
+        self.cases.clear()
+
 
 # Global replay store (demo-grade; en prod sería DB)
 _global_replay_store = ReplayStore()
