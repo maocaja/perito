@@ -47,6 +47,9 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         url = settings.database_url
+        # Tenemos psycopg v3, pero SQLAlchemy usa psycopg2 por default → forzar el dialecto psycopg (v3).
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         if url.startswith("postgresql") and "sslmode" not in url:
             logger.warning("database_url sin sslmode=require — TLS no garantizado (RNF-15).")
         _engine = create_engine(url)
