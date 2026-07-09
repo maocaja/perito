@@ -24,6 +24,7 @@ help:  ## Muestra esta ayuda
 	@echo "  make setup   Crea el venv ($(VENV)) e instala deps (obs + evals + psycopg)"
 	@echo "  make run     Levanta el dashboard (uvicorn) → http://localhost:8000/casos"
 	@echo "  make demo    4 escenarios (agentes reales si hay ANTHROPIC_API_KEY; si no, presets)"
+	@echo "  make demo-mail  Envía FNOL sintéticos al Gmail demo (para la demo EN VIVO; requiere DEMO_GMAIL_*)"
 	@echo "  make evals   Evals agénticos (pytest -m agentic, requiere key real)"
 	@echo "  make test    Suite base (LLM mockeado, sin costo)"
 	@echo ""
@@ -41,8 +42,11 @@ run:  ## Levanta el dashboard (HTMX) en :8000
 demo:  ## 4 escenarios por el pipeline real (o presets sin key) + Langfuse + resumen
 	cd backend && $(PY) demo_run.py
 
+demo-mail:  ## Envía correos FNOL sintéticos al Gmail demo (~5/min, tope MAIL_TOTAL). On-demand.
+	cd backend && $(PY) demo_mail.py
+
 evals:  ## Evals agénticos (Claude-as-judge) — cuesta API, requiere key real
 	cd backend && PERSISTENCE=memory $(PY) -m pytest tests/ -m agentic -q
 
-test:  ## Suite base (sin API, sin costo) — hermético: ignora .env (memory, sin Langfuse)
-	cd backend && ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY:-test} PERSISTENCE=memory LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= $(PY) -m pytest tests/ -q
+test:  ## Suite base (sin API, sin costo) — hermético: ignora .env (memory, sin Langfuse, poller off)
+	cd backend && ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY:-test} PERSISTENCE=memory LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= DEMO_LIVE=off $(PY) -m pytest tests/ -q

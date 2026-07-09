@@ -18,6 +18,24 @@
 <span class="badge k-{{ k }}"><span class="dot"></span>{{ severidad|capitalize }}</span>
 {%- endmacro %}
 
+{# Nombre técnico de campo → etiqueta humana (para la tabla de datos del siniestro). #}
+{% macro campo_label(nombre) %}
+{%- set l = {'numero_poliza':'N.º de póliza','fecha_siniestro':'Fecha del siniestro','tipo_siniestro':'Tipo de siniestro','monto_reclamado':'Monto reclamado'}.get(nombre, nombre) -%}{{ l }}
+{%- endmacro %}
+
+{# Evidencia de un campo, legible. El extractor real y los presets usan referencias técnicas
+   ('extracted from redacted_texto', 'span:campo') que se ven como debug → se muestran como
+   "extraído del aviso". Si es corrección humana o una cita real, se muestra tal cual (redactada, P5). #}
+{% macro campo_evidencia(origen) %}
+{%- if not origen or not origen.referencia -%}<span class="muted" style="font-style:normal">sin origen</span>
+{%- elif origen.tipo and origen.tipo.value == 'HUMANO' -%}Capturado por el analista (origen humano)
+{%- else -%}
+{%- set r = origen.referencia -%}
+{%- if 'redacted_texto' in r or 'extracted from' in r or r.startswith('span:') -%}extraído del aviso
+{%- else -%}“{{ r | redact }}”{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
 {# Extrae el valor de un campo de la extracción por nombre. #}
 {% macro campo_valor(extraccion, nombre) %}
 {%- if extraccion -%}{%- for c in extraccion.campos -%}{%- if c.nombre == nombre -%}{{ c.valor if c.valor is not none else '—' }}{%- endif -%}{%- endfor -%}{%- else -%}—{%- endif -%}

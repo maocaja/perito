@@ -7,6 +7,7 @@ INVARIANTES:
 - P5: el detalle muestra el aviso REDACTADO (redact_pii_spans_es_co).
 """
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -14,14 +15,19 @@ from fastapi import APIRouter, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import settings
 from app.contracts.enums import EstadoCaso, ResultadoCobertura, RolUsuario
 from app.security.redaction import redact_pii_spans_es_co
 from app.hitl.c8 import aprobar as hitl_aprobar, rechazar as hitl_rechazar
 from app.observability.replay import get_replay_store
 from app.dashboard.store import get_caso_repository
+from app.dashboard import vista_caso
 
 router = APIRouter(tags=["dashboard"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+# Filtro de redacción P5 para plantillas: cualquier valor mostrado pasa por el redactor (defensa
+# en profundidad). No aplicar a los inputs del form de corrección (el analista edita el valor real).
+_TEMPLATES.env.filters["redact"] = lambda v: redact_pii_spans_es_co(str(v)) if v is not None else v
 
 # Tasa blended ESTIMADA (Haiku ~$1/$5, Sonnet ~$3/$15 in/out por 1M) — NO facturable, solo orientativa.
 COSTO_USD_POR_1M_TOKENS = 8.0
@@ -70,11 +76,20 @@ def calcular_metricas(casos, replays) -> dict:
 
 
 def _detalle_context(caso, rol: str) -> dict:
-    """Contexto del detalle con el aviso REDACTADO (P5)."""
+    """Contexto del detalle: aviso REDACTADO (P5) + traza + view-models agent-native (Unit I, passive)."""
+    traza = get_replay_store().load(caso.id)  # {trace_events, token_summary} o None
     return {
         "rol": rol,
         "caso": caso,
         "aviso_redactado": redact_pii_spans_es_co(caso.aviso.texto_crudo),
+        "traza": traza,
+        "resumen": vista_caso.resumen_copiloto(caso),
+        "confianza": vista_caso.confianza_riesgo(caso, traza),
+        "recomendacion": vista_caso.recomendacion(caso),
+        "verificador": vista_caso.hallazgos_verificador(caso, traza),
+        "actividad": vista_caso.actividad_agentes(traza),
+        "faltantes": vista_caso.faltantes(caso),  # banner + tabla fusionada + regla de habilitación
+        "checklist": vista_caso.checklist_aprobacion(caso, traza),  # "Para aprobar se requiere"
     }
 
 
@@ -85,19 +100,41 @@ def _get_o_404(caso_id: str):
     return caso
 
 
+def _filtrar_bandeja(casos, estado: Optional[str]):
+    """Filtro de PRESENTACIÓN (passive): estados reales + pseudo-filtros de los KPIs clicables.
+
+    `RESUELTOS` (APROBADO+RECHAZADO) y `FRAUDE_ALTA` no son EstadoCaso: son agregados de UI que los
+    KPIs mapean. Cero lógica de dominio — solo agrupa lo que ya está en el caso.
+    """
+    if not estado:
+        return casos
+    if estado == "RESUELTOS":
+        return [c for c in casos if c.estado in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO)]
+    if estado == "FRAUDE_ALTA":
+        return [c for c in casos if c.alerta_fraude and c.alerta_fraude.severidad == "ALTA"]
+    try:
+        e = EstadoCaso(estado)
+    except ValueError:
+        return casos
+    return [c for c in casos if c.estado == e]
+
+
 @router.get("/", response_class=HTMLResponse)
 @router.get("/casos", response_class=HTMLResponse)
 def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Query(RolUsuario.ANALISTA.value)):
-    """H-19: bandeja de casos con filtro por estado + selector de rol stub."""
-    filtro = None
-    if estado:
-        try:
-            filtro = EstadoCaso(estado)
-        except ValueError:
-            filtro = None
+    """H-19: bandeja de casos con filtro por estado + KPIs clicables (toggle) + selector de rol stub."""
     repo = get_caso_repository()
     todos = repo.list()
-    casos = repo.list(estado=filtro)
+    casos = _filtrar_bandeja(todos, estado)
+    # Más reciente arriba (efecto "van entrando") + hora de proceso + flag de recién llegado (<20s).
+    casos = sorted(casos, key=lambda c: c.timestamp_actualizacion, reverse=True)
+    ahora = datetime.now(timezone.utc)
+    filas = [{
+        "caso": c,
+        "hora": c.timestamp_actualizacion.strftime("%H:%M:%S"),
+        "reciente": (ahora - c.timestamp_actualizacion).total_seconds() < 20,
+        "ramo": vista_caso.ramo_de(c),  # derivado de tipo_siniestro (passive, P7)
+    } for c in casos]
 
     # Conteos para los KPIs y los chips (agregación de presentación, no lógica de dominio).
     def _n(e):
@@ -114,10 +151,12 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
 
     return _TEMPLATES.TemplateResponse(request, "bandeja.html", {
         "casos": casos,
+        "filas": filas,
         "counts": counts,
         "nav_total": counts["total"],
         "estado_actual": estado or "",
         "rol": rol,
+        "en_vivo": settings.demo_live != "off",  # Unit H: activa el auto-refresh de la bandeja
     })
 
 

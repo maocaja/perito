@@ -122,6 +122,7 @@ PRESETS: dict[str, str] = {
     "fraude": "Fraude — monto excede la suma asegurada",
     "cobertura-negativa": "Cobertura negativa — tipo no contratado",
     "no-encontrada": "Póliza no encontrada — escala",
+    "campos-faltantes": "Datos faltantes — escala pidiendo info",
 }
 
 
@@ -129,27 +130,35 @@ def construir_caso_preset(escenario: str) -> Caso:
     """Arma un Caso-demo determinístico para uno de los 4 escenarios (sin LLM)."""
     if escenario == "feliz":
         return armar_caso(
-            "Reporto un choque AUTO_COLISION. Póliza POL-DEMO-FELIZ. Daños por $5.000.000.",
-            extraccion_demo(numero="POL-DEMO-FELIZ", monto="5000000"),
-            poliza_demo(numero="POL-DEMO-FELIZ", suma="100000000"),
+            "Reporto un choque AUTO_COLISION. Póliza POL-DEMO-1001. Daños por $5.000.000.",
+            extraccion_demo(numero="POL-DEMO-1001", monto="5000000"),
+            poliza_demo(numero="POL-DEMO-1001", suma="100000000"),
         )
     if escenario == "fraude":
         return armar_caso(
-            "Choque AUTO_COLISION. Póliza POL-DEMO-FRAUDE. Reclamo daños por $15.000.000.",
-            extraccion_demo(numero="POL-DEMO-FRAUDE", monto="15000000"),
-            poliza_demo(numero="POL-DEMO-FRAUDE", suma="10000000"),
+            "Choque AUTO_COLISION. Póliza POL-DEMO-1002. Reclamo daños por $15.000.000.",
+            extraccion_demo(numero="POL-DEMO-1002", monto="15000000"),
+            poliza_demo(numero="POL-DEMO-1002", suma="10000000"),
             con_alerta=True,
         )
     if escenario == "cobertura-negativa":
         return armar_caso(
-            "Daño por agua en la vivienda, tipo HOGAR_AGUA. Póliza POL-DEMO-NEG. Daños por $3.000.000.",
-            extraccion_demo(numero="POL-DEMO-NEG", tipo="HOGAR_AGUA", monto="3000000"),
-            poliza_demo(numero="POL-DEMO-NEG", coberturas=("AUTO_COLISION",)),
+            "Daño por agua en la vivienda, tipo HOGAR_AGUA. Póliza POL-DEMO-1003. Daños por $3.000.000.",
+            extraccion_demo(numero="POL-DEMO-1003", tipo="HOGAR_AGUA", monto="3000000"),
+            poliza_demo(numero="POL-DEMO-1003", coberturas=("AUTO_COLISION",)),
         )
     if escenario == "no-encontrada":
         return armar_caso(
-            "Choque AUTO_COLISION. Póliza POL-NO-EXISTE. Daños por $4.000.000.",
-            extraccion_demo(numero="POL-NO-EXISTE", monto="4000000"),
+            "Choque AUTO_COLISION. Póliza POL-DEMO-9999. Daños por $4.000.000.",
+            extraccion_demo(numero="POL-DEMO-9999", monto="4000000"),
             poliza=None,
+        )
+    if escenario == "campos-faltantes":
+        # Aviso incompleto (sin monto) → el motor escala: falta un dato, no se inventa (P4).
+        return armar_caso(
+            "Buenas, tuve un accidente con el carro. Mi póliza es POL-DEMO-1001. "
+            "Todavía no tengo el estimado de cuánto cuestan los arreglos.",
+            extraccion_demo(numero="POL-DEMO-1001", ausentes=("monto_reclamado",)),
+            poliza_demo(numero="POL-DEMO-1001"),
         )
     raise ValueError(f"escenario de preset desconocido: {escenario}")

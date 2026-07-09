@@ -52,7 +52,9 @@ sobre el `.env`, por si quieres sobreescribir algo puntual. `make test` es herm�
 `make demo` **narra cada paso en vivo** (C2 → C3 → C5 motor+cláusula → C6 fraude → estado), sin
 necesidad de abrir Langfuse. Luego cierra con **costo/caso + % escalado + links**.
 
-### Los 4 escenarios — el hilo narrativo (no solo el happy path)
+### Los 5 escenarios — el hilo narrativo (no solo el happy path)
+
+Los avisos van en **lenguaje natural** (como un usuario real escribe; el extractor C2 saca los campos):
 
 | Escenario | Qué demuestra | Invariante |
 |-----------|---------------|------------|
@@ -60,6 +62,7 @@ necesidad de abrir Langfuse. Luego cierra con **costo/caso + % escalado + links*
 | **Fraude** (monto excede la suma) | C6 **detecta y explica**; solo **sugiere**, no bloquea | P6 |
 | **Cobertura negativa** (tipo no contratado) | **NO_CUBIERTO** — lo decide el **motor**, no el LLM | P2 |
 | **Póliza no encontrada** | **escala** a REQUIERE_REVISION — **no inventa** una póliza | P4 |
+| **Datos faltantes** (sin monto) | **escala** pidiendo el dato — **no inventa** el faltante | P4 |
 
 En **todos**, el estado final ∈ `{LISTO_PARA_APROBAR, REQUIERE_REVISION}` — **el orquestador nunca
 cierra el caso** (P1: firma el humano con `aprobado_por`).
@@ -73,6 +76,46 @@ make run                      # http://localhost:8000/casos
 - **`/casos/{id}`** — detalle con el **aviso redactado (P5)**, extracción campo→origen, dictamen con
   cláusula citada, alerta de fraude, y **Aprobar / Corregir / Rechazar** (delegan en HITL; sin firma → 400).
 - **`/panel`** — cumplimiento: métricas agregadas + trazas por nodo + tokens/costo + export JSON.
+
+### Demo EN VIVO — correos de Gmail → bandeja viva → HITL (Unit H)
+
+La demo de un sistema agéntico corriendo: correos FNOL **llegan a un Gmail**, Perito los **procesa solo**,
+y en el dashboard ves la **bandeja llenarse en tiempo real**; entras a un caso, ves **qué hizo cada agente**,
+y **cierras con tu firma** (HITL).
+
+**Setup (una vez):** un **Gmail dedicado/desechable** (la app-password da acceso total; no tu personal) →
+activa 2FA → crea app-password (`myaccount.google.com/apppasswords`). En `.env`:
+```
+DEMO_GMAIL_ADDRESS=perito.demo@gmail.com
+DEMO_GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx     # 16 chars sin espacios
+```
+
+**Tres modos (`DEMO_LIVE`, control de costo — riesgo #2):**
+| Modo | Qué corre | Costo |
+|------|-----------|-------|
+| `off` (default) | poller apagado, app normal | cero |
+| `deterministic` | presets sin LLM → **ensayo del front GRATIS** | cero (sin `ANTHROPIC_API_KEY`) |
+| `real` | agentes Claude de verdad → el show | ~USD 0.01/correo |
+
+**Correrlo (dos terminales):**
+```bash
+# terminal 1 — la app con el poller vivo (ensaya gratis con deterministic; el show con real)
+DEMO_LIVE=deterministic make run        # → http://localhost:8000/casos
+
+# terminal 2 — el generador: manda MAIL_TOTAL correos sintéticos (~5/min) y se para solo
+make demo-mail
+```
+La bandeja (`/casos`) muestra **"● En vivo"** y se **auto-refresca cada 3s** (HTMX polling); los casos aparecen
+a medida que el poller los procesa. Entra a uno → **"Traza de agentes · qué hizo cada uno"** → **Aprobar/Corregir/
+Rechazar**. El caso **se detiene** en LISTO_PARA_APROBAR esperando tu firma — el poller **nunca cierra** (P1).
+
+**El usuario NO necesita saber la estructura.** Escribe el correo en lenguaje natural (*"choqué el carro, póliza
+POL-DEMO-1001, unos 5 millones"*) y el **extractor C2 saca los campos**. Si falta un dato esencial (monto, fecha,
+o una póliza reconocible) → **escala a un humano (P4), no inventa**. Para ver un dictamen de cobertura, menciona una
+póliza sembrada (`POL-DEMO-1001/1002/1003`); cualquier otra → escala (también es una demo válida).
+
+> **Costo:** el generador tiene tope (`MAIL_TOTAL`, ~15) y se para solo; el poller default está `off`. Una demo
+> real ≈ USD 0.20-0.40. Ensaya todo el front en `deterministic` sin gastar. Los correos son **sintéticos** (sin PII).
 
 ### Evals agénticos (Claude-as-judge)
 
