@@ -6,8 +6,9 @@ la RAÍZ del repo > defaults. El `.env` se resuelve por ruta absoluta (robusto a
 """
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # config.py → app → backend → raíz del repo (parents[2]).
@@ -50,6 +51,31 @@ class Settings(BaseSettings):
     # U2 API
     anthropic_api_key: str = Field(default="")
 
+    # Demo en vivo — poller de Gmail (Unit H). `off` por default: el poller NUNCA arranca (cero
+    # costo, sin key). `deterministic` = presets sin LLM (ensayo gratis). `real` = pipeline real
+    # (agentes Claude; requiere anthropic_api_key). Control de costo = riesgo #2 del PRD.
+    demo_live: Literal["off", "deterministic", "real"] = Field(default="off")
+    demo_gmail_address: str = Field(default="")       # SECRETO (buzón demo dedicado)
+    demo_gmail_app_password: str = Field(default="")  # SECRETO (app-password de Gmail)
+    imap_host: str = Field(default="imap.gmail.com")
+    smtp_host: str = Field(default="smtp.gmail.com")
+    poll_interval_s: int = Field(default=5, gt=0)     # segundos entre ciclos de lectura IMAP
+    mail_total: int = Field(default=15, gt=0)         # tope de correos que envía el generador
+
+    @field_validator("demo_live", mode="before")
+    @classmethod
+    def _normaliza_demo_live(cls, v):
+        """Acepta variantes de shell (mayúsculas/espacios). Fail-closed a `off` si viene vacío."""
+        s = str(v).strip().lower()
+        return s or "off"
+
+    @field_validator("demo_gmail_app_password", mode="before")
+    @classmethod
+    def _limpia_app_password(cls, v):
+        """Google muestra la app-password en grupos con espacios; IMAP la necesita SIN espacios (16 chars)."""
+        return str(v).replace(" ", "") if v else ""
+
 
 # Initialize settings from environment
 settings = Settings()
+

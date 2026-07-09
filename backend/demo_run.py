@@ -49,9 +49,9 @@ from app.security.redaction import redact_pii_spans_es_co
 # pasado (C3 no la marca "futura"). Dinámica para no vencerse cuando avanza el calendario.
 FECHA = (date.today() - timedelta(days=30)).isoformat()
 
-# Escenarios: aviso real + póliza a sembrar (None = NO se siembra → escala P4). Las keys
-# coinciden con los presets de `scenarios.py` para que el fallback sin-key reuse el mismo caso.
-# Avisos con campos etiquetados → suben la confianza de extracción del agente real.
+# Escenarios: aviso en LENGUAJE NATURAL (como un usuario real lo escribe — el extractor C2 saca los
+# campos del texto libre; el usuario NO necesita saber la estructura) + póliza a sembrar (None = NO
+# se siembra → escala P4). Las keys coinciden con los presets de `scenarios.py` (fallback determinístico).
 ESCENARIOS = [
     # Nota: los números de póliza son NEUTROS a propósito. El verificador adversarial (C3, Sonnet)
     # lee el numero_poliza; un nombre semántico (…-FRAUDE, …-NO-EXISTE) sesga su juicio de fidelidad
@@ -60,30 +60,88 @@ ESCENARIOS = [
     {
         "key": "feliz",
         "titulo": "FELIZ — cobertura OK",
-        "aviso": f"Siniestro tipo AUTO_COLISION bajo la poliza POL-DEMO-1001. Fecha del siniestro: {FECHA}. Monto reclamado: 5000000 pesos.",
+        "aviso": f"Buenos días, espero que se encuentren muy bien. Les escribo bastante preocupado porque "
+                 f"tuve un accidente con mi carro y la verdad es la primera vez que me pasa algo así, no sé "
+                 f"bien cómo es el proceso. Resulta que venía saliendo del trabajo por la carrera 30, ya era "
+                 f"tarde y estaba lloviznando, había mucho tráfico. Un motociclista se me atravesó de repente "
+                 f"y por no atropellarlo frené y giré el timón, pero terminé estrellándome contra un poste de "
+                 f"la luz del separador. El golpe fue en toda la parte delantera derecha: la puerta del "
+                 f"copiloto quedó abollada, el farol derecho destruido y el espejo partido. Gracias a Dios yo "
+                 f"salí bien, solo un susto y un golpecito en el brazo, pero el carro sí quedó bastante "
+                 f"maltratado. El siniestro fue el {FECHA}. Tengo con ustedes la póliza número POL-DEMO-1001, "
+                 f"que saqué hace como un año para el vehículo. Ya lo llevé a un taller de confianza y me "
+                 f"dijeron que la reparación, entre latonería, pintura, el farol y el espejo, sale en unos "
+                 f"5.000.000 de pesos, aunque todavía me deben pasar la cotización formal. Quisiera saber qué "
+                 f"debo hacer, qué documentos necesitan y si esto lo cubre mi póliza. Quedo muy atento a su "
+                 f"respuesta. Mil gracias por la ayuda.",
         "poliza": poliza_demo(numero="POL-DEMO-1001", suma="100000000"),
         "objetivo": "P2/P3: el motor dictamina y cita regla + cláusula · P1: el caso NO se cierra solo",
     },
     {
         "key": "fraude",
         "titulo": "FRAUDE — monto excede la suma asegurada",
-        "aviso": f"Siniestro tipo AUTO_COLISION bajo la poliza POL-DEMO-1002. Fecha del siniestro: {FECHA}. Monto reclamado: 15000000 pesos.",
+        "aviso": f"Cordial saludo. Escribo para reportar un siniestro que tuve con mi vehículo, fue un "
+                 f"choque bastante fuerte y estoy muy afectado. Ocurrió el {FECHA} en la vía que va hacia las "
+                 f"afueras de la ciudad; venía a velocidad normal cuando otro carro se pasó el semáforo en "
+                 f"rojo y me impactó de lado, mandándome contra el andén. El vehículo quedó prácticamente "
+                 f"destruido: el chasis se torció, se activaron todos los airbags, el motor quedó sonando "
+                 f"raro, las dos puertas del lado derecho no abren, el eje delantero se dañó y la carrocería "
+                 f"quedó doblada. Es un carro que yo cuidaba muchísimo, le había puesto rines nuevos y sonido. "
+                 f"Mi póliza con ustedes es la POL-DEMO-1002. Después de hablar con un perito conocido y con "
+                 f"el taller, estoy reclamando 15.000.000 de pesos por la totalidad de los daños, porque "
+                 f"francamente creo que el carro quedó para pérdida total. Necesito que me ayuden con esto lo "
+                 f"más pronto posible porque ese carro es mi herramienta de trabajo y sin él no puedo generar "
+                 f"ingresos. Agradezco su pronta gestión y quedo pendiente de sus indicaciones.",
         "poliza": poliza_demo(numero="POL-DEMO-1002", suma="10000000"),  # suma 10M < monto 15M → fraude
         "objetivo": "P6: fraude detectado y explicable (monto excede suma) · solo sugiere, decide el humano",
     },
     {
         "key": "cobertura-negativa",
         "titulo": "COBERTURA NEGATIVA — tipo no contratado",
-        "aviso": f"Siniestro tipo HOGAR_AGUA (dano por agua en vivienda) bajo la poliza POL-DEMO-1003. Fecha del siniestro: {FECHA}. Monto reclamado: 3000000 pesos.",
+        "aviso": f"Buenas tardes, escribo para reportar un daño en mi vivienda y ver si me lo pueden cubrir. "
+                 f"El {FECHA} en la madrugada se reventó una tubería del baño del segundo piso, al parecer por "
+                 f"la presión del agua, y cuando me desperté ya había un reguero por toda la casa. El agua "
+                 f"bajó por las escaleras y me dañó los muebles de la sala: el sofá quedó empapado, la mesa de "
+                 f"madera se hinchó y la alfombra quedó inservible. También se levantó una parte del piso "
+                 f"laminado del comedor. Fue un desastre, pasamos toda la mañana secando y sacando agua con "
+                 f"la familia, imagínese el estrés. Mi póliza es la POL-DEMO-1003. Un conocido que sabe de "
+                 f"construcción me ayudó a calcular y dice que reponer los muebles y arreglar el piso sale en "
+                 f"unos 3.000.000 de pesos más o menos. Es un daño por agua en la vivienda, tipo HOGAR_AGUA. "
+                 f"Quisiera saber si mi póliza responde por esto y cómo es el trámite para la reclamación. "
+                 f"Muchas gracias de antemano por su atención.",
         "poliza": poliza_demo(numero="POL-DEMO-1003", coberturas=("AUTO_COLISION",), suma="100000000"),  # suma alta → sin fraude incidental
         "objetivo": "P2: NO_CUBIERTO citando la regla de cobertura · lo decide el motor, NO el LLM",
     },
     {
         "key": "no-encontrada",
         "titulo": "PÓLIZA NO ENCONTRADA — escala",
-        "aviso": f"Siniestro tipo AUTO_COLISION bajo la poliza POL-DEMO-9999. Fecha del siniestro: {FECHA}. Monto reclamado: 4000000 pesos.",
+        "aviso": f"Hola, buenas. Necesito reportar un choque que tuve con mi carro el {FECHA}. Iba por una "
+                 f"calle destapada camino a la finca cuando otro vehículo que venía en sentido contrario me "
+                 f"cerró y, para esquivarlo, me subí a una cuneta; el carro se raspó todo el costado "
+                 f"izquierdo, se dañó el rin delantero y el bómper quedó guindando de un lado. No fue un "
+                 f"choque de muerte pero sí quedó feo y me tocó sacarlo con grúa. Mi número de póliza es "
+                 f"POL-DEMO-9999, o al menos ese es el que tengo anotado en un papel que me dio el corredor "
+                 f"cuando la compré. Los daños, según un mecánico que conozco, salen por ahí en 4.000.000 de "
+                 f"pesos entre el rin, el bómper y la latonería de todo el costado. Quisiera empezar el "
+                 f"proceso de reclamación cuanto antes. Quedo atento a lo que necesiten. Muchas gracias.",
         "poliza": None,  # a propósito NO se siembra → C4 no la encuentra → escala P4
         "objetivo": "P4: escala a REQUIERE_REVISION — NO inventa una póliza ni cierra el caso",
+    },
+    {
+        "key": "campos-faltantes",
+        "titulo": "DATOS FALTANTES — escala pidiendo info",
+        "aviso": "Buenos días. Les cuento que ayer tuve un accidente con el carro y estoy bastante "
+                 "estresado, no había tenido tiempo de reportarlo antes. Fue saliendo de un parqueadero de "
+                 "un centro comercial: otro carro me pegó por detrás cuando yo estaba saliendo en reversa, "
+                 "un golpe en el bómper trasero y la compuerta del baúl que ya no cierra bien. La otra "
+                 "persona se bajó, discutimos un rato, tomamos fotos y nos intercambiamos los datos del "
+                 "seguro, pero yo estaba muy nervioso y la verdad no revisé bien todo. Mi póliza con ustedes "
+                 "es la POL-DEMO-1001. Todavía no tengo ni idea de cuánto pueda costar el arreglo, apenas "
+                 "mañana voy a llevar el carro a un taller para que me den la cotización, así que aún no les "
+                 "puedo decir el monto de los daños. Quería ir adelantando el reporte mientras tanto. ¿Me "
+                 "pueden ir diciendo qué documentos necesito? Gracias, quedo muy pendiente.",
+        "poliza": None,  # reusa POL-DEMO-1001 (sembrada por 'feliz'); falta el monto → escala (P4)
+        "objetivo": "P4: aviso incompleto (sin monto) → escala, no inventa · el humano pide el dato",
     },
 ]
 

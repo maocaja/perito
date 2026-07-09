@@ -10,10 +10,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.dashboard.c11 import router as dashboard_router
 from app.api.ingest import router as ingest_router
 from app.api.hitl_actions import router as hitl_actions_router
 from app.demo.seed import seed_demo_casos
+from app.intake.poller import iniciar_poller
 
 _STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
 
@@ -45,8 +47,12 @@ def create_app() -> FastAPI:
         """Health check endpoint (liveness probe)."""
         return {"status": "ok", "service": "perito"}
 
-    # Demo: poblar la bandeja con casos representativos al arrancar (datos en memoria).
-    seed_demo_casos()
+    # Arranque (Unit H): en demo EN VIVO la bandeja se llena de correos (poller gated); si no, se
+    # siembra la demo estática. `iniciar_poller` es self-gated (no-op si DEMO_LIVE=off o sin creds).
+    if settings.demo_live == "off":
+        seed_demo_casos()
+    else:
+        iniciar_poller()
 
     return app
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="/static/htmx.min.js"></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -61,6 +61,10 @@
           <a class="{{ 'active' if rol_val == 'ANALISTA' }}" href="/casos?rol=ANALISTA">Analista</a>
           <a class="{{ 'active' if rol_val == 'CUMPLIMIENTO' }}" href="/panel?rol=CUMPLIMIENTO">Cumplimiento</a>
         </div>
+        <button class="icon-btn" id="bell" type="button" onclick="clearBell()" title="Notificaciones de nuevos casos" aria-label="Notificaciones de nuevos casos" style="position:relative">
+          <span aria-hidden="true">🔔</span>
+          <span class="bell-badge" id="bell-badge">0</span>
+        </button>
         <button class="icon-btn" type="button" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema (claro/oscuro)"><span id="theme-icon" aria-hidden="true">☾</span></button>
       </div>
     </header>
@@ -70,6 +74,8 @@
   </div>
 </div>
 
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+
 <script>
   function toggleTheme(){
     var r=document.documentElement, t=(r.dataset.theme==='dark')?'light':'dark';
@@ -77,6 +83,38 @@
     document.getElementById('theme-icon').textContent=(t==='dark')?'☀':'☾';
   }
   document.getElementById('theme-icon').textContent=(document.documentElement.dataset.theme==='dark')?'☀':'☾';
+
+  // Notificaciones en vivo (Unit H): detecta casos nuevos entre refrescos del poller.
+  (function(){
+    var seen=null, bell=0;
+    function rows(){ return document.querySelectorAll('.row-link[data-caso-id]'); }
+    function updateBell(){
+      var b=document.getElementById('bell-badge'); if(!b) return;
+      b.textContent=bell; b.style.display=bell>0?'flex':'none';
+      var el=document.getElementById('bell'); if(el){ el.classList.remove('ring'); void el.offsetWidth; el.classList.add('ring'); }
+    }
+    window.clearBell=function(){ bell=0; updateBell(); };
+    function notify(r){
+      bell++; updateBell();
+      var titulo=r.getAttribute('data-titulo')||'Siniestro', poliza=r.getAttribute('data-poliza')||'',
+          hora=r.getAttribute('data-hora')||'', fraude=r.getAttribute('data-fraude')||'';
+      var t=document.createElement('a'); t.className='toast'; t.href=r.getAttribute('href');
+      t.innerHTML='<div class="toast-ic">📬</div><div><div class="toast-title">Nuevo siniestro · '+titulo+'</div>'+
+        '<div class="toast-sub">'+poliza+' · '+hora+(fraude?' · <b style="color:var(--bad)">Fraude '+fraude+'</b>':'')+'</div></div>';
+      var box=document.getElementById('toasts'); box.appendChild(t);
+      setTimeout(function(){ t.classList.add('show'); },10);
+      setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){ t.remove(); },300); },5000);
+    }
+    function sync(){
+      var first=(seen===null); if(first) seen=new Set();
+      rows().forEach(function(r){
+        var id=r.getAttribute('data-caso-id');
+        if(!seen.has(id)){ seen.add(id); if(!first) notify(r); }
+      });
+    }
+    window.addEventListener('DOMContentLoaded', sync);
+    document.body.addEventListener('htmx:afterSwap', function(){ sync(); });
+  })();
 </script>
 </body>
 </html>
