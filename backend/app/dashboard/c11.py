@@ -28,8 +28,10 @@ COSTO_USD_POR_1M_TOKENS = 8.0
 _TERMINAL_COBERTURA = {ResultadoCobertura.CUBIERTO, ResultadoCobertura.CUBIERTO_PARCIAL, ResultadoCobertura.NO_CUBIERTO}
 
 
-def _calcular_metricas(casos, replays) -> dict:
+def calcular_metricas(casos, replays) -> dict:
     """Agregación de presentación (H-21) — cuenta campos YA calculados (passive, cero dominio, cero PII).
+
+    Pública (la reusa `demo_run.py` para el resumen de `make demo`, Unit G).
 
     Separa MÉTRICAS MEDIDAS (operación) de GARANTÍAS (invariantes verificadas por validador/tests).
     Robusto ante 0 casos (sin división por cero).
@@ -161,7 +163,7 @@ def panel(request: Request, rol: str = Query(RolUsuario.CUMPLIMIENTO.value)):
     """H-21: métricas agregadas de cumplimiento + trazas por nodo/tokens desde C9 (ReplayStore)."""
     store = get_replay_store()
     replays = [r for r in (store.load(cid) for cid in store.get_all_cases()) if r is not None]
-    metricas = _calcular_metricas(get_caso_repository().list(), replays)
+    metricas = calcular_metricas(get_caso_repository().list(), replays)
     return _TEMPLATES.TemplateResponse(request, "panel.html", {"replays": replays, "rol": rol, "metricas": metricas})
 
 

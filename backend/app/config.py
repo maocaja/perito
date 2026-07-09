@@ -1,13 +1,23 @@
-"""Configuración de Perito (U1 + U2)."""
+"""Configuración de Perito (U1 + U2).
+
+Los valores salen de (en orden de prioridad): variables de entorno del shell > archivo `.env` de
+la RAÍZ del repo > defaults. El `.env` se resuelve por ruta absoluta (robusto al cwd: funciona con
+`make` desde la raíz y con pytest desde `backend/`). Plantilla pública: `env.example` (`cp` → `.env`).
+"""
+
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# config.py → app → backend → raíz del repo (parents[2]).
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
     """Config validada e inmutable (U1 + U2)."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="forbid")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="forbid")
 
     # U1 Fields (optional for testing)
     database_url: str = Field(default="postgresql://localhost:5432/perito_test")
