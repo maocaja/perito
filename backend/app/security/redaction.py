@@ -188,7 +188,40 @@ def redact_pii_spans_es_co(texto: str) -> str:
         '[REDACTED]',
         texto
     )
-    
+
+    return texto
+
+
+# =====================================================================
+# U4 NER-LITE (aditivo, FASE 1) — nombres/direcciones por heurística
+# =====================================================================
+
+def redact_pii_extendida(texto: str) -> str:
+    """Redacción extendida para adjuntos (U4 fase 1): regex base + NER-LITE de nombres/direcciones.
+
+    NER-lite es HEURÍSTICO (patrones de introducción de nombre + vías), NO un modelo NER completo (fase 2).
+    P5: conservador — prefiere redactar de más en los patrones claros. Declara su límite (P7).
+    """
+    import re
+    if not texto:
+        return texto
+    texto = redact_pii_spans_es_co(texto)  # cédula/teléfono/email primero
+
+    # Nombres tras marcador de introducción: "me llamo Juan Pérez", "mi nombre es Ana María Gómez",
+    # "Sr. Pedro", "señora Marta Ruiz", "Dr. Luis". Captura 1-3 palabras Capitalizadas.
+    _NOMBRE = r'((?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})'
+    texto = re.sub(
+        r'(?:me llamo|mi nombre es|nombre[:\s]+|Sr\.?|Sra\.?|señor|señora|Dr\.?|Dra\.?)\s+' + _NOMBRE,
+        lambda m: m.group(0).replace(m.group(1), '[REDACTED]'),
+        texto, flags=re.IGNORECASE,
+    )
+    # Direcciones: "Calle 5 # 10-20", "Carrera 7 No 45-12", "Cra 12 #3-4", "Av 68 ..."
+    texto = re.sub(
+        r'(?:Calle|Cll\.?|Carrera|Cra\.?|Kr\.?|Avenida|Av\.?|Diagonal|Dg\.?|Transversal|Tv\.?)\s*\d+[A-Za-z]?\s*'
+        r'(?:#|No\.?|N°)?\s*\d+\s*[-–]?\s*\d*',
+        '[REDACTED]',
+        texto, flags=re.IGNORECASE,
+    )
     return texto
 
 

@@ -26,6 +26,9 @@ class Dictamen(Contract):
     regla_aplicada: str = Field(min_length=1)  # "R1".."R5", "PRE_MOTOR"
     clausula: Clausula | None = None  # None solo si REQUIERE_REVISION (validado)
     deducible_calculado: Money
+    # --- U3 product-aware (aditivo, opcional): cita la cobertura específica aplicada ---
+    cobertura_aplicada: str | None = None   # nombre de la cobertura del producto
+    sublimite_aplicado: Money | None = None  # el sublímite efectivo usado en R4
 
     @model_validator(mode="after")
     def _clausula_obligatoria_en_terminal(self) -> "Dictamen":

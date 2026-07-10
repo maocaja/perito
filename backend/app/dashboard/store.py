@@ -26,7 +26,7 @@ class CasoRepository(Protocol):
     """Interfaz de persistencia de casos (save/get/list/clear)."""
     def save(self, caso: Caso) -> Caso: ...
     def get(self, caso_id: str) -> Optional[Caso]: ...
-    def list(self, estado: Optional[EstadoCaso] = None) -> list[Caso]: ...
+    def list(self, estado: Optional[EstadoCaso] = None, limite: Optional[int] = None) -> list[Caso]: ...
     def clear(self) -> None: ...
 
 
@@ -43,11 +43,12 @@ class InMemoryCasoRepository:
     def get(self, caso_id: str) -> Optional[Caso]:
         return self._casos.get(caso_id)
 
-    def list(self, estado: Optional[EstadoCaso] = None) -> list[Caso]:
+    def list(self, estado: Optional[EstadoCaso] = None, limite: Optional[int] = None) -> list[Caso]:
         casos = list(self._casos.values())
         if estado is not None:
             casos = [c for c in casos if c.estado == estado]
-        return sorted(casos, key=lambda c: c.timestamp_actualizacion, reverse=True)
+        casos = sorted(casos, key=lambda c: c.timestamp_actualizacion, reverse=True)
+        return casos[:limite] if limite is not None else casos
 
     def clear(self) -> None:
         self._casos.clear()
@@ -83,12 +84,14 @@ class SqlCasoRepository:
             ).first()
         return Caso.model_validate_json(row[0]) if row else None
 
-    def list(self, estado: Optional[EstadoCaso] = None) -> list[Caso]:
+    def list(self, estado: Optional[EstadoCaso] = None, limite: Optional[int] = None) -> list[Caso]:
         from sqlalchemy import select
         from app.persistence.db import casos_table
         stmt = select(casos_table.c.data).order_by(casos_table.c.timestamp_actualizacion.desc())
         if estado is not None:
             stmt = stmt.where(casos_table.c.estado == estado.value)
+        if limite is not None:
+            stmt = stmt.limit(limite)  # P4: cota de carga a nivel DB (LIMIT SQL)
         with self.engine.connect() as conn:
             rows = conn.execute(stmt).all()
         return [Caso.model_validate_json(r[0]) for r in rows]
