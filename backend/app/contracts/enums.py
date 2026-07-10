@@ -72,7 +72,10 @@ class TipoClausula(str, Enum):
 # --- U2 Aditivos ---
 
 class TipoSiniestro(str, Enum):
-    """Tipos de siniestro cubiertos por póliza (U2)."""
+    """Tipos de siniestro cubiertos por póliza (U2; SOAT añadido en U3 product-aware)."""
     AUTO_COLISION = "AUTO_COLISION"
     AUTO_HURTO = "AUTO_HURTO"
     HOGAR_AGUA = "HOGAR_AGUA"
+    HOGAR_INCENDIO = "HOGAR_INCENDIO"
+    SOAT_GASTOS_MEDICOS = "SOAT_GASTOS_MEDICOS"
+    SOAT_INCAPACIDAD = "SOAT_INCAPACIDAD"

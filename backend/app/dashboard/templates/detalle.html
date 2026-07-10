@@ -16,6 +16,15 @@
   </div>
 </div>
 
+<!-- U1 · ROUTING: prioridad (regla citada) + equipo destino -->
+<div class="routing-line">
+  <span class="prio-badge prio-{{ prioridad.nivel|lower }}">Prioridad {{ prioridad.nivel|lower }}</span>
+  <span class="muted" style="font-size:12.5px">{{ prioridad.motivo }}</span>
+  <span class="routing-sep">·</span>
+  <span style="font-size:12.5px">→ {{ equipo.equipo }}</span>
+  {% if equipo.siu %}<span class="siu-tag">carril SIU · revisar</span>{% endif %}
+</div>
+
 <!-- BANNER DE PRÓXIMO PASO (héroe, full-width). Passive: describe el paso del HUMANO (P1). -->
 <div class="banner banner-{{ recomendacion.tono }}">
   <span class="banner-ic">{{ recomendacion.icono }}</span>
@@ -114,6 +123,34 @@
     </section>
     {% endif %}
 
+    <!-- U2 · DOCUMENTOS REQUERIDOS (checklist por producto) -->
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--text-3);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>
+        <h2>Documentos requeridos</h2>
+        {% if docs_checklist.disponible %}<span class="tag spacer">{{ docs_checklist.producto }}</span>{% endif %}
+      </div>
+      <div class="card-body">
+        {% if docs_checklist.disponible %}
+        <div class="checklist" style="border-bottom:none;padding-bottom:0;margin-bottom:0">
+          {% for it in docs_checklist.docs %}
+          <div class="check-item">
+            {% if it.presente is none %}
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+            {% elif it.presente %}
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            {% endif %}
+            <span class="check-lbl">{{ it.doc }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="hint" style="margin-top:12px">Requeridos para <strong>{{ docs_checklist.producto }}</strong>. La detección de cuáles llegaron se enchufa con la lectura de adjuntos (multimodal).</p>
+        {% else %}
+        <p class="hint">Catálogo de documentos no disponible para este producto (aún no modelado).</p>
+        {% endif %}
+      </div>
+    </section>
+
     <!-- CORREO RECIBIDO (apoyo, colapsable) -->
     <section class="card">
       <details class="email-details">
@@ -174,8 +211,11 @@
           <div style="font-size:12.5px;line-height:1.6;color:var(--text-2)"><span class="mono" style="color:var(--text);font-weight:600">{{ caso.dictamen.clausula.id }} · {{ caso.dictamen.clausula.texto }}.</span> {{ caso.dictamen.clausula.referencia }}</div>
         </div>
         {% endif %}
+        {% if caso.dictamen.cobertura_aplicada %}
+        <div style="margin-top:8px;font-size:12.5px;color:var(--text-2)">Cobertura aplicada: <span class="mono" style="color:var(--text)">{{ caso.dictamen.cobertura_aplicada }}</span>{% if caso.dictamen.sublimite_aplicado %} · sublímite <span class="mono" style="color:var(--text)">{{ caso.dictamen.sublimite_aplicado }}</span>{% endif %}</div>
+        {% endif %}
         {% if caso.dictamen.resultado.value in ['CUBIERTO','CUBIERTO_PARCIAL'] %}
-        <div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">Deducible calculado: <span class="mono" style="color:var(--text)">{{ caso.dictamen.deducible_calculado }}</span></div>
+        <div style="margin-top:8px;font-size:12.5px;color:var(--text-2)">Deducible calculado: <span class="mono" style="color:var(--text)">{{ caso.dictamen.deducible_calculado }}</span></div>
         {% endif %}
       </div>
     </section>

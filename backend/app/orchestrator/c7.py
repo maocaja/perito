@@ -240,11 +240,17 @@ def _es_terminal(estado: EstadoCaso) -> bool:
 
 
 def _snapshot_caso(caso: Caso) -> str:
-    """Hash deterministico de (extraccion, poliza, dictamen) para ciclo detection."""
+    """Hash determinístico del CONTENIDO de (extraccion, poliza, dictamen) para detección de ciclos (P4).
+
+    Usa el contenido (`model_dump_json`), NO `id()` del objeto: `id()` cambia en cada `model_copy`, así que
+    el snapshot nunca coincidía y el ciclo NUNCA se detectaba (bug). Ahora si el estado se repite → se detecta.
+    """
+    def _contenido(m):
+        return m.model_dump_json() if m is not None else None
     snapshot_dict = {
-        "extraccion_id": id(caso.extraccion) if caso.extraccion else None,
-        "poliza_id": id(caso.poliza_match) if caso.poliza_match else None,
-        "dictamen_id": id(caso.dictamen) if caso.dictamen else None,
+        "extraccion": _contenido(caso.extraccion),
+        "poliza": _contenido(caso.poliza_match),
+        "dictamen": _contenido(caso.dictamen),
     }
     snapshot_json = json.dumps(snapshot_dict, sort_keys=True)
     return hashlib.sha256(snapshot_json.encode()).hexdigest()

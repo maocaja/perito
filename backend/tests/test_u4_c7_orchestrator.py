@@ -202,3 +202,17 @@ def test_orquestador_confianza_baja_escala(caso_recibido, hitl_service_mock, cot
                              {"tokens_in": 10, "tokens_out": 5})):
         resultado = orquestar_fnol(caso_recibido, hitl_service_mock, cotas_standard)
     assert resultado.estado == EstadoCaso.REQUIERE_REVISION
+
+
+# --- Fix del bug de detección de ciclos (P4) ---
+
+def test_snapshot_caso_usa_contenido_no_id():
+    """P4: el snapshot de ciclo hashea CONTENIDO, no id() — antes id() cambiaba en cada model_copy
+    y el ciclo nunca se detectaba. Mismo contenido → mismo hash; distinto contenido → distinto."""
+    from app.orchestrator.c7 import _snapshot_caso
+    from app.demo.seed import seed_demo_casos
+    from app.dashboard.store import get_caso_repository
+    seed_demo_casos()
+    c = get_caso_repository().list()[0]
+    assert _snapshot_caso(c) == _snapshot_caso(c.model_copy(deep=True))   # mismo contenido, objeto distinto
+    assert _snapshot_caso(c) != _snapshot_caso(c.model_copy(update={"dictamen": None}))

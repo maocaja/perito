@@ -31,17 +31,39 @@ class Clausula(Contract):
     referencia: str = Field(min_length=1)
 
 
+class CoberturaContratada(Contract):
+    """Cobertura específica de un producto, con su PROPIO sublímite/deducible/exclusiones (U3, product-aware).
+
+    `nombre` coincide con un valor de `TipoSiniestro` (ej. "AUTO_COLISION"). `tope_smmlv` (opcional) modela
+    productos con tope legal en salarios mínimos (SOAT): el límite efectivo = min(sublimite, tope_smmlv·SMMLV).
+    """
+
+    nombre: str = Field(min_length=1)
+    sublimite: Money
+    deducible: Money
+    exclusiones: list[str] = Field(default_factory=list)
+    tope_smmlv: int | None = None
+
+
 class Poliza(Contract):
-    """Póliza sintética. Montos como Decimal (nunca float, PATTERN-U1-02)."""
+    """Póliza sintética. Montos como Decimal (nunca float, PATTERN-U1-02).
+
+    U3 (product-aware, ADITIVO): si `coberturas` está poblado, el motor lo prefiere (sublímite/deducible por
+    cobertura); si está vacío, cae al modelo plano (`coberturas_contratadas`/`suma_asegurada`/`deducible`).
+    Los campos planos quedan como retro-compat hasta migrar todo (limpieza en unit posterior).
+    """
 
     numero: str = Field(min_length=1)
     vigencia: RangoFechas
-    coberturas_contratadas: list[str] = Field(default_factory=list)
-    exclusiones: list[str] = Field(default_factory=list)
+    coberturas_contratadas: list[str] = Field(default_factory=list)  # PLANO (retro-compat)
+    exclusiones: list[str] = Field(default_factory=list)             # PLANO (retro-compat)
     suma_asegurada: Money
     deducible: Money
-    es_soat: bool = False  # forward-compat (RF-14); SOAT diferido
+    es_soat: bool = False
     clausulas: list[Clausula] = Field(default_factory=list)
+    # --- U3 product-aware (aditivo; si presente, gana sobre los campos planos) ---
+    producto: str | None = None
+    coberturas: list[CoberturaContratada] = Field(default_factory=list)
 
 
 class ResultadoPoliza(Contract):

@@ -16,7 +16,23 @@ from app.contracts.dictamen import Dictamen
 from app.contracts.enums import ResultadoCobertura, TipoClausula, TipoSiniestro
 from app.contracts.extraccion import CampoExtraido, ExtraccionValidada
 from app.contracts.money import Money
-from app.contracts.poliza import Clausula, Poliza, ResultadoPoliza
+from app.contracts.poliza import Clausula, CoberturaContratada, Poliza, ResultadoPoliza
+
+# Salario Mínimo Mensual Legal Vigente (Colombia). Valor EJEMPLAR para el tope SOAT (P7: ilustrativo).
+SMMLV_2026 = Decimal("1623500")
+
+# Productos con catálogo de cobertura modelado. Un producto declarado FUERA de este set y sin `coberturas`
+# explícitas no se puede validar → escala (P7: no se finge cobertura). El modelo plano (producto=None) NO
+# se ve afectado (retro-compat).
+PRODUCTOS_MODELADOS = {"Autos", "Hogar", "SOAT"}
+
+
+def _cobertura_efectiva(poliza: Poliza, tipo_siniestro: str) -> Optional[CoberturaContratada]:
+    """Cobertura del producto que aplica al siniestro (product-aware). None si no hay match o no es product-aware."""
+    for cob in poliza.coberturas:
+        if cob.nombre == tipo_siniestro:
+            return cob
+    return None
 
 
 def redondear_monto(monto: Decimal) -> Decimal:
@@ -71,32 +87,6 @@ def _get_campo(extraccion: ExtraccionValidada, nombre: str) -> Optional[CampoExt
         if campo.nombre == nombre:
             return campo
     return None
-
-
-def _calcular_r1_vigencia(
-    fecha_siniestro: Optional[date],
-    clausula_vigencia: Optional[Clausula]
-) -> bool:
-    """R1: Vigencia. ¿Está el siniestro dentro del período de vigencia?
-
-    Args:
-        fecha_siniestro: Fecha del siniestro (de extracción)
-        clausula_vigencia: Cláusula de vigencia de póliza
-
-    Returns:
-        True si dentro de rango, False si no (incluyendo None)
-    """
-    if not fecha_siniestro or not clausula_vigencia:
-        return False
-
-    # clausula_vigencia.referencia contiene el rango (desde-hasta)
-    # En estos ejemplos, usamos vigencia.desde/hasta directamente
-    # (Aquí asumo que Clausula tiene referencia con formato o que poliza.vigencia lo tiene)
-    # Para el MVP, accedemos via poliza.vigencia (RangoFechas)
-    # Esto se pasa a través del contexto; en motor_cobertura lo tenemos
-
-    # Retornar False aquí; se corrige con el contexto en motor_cobertura
-    return False
 
 
 def motor_cobertura(
@@ -176,106 +166,84 @@ def motor_cobertura(
             deducible_calculado=Decimal(0)
         )
 
-    # --- R2: Cobertura contratada ---
+    # --- R2: Cobertura contratada (product-aware si poliza.coberturas; si no, modelo plano) ---
+    def _revision() -> Dictamen:
+        return Dictamen(resultado=ResultadoCobertura.REQUIERE_REVISION, regla_aplicada="PRE_MOTOR",
+                        clausula=None, deducible_calculado=Decimal(0))
+
     tipo_siniestro_campo = _get_campo(extraccion, "tipo_siniestro")
     if not tipo_siniestro_campo or tipo_siniestro_campo.ausente:
-        return Dictamen(
-            resultado=ResultadoCobertura.REQUIERE_REVISION,
-            regla_aplicada="PRE_MOTOR",
-            clausula=None,
-            deducible_calculado=Decimal(0)
-        )
+        return _revision()
 
     tipo_siniestro = tipo_siniestro_campo.valor
     clausula_cobertura = obtener_clausula(poliza, TipoClausula.COBERTURA)
     if not clausula_cobertura:
-        return Dictamen(
-            resultado=ResultadoCobertura.REQUIERE_REVISION,
-            regla_aplicada="PRE_MOTOR",
-            clausula=None,
-            deducible_calculado=Decimal(0)
-        )
+        return _revision()
 
-    # R2 check: ¿está el tipo en las coberturas contratadas?
-    if tipo_siniestro not in poliza.coberturas_contratadas:
-        return Dictamen(
-            resultado=ResultadoCobertura.NO_CUBIERTO,
-            regla_aplicada="R2_COBERTURA",
-            clausula=clausula_cobertura,
-            deducible_calculado=Decimal(0)
-        )
+    # Producto declarado pero NO modelado y sin catálogo de coberturas → no se puede validar, escala (P7, §7).
+    if poliza.producto and poliza.producto not in PRODUCTOS_MODELADOS and not poliza.coberturas:
+        return Dictamen(resultado=ResultadoCobertura.REQUIERE_REVISION,
+                        regla_aplicada="PRODUCTO_NO_MODELADO", clausula=None, deducible_calculado=Decimal(0))
 
-    # --- R3: Exclusiones ---
-    # Si hay una exclusión que aplique, NO_CUBIERTO
-    # Por ahora: MVP simple (sin contexto de exclusión específica)
-    # En producción: evaluar cada exclusion.aplica(extraccion, poliza)
-    clausula_exclusion = obtener_clausula(poliza, TipoClausula.EXCLUSION)
-    if clausula_exclusion and len(poliza.exclusiones) > 0:
-        # Simplificación MVP: si hay exclusiones listadas, potencial match
-        # En real: iterar y chequear cada una
-        pass  # R3 skipped en MVP (sin lógica de exclusión específica)
+    # Valores EFECTIVOS: de la cobertura del producto (U3) o del modelo plano (retro-compat).
+    if poliza.coberturas:  # product-aware
+        cob = _cobertura_efectiva(poliza, tipo_siniestro)
+        if cob is None:
+            return Dictamen(resultado=ResultadoCobertura.NO_CUBIERTO, regla_aplicada="R2_COBERTURA",
+                            clausula=clausula_cobertura, deducible_calculado=Decimal(0))
+        eff_sublimite, eff_deducible = cob.sublimite, cob.deducible
+        eff_exclusiones, eff_tope_smmlv, cobertura_nombre = cob.exclusiones, cob.tope_smmlv, cob.nombre
+    else:  # plano (retro-compat)
+        if tipo_siniestro not in poliza.coberturas_contratadas:
+            return Dictamen(resultado=ResultadoCobertura.NO_CUBIERTO, regla_aplicada="R2_COBERTURA",
+                            clausula=clausula_cobertura, deducible_calculado=Decimal(0))
+        eff_sublimite, eff_deducible = poliza.suma_asegurada, poliza.deducible
+        eff_exclusiones, eff_tope_smmlv, cobertura_nombre = poliza.exclusiones, None, None
 
-    # --- R4: Límite de póliza ---
+    # --- R3: Exclusiones (ahora SÍ evalúa; antes era `pass`) ---
+    if tipo_siniestro in eff_exclusiones:
+        clausula_exclusion = obtener_clausula(poliza, TipoClausula.EXCLUSION) or clausula_cobertura
+        return Dictamen(resultado=ResultadoCobertura.NO_CUBIERTO, regla_aplicada="R3_EXCLUSION",
+                        clausula=clausula_exclusion, deducible_calculado=Decimal(0),
+                        cobertura_aplicada=cobertura_nombre)
+
+    # --- R4: Límite (sublímite de LA cobertura; SOAT topa en SMMLV) ---
     monto_reclamado_campo = _get_campo(extraccion, "monto_reclamado")
     if not monto_reclamado_campo or monto_reclamado_campo.ausente:
-        return Dictamen(
-            resultado=ResultadoCobertura.REQUIERE_REVISION,
-            regla_aplicada="PRE_MOTOR",
-            clausula=None,
-            deducible_calculado=Decimal(0)
-        )
-
-    monto_reclamado = None
+        return _revision()
     try:
-        if monto_reclamado_campo.valor:
-            monto_reclamado = Decimal(monto_reclamado_campo.valor)
+        monto_reclamado = Decimal(monto_reclamado_campo.valor) if monto_reclamado_campo.valor else None
     except Exception:
-        return Dictamen(
-            resultado=ResultadoCobertura.REQUIERE_REVISION,
-            regla_aplicada="PRE_MOTOR",
-            clausula=None,
-            deducible_calculado=Decimal(0)
-        )
+        return _revision()
+    if monto_reclamado is None:
+        return _revision()
 
-    clausula_limite = obtener_clausula(poliza, TipoClausula.LIMITE)
-    if not clausula_limite:
-        clausula_limite = clausula_cobertura  # Fallback
+    limite_efectivo = eff_sublimite
+    if eff_tope_smmlv is not None:  # SOAT: tope legal en salarios mínimos
+        limite_efectivo = min(limite_efectivo, Decimal(eff_tope_smmlv) * SMMLV_2026)
+    monto_tras_limite = redondear_monto(min(monto_reclamado, limite_efectivo))
 
-    # R4: monto_tras_limite = min(reclamado, suma_asegurada)
-    monto_tras_limite = min(monto_reclamado, poliza.suma_asegurada)
-    monto_tras_limite = redondear_monto(monto_tras_limite)
-
-    # --- R5: Deducible ---
+    # --- R5: Deducible (de LA cobertura) ---
     clausula_deducible = obtener_clausula(poliza, TipoClausula.DEDUCIBLE)
     if not clausula_deducible:
-        return Dictamen(
-            resultado=ResultadoCobertura.REQUIERE_REVISION,
-            regla_aplicada="PRE_MOTOR",
-            clausula=None,
-            deducible_calculado=Decimal(0)
-        )
+        return _revision()
+    pago_final = redondear_monto(max(Decimal(0), monto_tras_limite - eff_deducible))
+    deducible_aplicado = redondear_monto(min(eff_deducible, monto_tras_limite))
 
-    deducible = poliza.deducible
-    pago_final = max(Decimal(0), monto_tras_limite - deducible)
-    pago_final = redondear_monto(pago_final)
-    deducible_aplicado = min(deducible, monto_tras_limite)
-    deducible_aplicado = redondear_monto(deducible_aplicado)
-
-    # Determinar resultado final
+    # PARCIAL si el pago es MENOR que lo reclamado (por sublímite o por deducible); CUBIERTO si se paga todo.
     if pago_final == Decimal(0):
-        # deducible >= monto, o monto es 0 → CUBIERTO (no PARCIAL)
         resultado = ResultadoCobertura.CUBIERTO
-    elif pago_final < monto_tras_limite:
-        # Hay pago pero < monto (deducible reduce)
+    elif pago_final < redondear_monto(monto_reclamado):
         resultado = ResultadoCobertura.CUBIERTO_PARCIAL
     else:
-        # pago == monto (deducible no afecta)
         resultado = ResultadoCobertura.CUBIERTO
 
     return Dictamen(
         resultado=resultado,
         regla_aplicada="R5_DEDUCIBLE",
         clausula=clausula_deducible,
-        deducible_calculado=deducible_aplicado
+        deducible_calculado=deducible_aplicado,
+        cobertura_aplicada=cobertura_nombre,
+        sublimite_aplicado=redondear_monto(limite_efectivo),
     )
 
