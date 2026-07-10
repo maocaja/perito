@@ -143,6 +143,7 @@ def _procesar(correo) -> None:
         # extracción/dictamen son del preset (sin LLM). Números de póliza alineados → sin desajuste.
         caso = caso.model_copy(update={"aviso": AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO)})
         caso = _ingerir_adjuntos(caso, correo)  # M1: adjuntos reales sobre el caso preset (si el correo trae)
+        caso = _correlacionar_evidencia(caso, None)  # M3: overlay cross-fuente (sin traza en modo preset)
         with _save_lock:
             get_caso_repository().save(caso)
         sembrar_traza_demo(caso)

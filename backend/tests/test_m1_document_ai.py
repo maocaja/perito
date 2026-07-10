@@ -148,6 +148,41 @@ def test_correo_entrante_adjuntos_default_vacio():
     assert correo.adjuntos == []
 
 
+def test_mime_por_extension():
+    """El envío (demo) mapea el tipo MIME por extensión."""
+    from app.intake.mailbox import _mime_de
+    assert _mime_de("foto.jpg") == ("image", "jpeg")
+    assert _mime_de("denuncia.txt") == ("text", "plain")
+    assert _mime_de("x.desconocido") == ("application", "octet-stream")
+
+
+def test_adjuntos_del_correo_roundtrip():
+    """Enviar con adjuntos → parsear el MIME → `_extraer_adjuntos` los recupera (round-trip del canal demo)."""
+    from email.message import EmailMessage
+    from app.intake.mailbox import _mime_de
+
+    msg = EmailMessage()
+    msg["Subject"] = "[DEMO:fraude] test"
+    msg.set_content("cuerpo")
+    for nombre, contenido in [("foto_siniestro.jpg", b"\xff\xd8foto"), ("denuncia.txt", b"placa GHT456")]:
+        mt, st = _mime_de(nombre)
+        msg.add_attachment(contenido, maintype=mt, subtype=st, filename=nombre)
+    parsed = email.message_from_bytes(msg.as_bytes())
+    recuperados = {n for n, _ in _extraer_adjuntos(parsed)}
+    assert recuperados == {"foto_siniestro.jpg", "denuncia.txt"}
+
+
+def test_adjuntos_demo_fraude_diverge():
+    """El generador de demo produce placas divergentes en 'fraude' (para el 'aha' de M3) y foto compartida."""
+    from demo_mail import _adjuntos_demo, _FOTO_COMPARTIDA
+    adj_fraude = dict(_adjuntos_demo("fraude"))
+    adj_feliz = dict(_adjuntos_demo("feliz"))
+    # foto compartida (mismos bytes) → foto reutilizada al segundo correo
+    assert adj_fraude["foto_siniestro.jpg"] == adj_feliz["foto_siniestro.jpg"] == _FOTO_COMPARTIDA
+    # en 'fraude' la denuncia y el SOAT llevan placas distintas
+    assert b"GHT456" in adj_fraude["denuncia.txt"] and b"GHT457" in adj_fraude["soat.txt"]
+
+
 # ---------- persistencia round-trip (el Adjunto sobrevive al JSON blob) ----------
 
 def test_adjuntos_persisten_en_el_caso():

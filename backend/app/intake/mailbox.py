@@ -53,6 +53,21 @@ def _extraer_cuerpo(msg: email.message.Message) -> str:
     return ""
 
 
+_MIME_POR_EXT = {
+    ".jpg": ("image", "jpeg"), ".jpeg": ("image", "jpeg"), ".png": ("image", "png"),
+    ".pdf": ("application", "pdf"), ".txt": ("text", "plain"),
+}
+
+
+def _mime_de(nombre: str) -> tuple[str, str]:
+    """Tipo MIME (maintype, subtype) por extensión; default binario opaco."""
+    n = (nombre or "").lower()
+    for ext, mime in _MIME_POR_EXT.items():
+        if n.endswith(ext):
+            return mime
+    return ("application", "octet-stream")
+
+
 def _extraer_adjuntos(msg: email.message.Message) -> list[tuple[str, bytes]]:
     """Adjuntos MIME del correo → [(nombre, bytes)] (M1). Solo partes marcadas como attachment con nombre.
 
@@ -135,13 +150,18 @@ class Mailbox:
         self._imap.uid("store", uid, "+FLAGS", "(\\Seen)")
 
     # --- SMTP (envío, para el generador) ---
-    def enviar(self, asunto: str, cuerpo: str, to: Optional[str] = None) -> None:
-        """Envía un correo al buzón demo (por default a sí mismo). No requiere el context IMAP."""
+    def enviar(self, asunto: str, cuerpo: str, to: Optional[str] = None,
+               adjuntos: Optional[list[tuple[str, bytes]]] = None) -> None:
+        """Envía un correo al buzón demo (por default a sí mismo). `adjuntos`: (nombre, bytes) → los adjunta
+        con su tipo MIME por extensión (para ejercitar M1/M3 en la demo). No requiere el context IMAP."""
         msg = EmailMessage()
         msg["Subject"] = asunto
         msg["From"] = self.address
         msg["To"] = to or self.address
         msg.set_content(cuerpo)
+        for nombre, contenido in adjuntos or []:
+            maintype, subtype = _mime_de(nombre)
+            msg.add_attachment(contenido, maintype=maintype, subtype=subtype, filename=nombre)
         with smtplib.SMTP_SSL(self.smtp_host, 465) as smtp:
             smtp.login(self.address, self.password)
             smtp.send_message(msg)
