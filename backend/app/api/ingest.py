@@ -33,6 +33,8 @@ from app.demo.seed import sembrar_traza_demo
 
 router = APIRouter(tags=["ingest"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent.parent / "dashboard" / "templates"))
+from app.dashboard import branding  # noqa: E402  (W16: marca/nav consistente con el dashboard)
+branding.registrar(_TEMPLATES)
 
 MAX_AVISO_CHARS = 5000
 

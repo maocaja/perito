@@ -11,7 +11,7 @@ Credenciales desde `settings` (buzón demo dedicado). Ninguna dep nueva.
 import email
 import imaplib
 import smtplib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.header import decode_header, make_header
 from email.message import EmailMessage
 from typing import Optional
@@ -25,6 +25,7 @@ class CorreoEntrante:
     uid: str
     asunto: str   # decodificado; puede llevar el marcador [DEMO:<escenario>]
     cuerpo: str   # texto plano = el aviso FNOL
+    adjuntos: list[tuple[str, bytes]] = field(default_factory=list)  # M1: (nombre, bytes) de cada adjunto MIME
 
 
 def _decode_header(raw: Optional[str]) -> str:
@@ -50,6 +51,26 @@ def _extraer_cuerpo(msg: email.message.Message) -> str:
     if payload:
         return payload.decode(msg.get_content_charset() or "utf-8", errors="replace").strip()
     return ""
+
+
+def _extraer_adjuntos(msg: email.message.Message) -> list[tuple[str, bytes]]:
+    """Adjuntos MIME del correo → [(nombre, bytes)] (M1). Solo partes marcadas como attachment con nombre.
+
+    P5: aquí solo se CAPTURAN los bytes; la redacción/huella/omisión de media cruda la hace `document_ai`
+    (los bytes no se persisten: se convierten en texto redactado + huella). Vacío si el correo no es multipart.
+    """
+    if not msg.is_multipart():
+        return []
+    adjuntos: list[tuple[str, bytes]] = []
+    for part in msg.walk():
+        disp = str(part.get("Content-Disposition") or "")
+        if "attachment" not in disp:
+            continue
+        nombre = _decode_header(part.get_filename())
+        contenido = part.get_payload(decode=True)
+        if nombre and contenido:
+            adjuntos.append((nombre, contenido))
+    return adjuntos
 
 
 class Mailbox:
@@ -104,6 +125,7 @@ class Mailbox:
                 uid=uid.decode() if isinstance(uid, bytes) else str(uid),
                 asunto=_decode_header(msg.get("Subject")),
                 cuerpo=_extraer_cuerpo(msg),
+                adjuntos=_extraer_adjuntos(msg),  # M1: captura los adjuntos (antes se descartaban)
             ))
         return correos
 

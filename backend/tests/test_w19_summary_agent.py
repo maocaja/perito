@@ -1,0 +1,143 @@
+"""Tests W19 — Summary Agent (LLM mockeable). 🔒 P1.
+
+Central: el agente DESCRIBE, no decide. Guard fail-closed (sin PALABRAS_PROHIBIDAS; no contradice al motor)
++ fallback determinístico a W4. P5: prompt de campos redactados, no del texto_crudo. Hermético: sin key real,
+usa el fallback (no toca red).
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.demo.seed import seed_demo_casos
+from app.dashboard.store import get_caso_repository
+from app.dashboard import vista_caso
+from app.llm import summary
+from app.contracts.enums import ResultadoCobertura
+
+
+@pytest.fixture
+def client():
+    seed_demo_casos()
+    return TestClient(app)
+
+
+def _un_caso():
+    return get_caso_repository().list()[0]
+
+
+def _con_dictamen():
+    return next((c for c in get_caso_repository().list() if c.dictamen is not None), None)
+
+
+# ---------- hermético: sin LLM real → fallback (no red) ----------
+
+def test_hermetico_usa_fallback_base():
+    """Con key='test' (hermético) el agente NO llama al LLM → usa la plantilla W4 (origen='base')."""
+    caso = _un_caso()
+    texto, origen = summary.call_summary_agent(caso)
+    assert origen == "base"
+    assert texto == vista_caso.resumen_narrativo(caso)
+
+
+# ---------- agente real (mock) ----------
+
+def test_agente_redacta_cuando_llm_valido(monkeypatch):
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda caso: "El asegurado reportó un choque. La póliza está vigente.")
+    texto, origen = summary.call_summary_agent(_un_caso())
+    assert origen == "agente"
+    assert "choque" in texto
+
+
+# ---------- 🔒 guard fail-closed ----------
+
+def test_guard_rechaza_palabra_de_decision(monkeypatch):
+    """Si el LLM 'decide' (aprobado/rechazado) → guard falla → fallback base (P1)."""
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda caso: "El caso queda aprobado y cerrado.")
+    _texto, origen = summary.call_summary_agent(_un_caso())
+    assert origen == "base"
+
+
+def test_guard_rechaza_cobertura_contradictoria(monkeypatch):
+    """🔒 P2: si el LLM afirma una cobertura distinta a la del motor → guard falla → fallback."""
+    caso = _con_dictamen()
+    if caso is None:
+        pytest.skip("sin caso con dictamen")
+    contraria = "no cubierto" if caso.dictamen.resultado != ResultadoCobertura.NO_CUBIERTO else "cubierto"
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda c: f"El siniestro está {contraria} según el análisis.")
+    _texto, origen = summary.call_summary_agent(caso)
+    assert origen == "base"
+
+
+def test_guard_acepta_cobertura_coincidente(monkeypatch):
+    caso = _con_dictamen()
+    if caso is None:
+        pytest.skip("sin caso con dictamen")
+    label = caso.dictamen.resultado.value.replace("_", " ").lower()
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda c: f"Ocurrió un siniestro; el motor lo marcó {label}.")
+    _texto, origen = summary.call_summary_agent(caso)
+    assert origen == "agente"  # coincide con el motor → válido
+
+
+def test_guard_acepta_cubierto_parcial_especifico(monkeypatch):
+    """🔒 P2 (regresión del bug de substring): 'cubierto parcial' con dictamen CUBIERTO_PARCIAL NO se rechaza."""
+    caso = next((c for c in get_caso_repository().list()
+                 if c.dictamen and c.dictamen.resultado == ResultadoCobertura.CUBIERTO_PARCIAL), None)
+    if caso is None:
+        pytest.skip("sin caso CUBIERTO_PARCIAL")
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda c: "El motor lo marcó cubierto parcial; revisa el sublímite.")
+    _texto, origen = summary.call_summary_agent(caso)
+    assert origen == "agente"  # antes del fix, "cubierto" matcheaba dentro de "cubierto parcial" → falso rechazo
+
+
+def test_guard_rechaza_cobertura_sin_dictamen(monkeypatch):
+    """Si no hay dictamen y la narrativa afirma cobertura → guard falla → fallback (no inventa veredicto)."""
+    caso = next((c for c in get_caso_repository().list() if c.dictamen is None), None)
+    if caso is None:
+        pytest.skip("sin caso sin dictamen")
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda c: "El siniestro está cubierto por la póliza.")
+    _texto, origen = summary.call_summary_agent(caso)
+    assert origen == "base"
+
+
+def test_excepcion_del_llm_cae_a_fallback(monkeypatch):
+    monkeypatch.setattr(summary, "_llm_disponible", lambda: True)
+    monkeypatch.setattr(summary, "_llm_redacta", lambda c: (_ for _ in ()).throw(RuntimeError("LLM down")))
+    _texto, origen = summary.call_summary_agent(_un_caso())
+    assert origen == "base"
+
+
+# ---------- 🔒 P5 prompt ----------
+
+def test_prompt_no_incluye_texto_crudo_y_redacta():
+    """El prompt se arma de campos redactados, NO del texto_crudo del correo."""
+    from app.contracts.extraccion import CampoExtraido, ExtraccionValidada, EvidenciaOrigen
+    from app.contracts.enums import TipoOrigen
+    caso = _un_caso()
+    campos = list(caso.extraccion.campos) + [CampoExtraido(
+        nombre="numero_poliza", valor="POL-1 C.C. 1.098.765.432",
+        origen=EvidenciaOrigen(tipo=TipoOrigen.SPAN, referencia="s"), confianza=0.9, ausente=False)]
+    # el texto_crudo tiene PII que NO debe entrar al prompt
+    caso2 = caso.model_copy(update={"extraccion": ExtraccionValidada(
+        campos=[c for c in campos if c.nombre != "numero_poliza"] + [campos[-1]])})
+    prompt = summary.construir_prompt(caso2)
+    assert caso2.aviso.texto_crudo not in prompt          # no el correo crudo
+    assert "1.098.765.432" not in prompt                   # cédula redactada
+
+
+# ---------- render ----------
+
+def test_render_muestra_tag_de_origen(client):
+    html = client.get(f"/workbench/caso/{_un_caso().id}").text
+    assert "wb-agente-tag" in html
+    assert "Resumen ejecutivo" in html
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-q"])

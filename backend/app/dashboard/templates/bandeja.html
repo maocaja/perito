@@ -13,7 +13,7 @@
     </span>
     {% endif %}
   </div>
-  <a class="btn btn-primary" href="/nuevo?rol={{ rol }}" style="margin-left:auto"><span style="font-size:16px;line-height:1">+</span>Nuevo aviso</a>
+  {# Botón "Nuevo aviso" oculto: los avisos entran automáticamente desde el correo (poller). #}
 </div>
 
 <div id="bandeja-live"{% if en_vivo %} hx-get="/casos?estado={{ estado_actual }}&rol={{ rol }}&orden={{ orden }}" hx-trigger="every 3s" hx-select="#bandeja-live" hx-target="#bandeja-live" hx-swap="outerHTML"{% endif %}>

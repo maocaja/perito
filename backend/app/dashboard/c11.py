@@ -22,12 +22,22 @@ from app.hitl.c8 import aprobar as hitl_aprobar, rechazar as hitl_rechazar
 from app.observability.replay import get_replay_store
 from app.dashboard.store import get_caso_repository
 from app.dashboard import vista_caso
+from app.dashboard import documentos as _documentos
+from app.dashboard import evidencia as _evidencia
+from app.dashboard import comparativa as _comparativa
+from app.dashboard import productividad as _productividad
+from app.dashboard import copiloto as _copiloto
 
 router = APIRouter(tags=["dashboard"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # Filtro de redacción P5 para plantillas: cualquier valor mostrado pasa por el redactor (defensa
 # en profundidad). No aplicar a los inputs del form de corrección (el analista edita el valor real).
 _TEMPLATES.env.filters["redact"] = lambda v: redact_pii_spans_es_co(str(v)) if v is not None else v
+# W16: marca/nav desde la fuente única de branding (DIP) — sin literales dispersos en las plantillas.
+from app.dashboard import branding  # noqa: E402
+branding.registrar(_TEMPLATES)
+# W11: la plantilla depende de la fuente de verdad tipo→ícono (DRY/OCP), no de un hardcode.
+_TEMPLATES.env.filters["icono_tipo"] = _documentos.icono_de
 
 # Tasa blended ESTIMADA (Haiku ~$1/$5, Sonnet ~$3/$15 in/out por 1M) — NO facturable, solo orientativa.
 COSTO_USD_POR_1M_TOKENS = 8.0
@@ -78,6 +88,7 @@ def calcular_metricas(casos, replays) -> dict:
 def _detalle_context(caso, rol: str) -> dict:
     """Contexto del detalle: aviso REDACTADO (P5) + traza + view-models agent-native (Unit I, passive)."""
     traza = get_replay_store().load(caso.id)  # {trace_events, token_summary} o None
+    docs = _documentos.documentos_de(caso)  # W11: una sola vez (DRY)
     return {
         "rol": rol,
         "caso": caso,
@@ -96,6 +107,19 @@ def _detalle_context(caso, rol: str) -> dict:
         "carta_tipo": vista_caso.tipo_carta(caso),  # M: qué carta aplica (o None)
         "prioridad": vista_caso.prioridad(caso),  # U1: nivel + motivo (citable)
         "equipo": vista_caso.equipo(caso),  # U1: routing a equipo (+ SIU si fraude)
+        "clasificacion": vista_caso.clasificar(caso),  # W2: producto + tipo
+        "asegurado": vista_caso.asegurado_de(caso),  # W2: asegurado (mock/real, rotulado)
+        "tiempo_estimado": vista_caso.tiempo_estimado(caso),  # W2: estimado de revisión
+        "timeline": vista_caso.timeline(caso, traza),  # W3: pasos de la IA + conteos (mock)
+        "documentos": docs,  # W11: galería (provider mock, M1 lo vuelve real)
+        "documentos_tipos": _documentos.agrupar_por_tipo(docs),  # W11: por tipo
+        "comparativa": _comparativa.comparativa_de(caso),  # W13: multi-correo (mock, U7/U8 lo vuelven real)
+        "resumen_narrativo": vista_caso.resumen_narrativo(caso),  # W4: fallback determinístico
+        "resumen_ejecutivo": vista_caso.resumen_ejecutivo(caso),  # W19: Summary Agent (LLM) + fallback
+        "riesgos": vista_caso.riesgos(caso),  # W5: 'Riesgos a revisar' (P6, solo sugiere)
+        "campos_extraidos": vista_caso.campos_extraidos(caso),  # W17: dato·confianza·fuente (real+demo)
+        "health": vista_caso.health_check(caso, traza),  # W6: % completo + checklist unificado
+        "cobertura": vista_caso.explicacion_cobertura(caso),  # W7: 'por qué' del dictamen (P2, presenta)
         "docs_checklist": vista_caso.checklist_documentos(caso),  # U2: documentos requeridos por producto
     }
 
@@ -174,6 +198,131 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
         "rol": rol,
         "en_vivo": settings.demo_live != "off",  # Unit H: activa el auto-refresh de la bandeja
     })
+
+
+def _tiempo_relativo(ts, ahora) -> str:
+    """'hace X' compacto para la tarjeta de la cola (como el mockup: '2 min')."""
+    segs = max(0, int((ahora - ts).total_seconds()))
+    if segs < 60:
+        return f"{segs}s"
+    if segs < 3600:
+        return f"{segs // 60} min"
+    if segs < 86400:
+        return f"{segs // 3600} h"
+    return f"{segs // 86400} d"
+
+
+def _cola_filas(rol: str):
+    """Filas de la cola (columna izq de la Workbench). Passive: reusa prioridad/clasificar/carril/resumen."""
+    todos = get_caso_repository().list()
+    casos = sorted(todos, key=lambda c: c.timestamp_actualizacion, reverse=True)
+    ahora = datetime.now(timezone.utc)
+    filas = [{
+        "caso": c,
+        "hora": c.timestamp_actualizacion.strftime("%H:%M:%S"),
+        "hace": _tiempo_relativo(c.timestamp_actualizacion, ahora),
+        "ramo": vista_caso.ramo_de(c),
+        "senal_fraude": vista_caso.senal_fraude(c),
+        "prioridad": vista_caso.prioridad(c),
+        "clasificacion": vista_caso.clasificar(c),
+        "carril": vista_caso.clasificador_cola(c),   # W8: carril por razón
+        "resumen": vista_caso.resumen_cola(c),        # tarjeta rica (asegurado/póliza/placa/%/conteos)
+    } for c in casos]
+    return casos, filas
+
+
+def _coincide_busqueda(fila, termino: str) -> bool:
+    """W16: ¿la fila calza el término de búsqueda? (id de caso · póliza · tipo · asegurado). Passive.
+
+    P5: el nombre del asegurado se usa SOLO para el match en memoria (no se loguea ni se persiste aquí); ya
+    viene por el boundary redactado de `asegurado_de` (tel/email neutralizados)."""
+    caso = fila["caso"]
+    poliza = next((c.valor for c in caso.extraccion.campos
+                   if c.nombre == "numero_poliza" and not c.ausente), "") if caso.extraccion else ""
+    campos = [caso.id, poliza or "", fila["clasificacion"]["tipo"], vista_caso.asegurado_de(caso)["nombre"]]
+    return any(termino in (v or "").lower() for v in campos)
+
+
+@router.get("/workbench", response_class=HTMLResponse)
+def workbench(request: Request, rol: str = Query(RolUsuario.ANALISTA.value),
+              caso_id: Optional[str] = Query(None), carril: Optional[str] = Query(None),
+              avanzar: Optional[str] = Query(None), q: Optional[str] = Query(None),
+              estado: Optional[str] = Query(None)):
+    """W1+W8: la estación unificada 3-columnas (cola izq por carriles · historia centro · acciones der).
+
+    Server-rendered (ADR-001). Selecciona un caso → el centro/derecha se cargan por HTMX sin recargar el
+    shell. Passive: reusa los view-models; cero lógica de decisión en cliente (P1).
+    """
+    casos, filas = _cola_filas(rol)
+    # W8: conteos por carril (sobre TODA la cola) + filtro opcional por carril.
+    carriles = [{"key": k, "icono": i, "etiqueta": e,
+                 "count": sum(1 for f in filas if f["carril"]["carril"] == k)} for k, i, e in vista_caso.CARRILES]
+    if carril:
+        filas = [f for f in filas if f["carril"]["carril"] == carril]
+    if estado:  # nav lateral (Inbox/En Proceso/Radicados/Escalados) → filtra SIN salir del workbench
+        visibles_por_estado = set(id(c) for c in _filtrar_bandeja([f["caso"] for f in filas], estado))
+        filas = [f for f in filas if id(f["caso"]) in visibles_por_estado]
+    if q and q.strip():  # W16: búsqueda global (póliza/cliente/placa/caso)
+        termino = q.strip().lower()
+        filas = [f for f in filas if _coincide_busqueda(f, termino)]
+    casos_visibles = [f["caso"] for f in filas]
+    # Caso activo: el pedido explícito, o el primero de la cola visible (para que la estación no arranque vacía).
+    # W10: `avanzar=1` (tras una acción) → salta al SIGUIENTE de la cola visible (flujo "actúa → siguiente").
+    activo = None
+    if caso_id:
+        idx = next((i for i, f in enumerate(filas) if f["caso"].id == caso_id), None)
+        if avanzar and idx is not None and idx + 1 < len(filas):
+            activo = filas[idx + 1]["caso"]
+        elif idx is not None:
+            activo = filas[idx]["caso"]
+        else:  # el caso ya no está en la cola visible (p.ej. cambió de carril) → primero visible
+            activo = casos_visibles[0] if casos_visibles else None
+    elif casos_visibles:
+        activo = casos_visibles[0]
+    ctx = {
+        "rol": rol,
+        "filas": filas,
+        "carriles": carriles,
+        "carril_actual": carril or "",
+        "q_actual": q or "",
+        "estado_wb": estado or "",
+        "filtrado": bool(carril or estado or (q and q.strip())),  # hay un filtro activo en la cola
+        "productividad": _productividad.productividad(rol),  # W14: métricas del operador (real + mock)
+        "nav_total": len(casos),
+        "en_vivo": settings.demo_live != "off",
+        "caso_activo_id": activo.id if activo else None,
+    }
+    if activo is not None:
+        ctx["detalle"] = _detalle_context(activo, rol)
+    return _TEMPLATES.TemplateResponse(request, "workbench.html", ctx)
+
+
+@router.post("/workbench/preguntar/{caso_id}", response_class=HTMLResponse)
+def workbench_preguntar(request: Request, caso_id: str, pregunta: str = Form("")):
+    """W15: copiloto conversacional (MOCK). Responde sobre el caso; solo EXPLICA, no decide ni muta (P1/P6)."""
+    caso = _get_o_404(caso_id)
+    respuesta = _copiloto.responder(pregunta, caso)
+    return _TEMPLATES.TemplateResponse(request, "workbench_chat.html",
+                                       {"pregunta": pregunta, "respuesta": respuesta})
+
+
+@router.get("/workbench/evidencia/{caso_id}", response_class=HTMLResponse)
+def workbench_evidencia(request: Request, caso_id: str, campo: str = Query(...),
+                        rol: str = Query(RolUsuario.ANALISTA.value)):
+    """W12: parcial del visor de evidencia de un campo (salto a la fuente). Fail-closed: sin ancla → aviso."""
+    caso = _get_o_404(caso_id)
+    ancla = _evidencia.ancla_de(caso, campo)
+    ui = next((c for c in vista_caso.campos_extraidos(caso) if c.label == campo), None)
+    ctx = {"campo": campo, "ancla": ancla, "confianza": ui.confianza if ui else None}
+    return _TEMPLATES.TemplateResponse(request, "workbench_evidencia.html", ctx)
+
+
+@router.get("/workbench/caso/{caso_id}", response_class=HTMLResponse)
+def workbench_caso(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value)):
+    """W1: parcial del caso (centro + derecha) para el swap HTMX al seleccionar en la cola."""
+    caso = _get_o_404(caso_id)
+    ctx = {"rol": rol, "detalle": _detalle_context(caso, rol), "caso_activo_id": caso.id}
+    return _TEMPLATES.TemplateResponse(request, "workbench_caso.html", ctx)
 
 
 @router.get("/casos/{caso_id}", response_class=HTMLResponse)

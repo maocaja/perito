@@ -93,6 +93,37 @@ def _loop() -> None:
         time.sleep(settings.poll_interval_s)
 
 
+def _ingerir_adjuntos(caso, correo):
+    """M1: adjuntos del correo → `Adjunto`s colgados del caso + huellas registradas (foto reutilizada, U6).
+
+    Registra las huellas ANTES de orquestar (el cross-claim del propio caso se auto-excluye por `excluir_id`).
+    Passive (P6/P5): leer/redactar/huellar/indexar; no decide ni persiste media cruda. Devuelve el caso (con
+    adjuntos si los hubo) — si no hay adjuntos, el caso vuelve intacto y los providers caen al mock (P7)."""
+    from app.intake.document_ai import procesar_adjuntos, registrar_huellas
+
+    # Defensivo a propósito: el poller recibe correos externos (y dobles de test) que pueden no traer el campo.
+    adjuntos = procesar_adjuntos(getattr(correo, "adjuntos", []) or [])
+    if not adjuntos:
+        return caso
+    registrar_huellas(adjuntos, caso.id)
+    return caso.model_copy(update={"adjuntos": adjuntos})
+
+
+def _correlacionar_evidencia(caso, tracer):
+    """M3: cruza fuentes (correo ↔ adjuntos) tras M1/M2. Adjunta el overlay `correlaciones` y emite el evento
+    de traza (Timeline W18). 🔒 P6: informativo — no toca estado. Latente (P7): vacío si no hay ≥2 fuentes."""
+    from app.agents.evidence_correlator import correlacionar
+
+    correlaciones = correlacionar(caso)
+    if not correlaciones:
+        return caso
+    divergencias = sum(1 for c in correlaciones if not c.coincide)
+    if tracer is not None:
+        tracer.emit("evidence_correlator",
+                    f"Cruzó fuentes en {len(correlaciones)} campo(s); {divergencias} inconsistencia(s)")
+    return caso.model_copy(update={"correlaciones": correlaciones})
+
+
 def _procesar(correo) -> None:
     """Un correo → un caso, guardado + trazado. NUNCA alcanza terminal (P1)."""
     from app.dashboard.store import get_caso_repository
@@ -111,6 +142,7 @@ def _procesar(correo) -> None:
         # Conserva el CORREO tal cual llegó como aviso (el operador debe ver lo que entró); la
         # extracción/dictamen son del preset (sin LLM). Números de póliza alineados → sin desajuste.
         caso = caso.model_copy(update={"aviso": AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO)})
+        caso = _ingerir_adjuntos(caso, correo)  # M1: adjuntos reales sobre el caso preset (si el correo trae)
         with _save_lock:
             get_caso_repository().save(caso)
         sembrar_traza_demo(caso)
@@ -137,6 +169,7 @@ def _procesar(correo) -> None:
     from app.orchestrator.c7 import orquestar_fnol
 
     caso = intake_crear_caso(AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO))
+    caso = _ingerir_adjuntos(caso, correo)  # M1: adjuntos leídos/redactados/huellados antes de orquestar
     tracer = Tracer(caso.id)
     try:
         caso = orquestar_fnol(caso, c8, Cotas(max_rondas=1, presupuesto_tokens=50000), tracer)
@@ -145,6 +178,7 @@ def _procesar(correo) -> None:
             "estado": EstadoCaso.REQUIERE_REVISION,
             "motivo_escalamiento": f"Orquestación falló: {e}",
         })
+    caso = _correlacionar_evidencia(caso, tracer)  # M3: cruza fuentes (informativo, P6) + traza W18
     with _save_lock:
         get_caso_repository().save(caso)
     get_replay_store().save(tracer, caso.estado.value, caso.motivo_escalamiento)

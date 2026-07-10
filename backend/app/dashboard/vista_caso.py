@@ -12,8 +12,11 @@ INVARIANTES:
 """
 
 import re
+from dataclasses import dataclass
+from typing import Literal
 
-from app.contracts.enums import EstadoCaso
+from app.contracts.enums import EstadoCaso, ResultadoCobertura, TipoOrigen
+from app.contracts.correlacion import CONFIANZA_DIVERGENCIA
 from app.security.redaction import redact_pii_spans_es_co
 
 CAMPOS = ["numero_poliza", "fecha_siniestro", "tipo_siniestro", "monto_reclamado"]
@@ -37,7 +40,13 @@ _NODOS = {
     "c5_motor_cobertura":   ("Motor R1–R5 · dictaminó la cobertura", "⚖️"),
     "fraude":               ("Fraude · revisó inconsistencias", "🕵️"),
     "c6_fraude":            ("Fraude · revisó inconsistencias", "🕵️"),
+    "c2_reextraccion":      ("Extractor · re-extrajo tras la crítica (loop reflexivo)", "🔁"),
+    "c3_reverificacion":    ("Verificador · re-revisó la extracción", "✔️"),
     "orquestador_decision": ("Orquestador · dejó el caso listo para el humano", "🧑‍⚖️"),
+    # Agentes que se suman cuando emitan traza (M1/M3/W19), sin tocar la vista (mapa extensible):
+    "document_ai":          ("Document AI · leyó los adjuntos", "📎"),
+    "evidence_correlator":  ("Correlación de evidencia · cruzó fuentes", "🧩"),
+    "summary_agent":        ("Resumen · redactó la historia del caso", "✍️"),
 }
 
 _C3_RE = re.compile(r"confianza=([0-9.]+),\s*señales=(\d+)")
@@ -213,6 +222,334 @@ def equipo(caso) -> dict:
     dest = _EQUIPO.get(ramo_de(caso), "Ajustadores")
     siu = caso.alerta_fraude is not None  # sugerencia de carril SIU, no cambia estado
     return {"equipo": dest, "siu": siu}
+
+
+# --- W2 · providers del header (mock intercambiable hasta M2, rotulado P7) ---
+_DEMO_NOMBRES = ["Juan Pérez", "María Gómez", "Carlos Ruiz", "Ana Torres", "Luis Marín", "Sofía Díaz"]
+
+
+def asegurado_de(caso) -> dict:
+    """Nombre del asegurado. Interfaz estable {nombre, origen}. **M2** lo vuelve real leyendo 'asegurado_nombre'
+    (P7: si no está, cae al demo determinístico por caso). P5 defensa en profundidad: el nombre se redacta en el
+    boundary (`_red`) — no oculta el nombre operacional, pero neutraliza un tel/email embebido en el campo."""
+    c = _campo(caso, "asegurado_nombre")
+    if c and not c.ausente and c.valor:
+        return {"nombre": _red(c.valor), "origen": "real"}
+    nombre = _DEMO_NOMBRES[sum(ord(ch) for ch in caso.id) % len(_DEMO_NOMBRES)]
+    return {"nombre": nombre, "origen": "demo"}
+
+
+def tiempo_estimado(caso) -> dict:
+    """Tiempo estimado de revisión (heurística honesta: más faltantes/riesgo → más tiempo). Rotulado
+    'estimado' (P7): no es una medición real. Interfaz {texto, segundos, es_estimado}."""
+    segundos = 90 + 30 * len(faltantes(caso))
+    if caso.alerta_fraude is not None:
+        segundos += 45
+    m, s = divmod(segundos, 60)
+    texto = f"{m} min {s:02d} s" if m else f"{s} s"
+    return {"texto": texto, "segundos": segundos, "es_estimado": True}
+
+
+# --- W5 · Riesgos ("míralo") — reencuadre passive de alerta_fraude (P6: solo sugiere) ---
+_RIESGO_LEGIBLE = {
+    "FECHA_ANTERIOR_VIGENCIA": "La fecha del siniestro es anterior a la vigencia de la póliza.",
+    "FECHA_POSTERIOR_VIGENCIA": "La fecha del siniestro es posterior a la vigencia de la póliza.",
+    "FECHA_FUTURO": "La fecha del siniestro está en el futuro.",
+    "MONTO_EXCEDE_SUMA": "El monto reclamado supera la suma asegurada.",
+    "TIPO_NO_CUBIERTO": "El tipo de siniestro no está en las coberturas contratadas.",
+    "FRECUENCIA": "Reclamaciones frecuentes en esta póliza.",
+    "FOTO_REUTILIZADA": "Una foto coincide con un siniestro anterior.",
+    "CO_OCURRENCIA": "Entidad compartida con otros casos.",
+}
+
+
+def _riesgo_legible(referencia: str) -> str:
+    """Traduce la referencia interna a una frase 'míralo' humana. Genérica → sin PII (P5)."""
+    prefijo = (referencia or "").split(":", 1)[0].strip()
+    return _RIESGO_LEGIBLE.get(prefijo, "Inconsistencia detectada — revísala.")
+
+
+def riesgos(caso) -> dict:
+    """W5 · 'Riesgos a revisar' — reúne `alerta_fraude` (C6) + divergencias cross-fuente (M3). 🔒 P6: SOLO
+    sugiere ('míralo'), nunca decide/bloquea. Passive: no toca estado. {hay, severidad, confianza, explicacion,
+    lista[]} (clave 'lista', no 'items': colisiona con `dict.items` en Jinja)."""
+    fr = caso.alerta_fraude
+    lista = []
+    if fr is not None and fr.inconsistencias:
+        # P5 defensa en profundidad: la referencia cruda se REDACTA (además del |redact del template); el
+        # 'legible' se calcula del prefijo crudo (que no lleva PII).
+        lista += [{"texto": _riesgo_legible(e.referencia), "referencia": _red(e.referencia)}
+                  for e in fr.inconsistencias]
+    # M3: cada divergencia cross-fuente es un riesgo "míralo" (ya redactado en el correlador; _red por si acaso).
+    lista += [{"texto": _red(c.inconsistencia), "referencia": f"Correlación · {c.campo_label}"}
+              for c in getattr(caso, "correlaciones", None) or [] if not c.coincide and c.inconsistencia]
+
+    if not lista:  # ni alerta ni divergencias → no hay riesgos
+        return {"hay": False, "lista": []}
+    return {
+        "hay": True,
+        # Sin alerta de fraude, el único riesgo son divergencias cross-fuente (M3): severidad MEDIA (una
+        # inconsistencia entre fuentes merece más que 'BAJA', pero es 'míralo', no fraude — P6).
+        "severidad": fr.severidad if fr is not None else "MEDIA",
+        "confianza": fr.confianza if fr is not None else CONFIANZA_DIVERGENCIA,
+        "explicacion": _red(fr.explicacion) if fr is not None else "Inconsistencias entre fuentes del caso — revísalas.",
+        "lista": lista,
+    }
+
+
+# --- W8 · Cola inteligente por razón (carriles determinísticos, citables) ---
+CARRILES = [  # orden de presentación (urgencia) — clave, icono, etiqueta
+    ("rojo", "🔴", "Lesionados"),
+    ("ambar", "🟠", "Cobertura dudosa"),
+    ("amarillo", "🟡", "Documentos faltantes"),
+    ("verde", "🟢", "Listo para radicar"),
+]
+_CARRIL_META = {k: {"icono": i, "etiqueta": e} for k, i, e in CARRILES}
+
+
+def _lesionados(caso) -> bool:
+    """¿Hay lesionados? M2: lee el campo REAL 'lesionados' del extractor determinístico (conteo > 0). Si no
+    está (caso viejo/preset), cae a la heurística sobre el texto del aviso — misma señal, degradación honesta."""
+    if getattr(caso, "extraccion", None):
+        c = _campo(caso, "lesionados")
+        if c and not c.ausente and c.valor:
+            return c.valor.strip() not in ("", "0")
+    t = (caso.aviso.texto_crudo or "").lower() if getattr(caso, "aviso", None) else ""
+    return any(k in t for k in ("lesionad", "herido", "lesión", "lesion"))
+
+
+def resumen_cola(caso) -> dict:
+    """Campos de la TARJETA rica de la cola (como el mockup). Reales: póliza, % completo. Mock (rotulado en
+    la UI): asegurado, placa, conteos de correos/docs — hasta M1/M2. {asegurado, poliza, placa, pct, correos, docs}."""
+    presentes = _presentes(caso)
+    poliza = None
+    if caso.extraccion:
+        poliza = next((c.valor for c in caso.extraccion.campos
+                       if c.nombre == "numero_poliza" and not c.ausente), None)
+    h = sum(ord(ch) for ch in caso.id)
+    placa = _campo(caso, "placa")
+    return {
+        "asegurado": asegurado_de(caso)["nombre"],   # real si C2 lo extrajo (asegurado_de), si no mock
+        "poliza": poliza or "—",                       # real
+        "placa": placa.valor if (placa and not placa.ausente and placa.valor) else _demo_pick(caso, _DEMO_PLACA),
+        "pct": round(100 * len(presentes) / len(CAMPOS)),  # real (completitud de campos)
+        "correos": 1 + h % 3,                          # mock
+        "docs": 6 + h % 12,                            # mock
+    }
+
+
+def clasificador_cola(caso) -> dict:
+    """W8 · Carril de la cola por RAZÓN (determinístico, mutuamente excluyente, prioridad por urgencia).
+    Passive (P1/P2): ORDENA el trabajo, no decide cobertura/estado. {carril, icono, etiqueta, motivo}.
+    """
+    d = caso.dictamen
+    est = caso.estado
+    falt = _faltantes(caso)
+    if _lesionados(caso):
+        carril, motivo = "rojo", "posibles lesionados (heurística) → atención prioritaria"
+    elif (caso.alerta_fraude is not None
+          or (d is not None and d.resultado == ResultadoCobertura.CUBIERTO_PARCIAL)
+          or (est == EstadoCaso.REQUIERE_REVISION and not falt)):
+        carril, motivo = "ambar", "cobertura/riesgo a revisar antes de decidir"
+    elif falt:
+        carril, motivo = "amarillo", f"faltan datos ({', '.join(falt)})"
+    elif est in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO):
+        carril, motivo = "verde", "caso cerrado (resuelto por humano)"
+    elif est == EstadoCaso.LISTO_PARA_APROBAR:
+        carril, motivo = "verde", "preparado — listo para tu firma"
+    else:
+        carril, motivo = "verde", "sin pendientes de preparación"
+    return {"carril": carril, **_CARRIL_META[carril], "motivo": motivo}
+
+
+def _frase_cobertura(d, pol) -> str:
+    # P5 defensa en profundidad: `_red` sobre los valores (son de catálogo/montos, pero se blinda igual).
+    partes = [f"Dictamen: {_label_cobertura(d)} (regla {d.regla_aplicada})."]
+    if d.cobertura_aplicada:
+        partes.append(f"Cobertura aplicada: {_red(str(d.cobertura_aplicada))}.")
+    if d.sublimite_aplicado is not None:
+        partes.append(f"Sublímite: {_red(str(d.sublimite_aplicado))}.")
+    partes.append(f"Deducible: {_red(str(d.deducible_calculado))}.")
+    if pol and getattr(pol, "vigencia", None):
+        partes.append(f"Vigencia hasta {pol.vigencia.hasta}.")
+    return " ".join(partes)
+
+
+def explicacion_cobertura(caso) -> dict:
+    """W7 · El 'por qué' del dictamen. 🔒 P2: SOLO PRESENTA la decisión del motor R1-R5 (no re-decide).
+    Cita regla + cláusula + (U3) cobertura/sublímite/deducible/vigencia — todo tomado del `Dictamen`/`Poliza`."""
+    d = caso.dictamen
+    if d is None:
+        return {"disponible": False}
+    pol = caso.poliza_match.poliza if (caso.poliza_match and caso.poliza_match.poliza) else None
+    return {
+        "disponible": True,
+        "resultado": d.resultado.value,
+        "label": _label_cobertura(d),
+        "nivel": _nivel_cobertura(d),
+        "regla": d.regla_aplicada,
+        "clausula": ({"texto": _red(d.clausula.texto), "referencia": d.clausula.referencia}
+                     if d.clausula else None),
+        "cobertura": d.cobertura_aplicada,
+        "sublimite": str(d.sublimite_aplicado) if d.sublimite_aplicado is not None else None,
+        "deducible": str(d.deducible_calculado),
+        "vigencia_hasta": str(pol.vigencia.hasta) if pol and getattr(pol, "vigencia", None) else None,
+        "frase": _frase_cobertura(d, pol),
+    }
+
+
+def resumen_ejecutivo(caso) -> dict:
+    """W19 · La historia del caso vía el **Summary Agent** (LLM), con fallback determinístico a W4.
+    {texto, origen}: origen="agente" (lo redactó el LLM) | "base" (plantilla W4). Rotulado en la UI (P7)."""
+    from app.llm.summary import call_summary_agent  # lazy: evita ciclo dashboard↔llm
+    texto, origen = call_summary_agent(caso)
+    return {"texto": texto, "origen": origen}
+
+
+def health_check(caso, traza) -> dict:
+    """W6 · Health Check del caso: % completo + checklist unificado (campos · verificación · cobertura ·
+    documentos). Passive (P1): informativo, el gate real sigue en `hitl`. P7: no fabrica; los ítems que
+    dependen de adjuntos van rotulados 'demo' y NO cuentan al % (no se puede validar sin M1). % reproducible."""
+    checks = []
+    for nombre in CAMPOS:
+        c = _campo(caso, nombre)
+        ok = c is not None and not c.ausente and c.valor is not None
+        checks.append({"label": nombre.replace("_", " ").capitalize(),
+                       "estado": "ok" if ok else "warn",
+                       "detalle": "capturado" if ok else "falta", "demo": False})
+    verif = hallazgos_verificador(caso, traza)
+    checks.append({"label": "Verificación de fidelidad",
+                   "estado": "ok" if verif["disponible"] else "na",
+                   "detalle": f"confianza {verif['confianza']:.2f}" if verif["disponible"] else "no aplica (modo determinístico)",
+                   "demo": False})
+    d = caso.dictamen
+    # Honesto (P7): solo CUBIERTO es ✔; PARCIAL/NO_CUBIERTO/REQUIERE se muestran ⚠ (no un falso 'todo bien').
+    _cob_estado = {"CUBIERTO": "ok"}.get(d.resultado.value, "warn") if d else "warn"
+    checks.append({"label": "Cobertura dictaminada", "estado": _cob_estado,
+                   "detalle": _label_cobertura(d) if d else "pendiente de datos", "demo": False})
+    for it in checklist_documentos(caso)["docs"]:  # adjuntos no fluyen aún (M1) → 'na' rotulado demo
+        checks.append({"label": it["doc"], "estado": "na", "detalle": "pendiente de validar", "demo": True})
+    evaluables = [c for c in checks if c["estado"] != "na"]
+    oks = sum(1 for c in evaluables if c["estado"] == "ok")
+    return {"pct": round(100 * oks / len(evaluables)) if evaluables else 0, "checks": checks}
+
+
+def resumen_narrativo(caso) -> str:
+    """W4 · Resumen ejecutivo en PROSA, compuesto DETERMINÍSTICAMENTE desde los datos (no LLM libre).
+    P1: sin `PALABRAS_PROHIBIDAS` (fail-closed a neutro). P7: nombra lo ausente, no lo inventa.
+    """
+    aseg = asegurado_de(caso)
+    cl = clasificar(caso)
+    tipo = cl["tipo"].replace("_", " ").lower() if cl["tipo"] != "—" else "un siniestro"
+    # P5 defensa en profundidad: el view-model devuelve prosa YA redactada (no depender solo del |redact
+    # del template). `_red` es no-op para el nombre demo, pero blinda el path real (M2) y el monto.
+    partes = [f"{_red(aseg['nombre'])} reportó {tipo} ({cl['producto']})."]
+    m = _campo(caso, "monto_reclamado")
+    if m and not m.ausente and m.valor:
+        partes.append(f"Monto reclamado: {_red(str(m.valor))}.")
+    if caso.dictamen:
+        partes.append(f"Cobertura: {_label_cobertura(caso.dictamen)} (regla {caso.dictamen.regla_aplicada}).")
+    if caso.alerta_fraude:
+        partes.append(f"Hay una señal de riesgo ({caso.alerta_fraude.severidad}) para revisar.")
+    falt = faltantes(caso)
+    if falt:
+        partes.append("Falta: " + ", ".join(falt) + ".")
+    texto = " ".join(partes)
+    if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):  # P1 fail-closed
+        return "Resumen no disponible; revisa el caso y decide (P1)."
+    return texto
+
+
+# ============================================================================
+# W17 · Panel "Información Extraída" — dato · confianza · FUENTE (reales + ricos mock)
+# ============================================================================
+
+@dataclass(frozen=True)
+class CampoUI:
+    """DTO de un campo para el panel del copiloto. Interfaz ESTABLE que M2 llenará con datos reales (DIP).
+
+    `origen="real"` ⟺ lo produjo un agente real (está en `extraccion.campos`); su confianza se muestra tal
+    cual (aunque sea baja). `origen="demo"` = campo rico que aún no producimos (rotulado, P7).
+    """
+    label: str
+    valor: str | None
+    confianza: float | None
+    fuente: str
+    origen: Literal["real", "demo"]
+    clase: str = "extraido"  # extraido | validado | relacionado (conexión W11)
+
+
+# Nombre técnico del campo → etiqueta humana del panel. Los campos ricos de M2 (vehiculo/lugar/telefono/
+# cédula/lesionados) mapean a las MISMAS etiquetas que los demos de `_CAMPOS_RICOS`, así un real desplaza al mock.
+_LABEL_CAMPO = {
+    "numero_poliza": "Póliza", "fecha_siniestro": "Fecha del evento",
+    "tipo_siniestro": "Tipo de siniestro", "monto_reclamado": "Monto reclamado",
+    "asegurado_nombre": "Asegurado", "placa": "Placa",
+    "vehiculo": "Vehículo", "lugar": "Lugar", "telefono": "Teléfono",
+    "asegurado_cedula": "Cédula", "lesionados": "Lesionados",
+}
+# Tipo de evidencia → fuente legible (P3: cada dato dice de dónde viene).
+_FUENTE_LEGIBLE = {
+    TipoOrigen.SPAN: "Correo", TipoOrigen.PAGINA: "PDF", TipoOrigen.REGION: "Imagen",
+    TipoOrigen.HUMANO: "Corrección humana",
+}
+
+
+def _fuente_de(origen) -> str:
+    """Fuente legible de un `EvidenciaOrigen` real (no inventa; default al tipo crudo)."""
+    if origen is None:
+        return "—"
+    base = _FUENTE_LEGIBLE.get(origen.tipo, str(getattr(origen.tipo, "value", origen.tipo)))
+    ref = (getattr(origen, "referencia", "") or "").strip()
+    return f"{base} · {ref}" if (origen.tipo == TipoOrigen.PAGINA and ref) else base
+
+
+# Campos ricos que AÚN NO producimos → mock rotulado hasta M2. (label, fuente_demo, confianza_demo, generador).
+_DEMO_LUGAR = ["Autopista Norte con Calle 153, Bogotá", "Carrera 7 con Calle 80, Bogotá", "Calle 26 con Cra 68, Bogotá"]
+_DEMO_VEHICULO = ["Mazda CX-5 2021", "Chevrolet Onix 2022", "Renault Duster 2020", "Kia Sportage 2023"]
+_DEMO_PLACA = ["ABC123", "XYZ789", "DEF456", "GHI321"]
+_DEMO_TELEFONO = ["310 555 8899", "300 111 2233", "320 444 5566", "315 777 8899"]
+
+
+def _demo_pick(caso, pool: list) -> str:
+    return pool[sum(ord(c) for c in caso.id) % len(pool)]
+
+
+_CAMPOS_RICOS = [  # (label, fuente, confianza, generador) — todos origen="demo" hasta M2
+    ("Asegurado", "Correo", 0.99, lambda c: asegurado_de(c)["nombre"]),
+    ("Vehículo", "SOAT", 0.98, lambda c: _demo_pick(c, _DEMO_VEHICULO)),
+    ("Placa", "Fotos", 0.99, lambda c: _demo_pick(c, _DEMO_PLACA)),
+    ("Lugar", "Denuncia", 0.95, lambda c: _demo_pick(c, _DEMO_LUGAR)),
+    ("Teléfono", "Correo", 0.99, lambda c: _demo_pick(c, _DEMO_TELEFONO)),
+]
+
+
+def campos_extraidos(caso) -> list[CampoUI]:
+    """W17 · Los campos del copiloto: **reales primero** (del extractor, con su confianza/fuente VERDADERAS),
+    luego los ricos **mock** rotulados. Sin dedup por label (un real desplaza al demo del mismo label). P5:
+    valores redactados. 🔴 Blindaje agéntico: lo real es real; el mock es solo el dato que aún no producimos.
+    """
+    overlay = {c.campo_nombre: c for c in (getattr(caso, "correlaciones", None) or [])}  # M3
+    reales: list[CampoUI] = []
+    labels_reales: set[str] = set()
+    if caso.extraccion:
+        for c in caso.extraccion.campos:
+            if c.ausente or c.valor is None:
+                continue
+            label = _LABEL_CAMPO.get(c.nombre, c.nombre.replace("_", " ").capitalize())
+            if label in labels_reales:  # dos reales con el mismo label → no duplicar (raro, pero robusto)
+                continue
+            # M3: si hay correlación cross-fuente, la confianza consolidada y la clase la manda el overlay
+            # (coincide → 'validado' por varias fuentes; diverge → queda 'extraido' y el riesgo va a W5).
+            corr = overlay.get(c.nombre)
+            confianza = corr.confianza_ajustada if corr else c.confianza
+            clase = "validado" if (corr and corr.coincide) else "extraido"
+            reales.append(CampoUI(label=label, valor=_red(str(c.valor)), confianza=confianza,
+                                  fuente=_fuente_de(c.origen), origen="real", clase=clase))
+            labels_reales.add(label)
+    demo = [CampoUI(label=lbl, valor=_red(str(gen(caso))), confianza=conf, fuente=fte, origen="demo")
+            for (lbl, fte, conf, gen) in _CAMPOS_RICOS if lbl not in labels_reales]
+    return reales + demo
 
 
 def tipo_carta(caso) -> str | None:
@@ -398,7 +735,7 @@ def actividad_agentes(traza) -> list[dict]:
         return []
     feed = []
     for ev in traza.get("trace_events", []):
-        nodo = ev.get("nodo", "")
+        nodo = (ev.get("nodo") or "").strip() or "desconocido"
         etiqueta, icono = _NODOS.get(nodo, (nodo, "•"))  # fallback: nombre técnico
         toks = (ev.get("tokens_in", 0) or 0) + (ev.get("tokens_out", 0) or 0)
         ts = ev.get("timestamp") or ""
@@ -411,3 +748,41 @@ def actividad_agentes(traza) -> list[dict]:
             "error": ev.get("error"),
         })
     return feed
+
+
+# ---------------------------------------------------- W3 · Timeline visual de la IA
+
+def conteo_adjuntos(caso) -> dict:
+    """Conteo de adjuntos leídos por la IA. Interfaz {pdfs, fotos, origen}. Si el caso trae adjuntos REALES
+    (M1) → conteo real (origen='real'); si no, mock determinístico por caso (origen='demo', P7)."""
+    adjuntos = caso.adjuntos  # M1: siempre lista (default_factory); vacía ⇒ mock
+    if adjuntos:
+        return {"pdfs": sum(1 for a in adjuntos if a.tipo == "pdf"),
+                "fotos": sum(1 for a in adjuntos if a.tipo == "foto"),
+                "origen": "real"}
+    h = sum(ord(c) for c in caso.id)
+    return {"pdfs": 1 + h % 4, "fotos": 2 + h % 8, "origen": "demo"}
+
+
+def timeline(caso, traza) -> list[dict]:
+    """Timeline agent-native (W18): correo → docs (mock rotulado) → pasos de AGENTES (de la traza) → estado.
+    Passive (P7): los pasos de agentes salen de la traza REAL (nunca se fabrican); los conteos van rotulados
+    `demo` y distintos. P4: lee la traza sin re-ejecutar agentes; sin traza, no hay pasos de agente."""
+    docs = conteo_adjuntos(caso)
+    demo = docs["origen"] == "demo"
+    pasos = [
+        {"icono": "📬", "texto": "Correo recibido", "estado": "ok", "demo": False},
+        {"icono": "📄", "texto": f"Leyó {docs['pdfs']} PDF(s)", "estado": "ok", "demo": demo},
+        {"icono": "📷", "texto": f"Leyó {docs['fotos']} fotografía(s)", "estado": "ok", "demo": demo},
+    ]
+    for ev in actividad_agentes(traza):  # 🔴 pasos de AGENTES: SOLO de la traza real (nunca fabricados)
+        pasos.append({"icono": ev["icono"], "texto": ev["etiqueta"],
+                      "detalle": ev.get("resultado", ""), "tokens": ev.get("tokens", 0),
+                      "hora": ev.get("hora", ""), "estado": "bad" if ev.get("error") else "ok", "demo": False})
+    _final = {"LISTO_PARA_APROBAR": ("✅", "Caso listo", "ok"),
+              "REQUIERE_REVISION": ("⚠️", "Escalado a revisión humana", "warn"),
+              "APROBADO": ("🔒", "Caso aprobado por humano", "ok"),
+              "RECHAZADO": ("🔒", "Caso rechazado por humano", "bad")}.get(caso.estado.value)
+    if _final:
+        pasos.append({"icono": _final[0], "texto": _final[1], "estado": _final[2], "demo": False})
+    return pasos

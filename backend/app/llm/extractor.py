@@ -19,6 +19,7 @@ from app.contracts.extraccion import ExtraccionValidada, CampoExtraido, Evidenci
 from app.contracts.enums import TipoOrigen
 
 from app.security.redaction import build_extraction_prompt_u2
+from app.intake.entidades import extraer_entidades
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,11 @@ def call_c2_extractor(texto_crudo: str, feedback: str = "") -> tuple[ExtraccionV
                 )
             )
         
+        # M2: extracción rica DETERMINÍSTICA de entidades PII (nombre/placa/teléfono/cédula/lugar/vehículo/
+        # lesionados) sobre el texto CRUDO — nunca al LLM (P5). Complementa los 4 campos operacionales del LLM;
+        # nombres canónicos disjuntos (sin colisión). Solo se emite lo hallado (no-invención, P4).
+        campos += extraer_entidades(texto_crudo)
+
         # Construct ExtraccionValidada (not validate from crudo, but from built campos)
         extraccion = ExtraccionValidada(campos=campos)
         logger.info(f"Extraction mapped: {len(campos)} campos with origin (P3) and ausente logic (P4)")

@@ -117,3 +117,105 @@ def corregir(
 
     get_caso_repository().save(actualizado)
     return RedirectResponse(f"/casos/{caso_id}?rol={rol}", status_code=303)
+
+
+# ============================================================================
+# W9 · Acciones ampliadas del operador. 🔒 P1: ninguna alcanza estado terminal
+# (APROBADO/RECHAZADO) salvo Radicar, que exige firma humana. Todas redirigen a la Workbench (PRG).
+# ============================================================================
+
+def _get_activo(caso_id: str):
+    caso = get_caso_repository().get(caso_id)
+    if caso is None:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+    return caso
+
+
+def _firma(usuario: Optional[str]) -> str:
+    if not usuario or not usuario.strip():
+        raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
+    return usuario.strip()
+
+
+def _volver(caso_id: str, rol: str) -> RedirectResponse:
+    # W10: `avanzar=1` → la workbench carga el SIGUIENTE caso de la cola (flujo "actúa → siguiente").
+    return RedirectResponse(f"/workbench?rol={rol}&caso_id={caso_id}&avanzar=1", status_code=303)
+
+
+def _persistir_update(caso: Caso, updates: dict) -> Caso:
+    """Aplica cambios en campos NO frozen vía model_validate (defensivo: re-ejecuta validadores, patrón de
+    `corregir`). NUNCA toca estado/aprobado_por (esos van por HITL)."""
+    d = caso.model_dump()
+    d.update(updates)
+    d["timestamp_actualizacion"] = datetime.now(timezone.utc)
+    return Caso.model_validate(d)
+
+
+@router.post("/casos/{caso_id}/radicar", response_class=RedirectResponse)
+def radicar(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Radicar = aprobación humana (reusa hitl.aprobar). 🔒 P1: exige `usuario`; solo desde LISTO_PARA_APROBAR."""
+    from app.hitl.c8 import aprobar as hitl_aprobar
+    firma = _firma(usuario)
+    caso = _get_activo(caso_id)
+    # 🔒 P1: refuerzo server-side del gate — solo se radica desde LISTO_PARA_APROBAR (no saltar revisión).
+    if caso.estado != EstadoCaso.LISTO_PARA_APROBAR:
+        raise HTTPException(status_code=409, detail="El caso no está listo para radicar (P1)")
+    try:
+        actualizado = hitl_aprobar(caso, firma)  # única vía a APROBADO (exige aprobado_por)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    get_caso_repository().save(actualizado)
+    return _volver(caso_id, rol)
+
+
+@router.post("/casos/{caso_id}/escalar", response_class=RedirectResponse)
+def escalar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
+            rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Escalar a revisión humana (REQUIERE_REVISION). NO es terminal (P1). Vía HITL (transicionar)."""
+    from app.hitl.c8 import transicionar
+    firma = _firma(usuario)
+    caso = _get_activo(caso_id)
+    if caso.estado in _TERMINALES:
+        raise HTTPException(status_code=409, detail="El caso ya fue decidido (P1)")
+    razon = (motivo or "").strip() or f"Escalado por {firma}"
+    actualizado = transicionar(caso, EstadoCaso.REQUIERE_REVISION, actor=firma, motivo=razon)
+    get_caso_repository().save(actualizado)
+    return _volver(caso_id, rol)
+
+
+@router.post("/casos/{caso_id}/enviar_fraude", response_class=RedirectResponse)
+def enviar_fraude(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Enviar a fraude = ROUTING al carril SIU. 🔒 P6: NO crea alerta, NO cambia dictamen ni estado; solo
+    anota `derivado_siu_por`. Es una acción de trabajo, no un veredicto."""
+    firma = _firma(usuario)
+    caso = _get_activo(caso_id)
+    get_caso_repository().save(_persistir_update(caso, {"derivado_siu_por": firma}))
+    return _volver(caso_id, rol)
+
+
+@router.post("/casos/{caso_id}/solicitar_docs", response_class=RedirectResponse)
+def solicitar_docs(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Prepara el borrador de solicitud de documentos faltantes. Envío MOCK (rotulado): NO envía correo real;
+    NO cambia estado. El borrador se compone de los campos faltantes."""
+    from app.dashboard import vista_caso
+    firma = _firma(usuario)
+    caso = _get_activo(caso_id)
+    falt = vista_caso.faltantes(caso)
+    if not falt:
+        borrador = "[demo · no enviado] No hay documentos/datos faltantes que solicitar."
+    else:
+        borrador = ("[demo · no enviado] Solicitud de documentos preparada por %s: por favor remita %s."
+                    % (firma, ", ".join(falt)))
+    get_caso_repository().save(_persistir_update(caso, {"solicitud_docs": borrador}))
+    return _volver(caso_id, rol)
+
+
+@router.post("/casos/{caso_id}/guardar_borrador", response_class=RedirectResponse)
+def guardar_borrador(caso_id: str, usuario: Optional[str] = Form(None), nota: Optional[str] = Form(None),
+                     rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Guarda una nota/borrador del operador. NO cambia estado (P1: nunca terminal)."""
+    firma = _firma(usuario)
+    caso = _get_activo(caso_id)
+    texto = (nota or "").strip()
+    get_caso_repository().save(_persistir_update(caso, {"nota_operador": f"{firma}: {texto}" if texto else None}))
+    return _volver(caso_id, rol)

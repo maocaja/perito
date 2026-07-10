@@ -69,7 +69,12 @@ def _severidad_por_distancia(d: int) -> Optional[str]:
 
 
 def _confianza_por_distancia(d: int) -> float:
-    """Confianza decreciente con la distancia; distancia 0 ≈ 0.99 pero NUNCA 1.0 (nunca veredicto, P7)."""
+    """Confianza decreciente con la distancia; distancia 0 ≈ 0.99 pero NUNCA 1.0 (nunca veredicto, P7).
+
+    Interpolación lineal explícita (no un score calibrado): distancia 0 → 0.99 (tope, jamás 1.0); a mayor
+    distancia baja hasta ~0.51 en el borde de señal (d=HAMMING_MEDIA). Términos: 0.99 = tope sub-veredicto;
+    0.6 = caída total a lo largo del rango [0, HAMMING_MEDIA]; el +1 evita tocar 1.0 aun en el peor caso.
+    """
     if d > HAMMING_MEDIA:  # ≥ 8 no es señal (y _hamming_hex nunca devuelve negativos: 10**9 si inválido)
         return 0.0
     return round(0.99 - (d / (HAMMING_MEDIA + 1)) * 0.6, 3)
@@ -185,4 +190,25 @@ def construir_alerta_cross_claim(
         explicacion=explicacion,
         confianza=confianza,
         capa=CAPA_CROSS_CLAIM,
+    )
+
+
+def combinar_alertas(intra: Optional[AlertaFraude], cross: Optional[AlertaFraude]) -> Optional[AlertaFraude]:
+    """U10: funde la alerta intra-caso (capas 1-2) con la cross-claim (capa 4) en una sola. Determinístico.
+
+    `severidad`/`confianza`/`capa` = **max** (manda la señal más fuerte; es una sugerencia agregada, no un
+    score calibrado). Une las `inconsistencias`. Ninguna pisa a la otra. None si ninguna disparó (P7).
+    """
+    presentes = [a for a in (intra, cross) if a is not None]
+    if not presentes:
+        return None
+    if len(presentes) == 1:
+        return presentes[0]
+    severidad = max((a.severidad for a in presentes), key=lambda s: _ORDEN_SEVERIDAD.get(s, 0))
+    return AlertaFraude(
+        severidad=severidad,
+        inconsistencias=list(intra.inconsistencias) + list(cross.inconsistencias),
+        explicacion=f"{intra.explicacion} | {cross.explicacion}",
+        confianza=max(a.confianza for a in presentes),
+        capa=max(a.capa for a in presentes),
     )
