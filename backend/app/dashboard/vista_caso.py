@@ -150,6 +150,71 @@ def razon_escalamiento(caso) -> str | None:
     return "escalado a revisión humana (dato ambiguo o póliza sin match)"
 
 
+# ------------------------------------------------ U2 · Documentos requeridos por producto (passive)
+
+# Catálogo determinístico producto → documentos requeridos (ejemplares reales). Productos no modelados → [].
+_DOCS_POR_PRODUCTO = {
+    "Autos": ["Denuncia de tránsito", "Licencia de conducción", "Tarjeta de propiedad",
+              "SOAT vigente", "Fotos del vehículo", "Cotización del taller"],
+    "Hogar": ["Soporte de propiedad/tenencia", "Fotos de los daños", "Cotización de reparación",
+              "Denuncia (si aplica)"],
+}
+
+
+def documentos_requeridos(producto: str) -> list[str]:
+    """Documentos requeridos por producto (catálogo determinístico). Sin catálogo → [] (P7, no inventa)."""
+    return _DOCS_POR_PRODUCTO.get(producto, [])
+
+
+def checklist_documentos(caso) -> dict:
+    """Checklist de documentos por producto. `presente=None` hasta que U4 (multimodal) detecte adjuntos.
+
+    P7: si el producto no está modelado → `disponible=False` (no inventa una lista).
+    """
+    prod = ramo_de(caso)
+    docs = documentos_requeridos(prod)
+    if not docs:
+        return {"producto": prod, "disponible": False, "docs": []}
+    return {"producto": prod, "disponible": True,
+            "docs": [{"doc": d, "presente": None} for d in docs]}  # 'docs' (no 'items': colisiona con dict.items en Jinja)
+
+
+# -------------------------------------------- U1 · Clasificación + Prioridad + Routing (passive)
+
+def clasificar(caso) -> dict:
+    """Producto (derivado del ramo) + tipo del siniestro. Passive; sin match → '—' (P7)."""
+    c = _campo(caso, "tipo_siniestro")
+    tipo = (c.valor if c and not c.ausente else None) or "—"
+    return {"producto": ramo_de(caso), "tipo": tipo}
+
+
+def prioridad(caso) -> dict:
+    """Prioridad por REGLAS citables (P2-style). Cita la regla que la disparó. Passive, no decide (P1).
+
+    Con los datos actuales (sin 'lesionados' aún — llega con U4) se prioriza por fraude, escalamiento y
+    dictamen. La regla queda explícita en 'motivo'.
+    """
+    est = caso.estado  # var local: comparación de enum sin el patrón de mutación (passive)
+    fr = caso.alerta_fraude
+    if fr and fr.severidad == "ALTA":
+        return {"nivel": "ALTA", "motivo": "señal de fraude alta → revisión prioritaria"}
+    if est == EstadoCaso.REQUIERE_REVISION:
+        return {"nivel": "MEDIA", "motivo": "requiere revisión (dato faltante o póliza)"}
+    if fr:
+        return {"nivel": "MEDIA", "motivo": f"señal de fraude {fr.severidad.lower()}"}
+    return {"nivel": "BAJA", "motivo": "sin señales críticas"}
+
+
+_EQUIPO = {"Autos": "Equipo Autos", "Hogar": "Equipo Hogar"}
+
+
+def equipo(caso) -> dict:
+    """Equipo destino por producto (mapping determinístico) + sugerencia SIU si hay fraude (P6: solo sugiere)."""
+    dest = _EQUIPO.get(ramo_de(caso), "Ajustadores")
+    siu = caso.alerta_fraude is not None  # sugerencia de carril SIU, no cambia estado
+    return {"equipo": dest, "siu": siu}
+
+
 def tipo_carta(caso) -> str | None:
     """Qué carta aplica según el estado (Unit M): 'resolucion' | 'datos' | None. Passive."""
     est = caso.estado  # var local para comparar el enum sin el patrón de mutación (passive)

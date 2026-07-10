@@ -338,6 +338,93 @@ def test_panel_auditoria_eu_ai_act(client):
     assert "juez Claude" in html
 
 
+# ---------- U1: clasificación + prioridad + routing ----------
+
+def test_prioridad_cita_regla(client):
+    """La prioridad devuelve nivel + motivo (regla citada), passive."""
+    for c in get_caso_repository().list():
+        p = vista_caso.prioridad(c)
+        assert p["nivel"] in ("ALTA", "MEDIA", "BAJA")
+        assert p["motivo"]  # siempre cita el porqué
+
+
+def test_prioridad_fraude_alta_es_alta(client):
+    """Fraude ALTA → prioridad ALTA (regla)."""
+    base = next(c for c in get_caso_repository().list() if c.alerta_fraude)
+    alta = base.model_copy(update={"alerta_fraude": base.alerta_fraude.model_copy(update={"severidad": "ALTA"})})
+    assert vista_caso.prioridad(alta)["nivel"] == "ALTA"
+
+
+def test_prioridad_no_muta_estado(client):
+    """P1: prioridad/routing son passive — no tocan el estado."""
+    c = _caso_listo()
+    antes = c.estado
+    vista_caso.prioridad(c); vista_caso.equipo(c); vista_caso.clasificar(c)
+    assert c.estado == antes
+
+
+def test_equipo_por_producto_y_siu(client):
+    """Routing: producto → equipo; fraude → sugiere SIU (P6, sin cambiar estado)."""
+    con_fraude = next((c for c in get_caso_repository().list() if c.alerta_fraude), None)
+    sin_fraude = next((c for c in get_caso_repository().list() if not c.alerta_fraude), None)
+    assert con_fraude and sin_fraude, "el seed debe traer casos con y sin fraude"
+    e = vista_caso.equipo(con_fraude)
+    assert e["equipo"] and e["siu"] is True
+    assert vista_caso.equipo(sin_fraude)["siu"] is False
+
+
+def test_clasificar_no_inventa_tipo(client):
+    """P7: clasificar() devuelve '—' si tipo_siniestro está ausente; no inventa."""
+    from app.contracts.extraccion import ExtraccionValidada, CampoExtraido
+    base = _caso_listo()
+    sin_tipo = base.model_copy(update={"extraccion": ExtraccionValidada(
+        campos=[CampoExtraido(nombre="tipo_siniestro", valor=None, ausente=True)])})
+    assert vista_caso.clasificar(sin_tipo)["tipo"] == "—"
+
+
+def test_orden_por_prioridad_no_rompe_filtro(client):
+    """El orden por prioridad es opt-in y preserva el filtro/HTMX (no rompe el efecto en vivo)."""
+    html = client.get("/casos", params={"orden": "prioridad"}).text
+    assert "orden=prioridad" in html  # el toggle/HTMX mantiene el orden
+    assert 'id="bandeja-live"' in html  # la bandeja sigue intacta
+
+
+def test_detalle_muestra_prioridad_y_equipo(client):
+    """El detalle renderiza la línea de routing (prioridad + equipo)."""
+    html = client.get(f"/casos/{_caso_listo().id}").text
+    assert "Prioridad" in html and "prio-badge" in html
+
+
+# ---------- U2: documentos requeridos por producto ----------
+
+def test_docs_por_producto_distintos(client):
+    """Cada producto exige documentos distintos (catálogo determinístico)."""
+    autos = vista_caso.documentos_requeridos("Autos")
+    hogar = vista_caso.documentos_requeridos("Hogar")
+    assert autos and hogar and autos != hogar
+
+
+def test_docs_producto_no_modelado_no_inventa(client):
+    """P7: producto sin catálogo → disponible=False, sin lista inventada."""
+    assert vista_caso.documentos_requeridos("Vida") == []
+    ck = vista_caso.checklist_documentos(_caso_listo())  # ramo Autos/Hogar/— según el caso
+    assert isinstance(ck["disponible"], bool)
+    if not ck["disponible"]:
+        assert ck["docs"] == []
+
+
+def test_detalle_muestra_documentos(client):
+    """El detalle renderiza la sección con los documentos ESPECÍFICOS del producto."""
+    caso = next((c for c in get_caso_repository().list()
+                 if vista_caso.checklist_documentos(c)["disponible"]), None)
+    if caso:
+        html = client.get(f"/casos/{caso.id}").text
+        assert "Documentos requeridos" in html
+        ck = vista_caso.checklist_documentos(caso)
+        for it in ck["docs"]:  # cada documento del catálogo aparece renderizado
+            assert it["doc"] in html
+
+
 # ---------- No regresión: bandeja en vivo (HTMX) ----------
 
 def test_bandeja_live_htmx_preservado(client, monkeypatch):

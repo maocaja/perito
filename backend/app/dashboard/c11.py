@@ -94,6 +94,9 @@ def _detalle_context(caso, rol: str) -> dict:
         "latencia": vista_caso.latencia_caso(traza),  # N: latencia real del pipeline
         "razon_escalamiento": vista_caso.razon_escalamiento(caso),  # N: por qué escaló
         "carta_tipo": vista_caso.tipo_carta(caso),  # M: qué carta aplica (o None)
+        "prioridad": vista_caso.prioridad(caso),  # U1: nivel + motivo (citable)
+        "equipo": vista_caso.equipo(caso),  # U1: routing a equipo (+ SIU si fraude)
+        "docs_checklist": vista_caso.checklist_documentos(caso),  # U2: documentos requeridos por producto
     }
 
 
@@ -125,8 +128,9 @@ def _filtrar_bandeja(casos, estado: Optional[str]):
 
 @router.get("/", response_class=HTMLResponse)
 @router.get("/casos", response_class=HTMLResponse)
-def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Query(RolUsuario.ANALISTA.value)):
-    """H-19: bandeja de casos con filtro por estado + KPIs clicables (toggle) + selector de rol stub."""
+def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Query(RolUsuario.ANALISTA.value),
+            orden: Optional[str] = Query(None)):
+    """H-19: bandeja con filtro por estado + KPIs clicables + orden (recientes | prioridad, U1)."""
     repo = get_caso_repository()
     todos = repo.list()
     casos = _filtrar_bandeja(todos, estado)
@@ -139,7 +143,13 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
         "reciente": (ahora - c.timestamp_actualizacion).total_seconds() < 20,
         "ramo": vista_caso.ramo_de(c),  # derivado de tipo_siniestro (passive, P7)
         "senal_fraude": vista_caso.senal_fraude(c),  # el "por qué" del fraude (passive, P6)
+        "prioridad": vista_caso.prioridad(c),  # U1: nivel de prioridad (chip + acento)
     } for c in casos]
+    # Orden secundario OPT-IN por prioridad (default: cronológico, para no romper el efecto en vivo).
+    if orden == "prioridad":
+        _rank = {"ALTA": 0, "MEDIA": 1, "BAJA": 2}
+        filas.sort(key=lambda f: (_rank.get(f["prioridad"]["nivel"], 3),
+                                  -f["caso"].timestamp_actualizacion.timestamp()))
 
     # Conteos para los KPIs y los chips (agregación de presentación, no lógica de dominio).
     def _n(e):
@@ -160,6 +170,7 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
         "counts": counts,
         "nav_total": counts["total"],
         "estado_actual": estado or "",
+        "orden": orden or "",
         "rol": rol,
         "en_vivo": settings.demo_live != "off",  # Unit H: activa el auto-refresh de la bandeja
     })

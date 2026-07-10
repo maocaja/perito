@@ -16,7 +16,7 @@
   <a class="btn btn-primary" href="/nuevo?rol={{ rol }}" style="margin-left:auto"><span style="font-size:16px;line-height:1">+</span>Nuevo aviso</a>
 </div>
 
-<div id="bandeja-live"{% if en_vivo %} hx-get="/casos?estado={{ estado_actual }}&rol={{ rol }}" hx-trigger="every 3s" hx-select="#bandeja-live" hx-target="#bandeja-live" hx-swap="outerHTML"{% endif %}>
+<div id="bandeja-live"{% if en_vivo %} hx-get="/casos?estado={{ estado_actual }}&rol={{ rol }}&orden={{ orden }}" hx-trigger="every 3s" hx-select="#bandeja-live" hx-target="#bandeja-live" hx-swap="outerHTML"{% endif %}>
 {# KPIs clicables (toggle): clic filtra por ese grupo; clic en el activo vuelve a "Todos". #}
 {% macro kpi_href(key) %}{% if estado_actual == key %}/casos?rol={{ rol }}{% else %}/casos?estado={{ key }}&rol={{ rol }}{% endif %}{% endmacro %}
 <div class="kpi-grid">
@@ -44,6 +44,11 @@
   {% for est, lbl in [('LISTO_PARA_APROBAR','Listo para decisión'),('REQUIERE_REVISION','Requiere revisión'),('APROBADO','Aprobado'),('RECHAZADO','Rechazado')] %}
   <a class="chip {{ 'active' if estado_actual == est }}" href="/casos?estado={{ est }}&rol={{ rol }}">{{ lbl }} <span class="n">{{ counts[est] }}</span></a>
   {% endfor %}
+  <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <span class="chips-label" style="margin:0">Orden</span>
+    <a class="chip {{ 'active' if orden != 'prioridad' }}" href="/casos?estado={{ estado_actual }}&rol={{ rol }}">Recientes</a>
+    <a class="chip {{ 'active' if orden == 'prioridad' }}" href="/casos?estado={{ estado_actual }}&rol={{ rol }}&orden=prioridad">Prioridad</a>
+  </span>
 </div>
 
 <div class="table">
@@ -52,7 +57,9 @@
   </div>
   {% for f in filas %}{% set c = f.caso %}
   {%- set _monto = ui.campo_valor(c.extraccion,'monto_reclamado') -%}
-  <a class="tr row-link grid-bandeja" href="/casos/{{ c.id }}?rol={{ rol }}"
+  {%- set _prio = {'ALTA':'prio-alta','MEDIA':'prio-media'}.get(f.prioridad.nivel,'') -%}
+  <a class="tr row-link grid-bandeja {{ _prio }}" href="/casos/{{ c.id }}?rol={{ rol }}"
+     title="Prioridad {{ f.prioridad.nivel|lower }} — {{ f.prioridad.motivo }}"
      data-caso-id="{{ c.id }}"
      data-titulo="{{ ui.campo_valor(c.extraccion,'tipo_siniestro') }}"
      data-poliza="{{ ui.campo_valor(c.extraccion,'numero_poliza') }}"
