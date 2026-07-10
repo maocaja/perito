@@ -21,7 +21,7 @@
 {% macro kpi_href(key) %}{% if estado_actual == key %}/casos?rol={{ rol }}{% else %}/casos?estado={{ key }}&rol={{ rol }}{% endif %}{% endmacro %}
 <div class="kpi-grid">
   <a class="kpi {{ 'active' if estado_actual == 'LISTO_PARA_APROBAR' }}" href="{{ kpi_href('LISTO_PARA_APROBAR')|trim }}" aria-pressed="{{ 'true' if estado_actual == 'LISTO_PARA_APROBAR' else 'false' }}">
-    <div class="kpi-top"><span class="kpi-label">Listos para aprobar</span><span class="kpi-icon k-info"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span></div>
+    <div class="kpi-top"><span class="kpi-label">Listos para decisión</span><span class="kpi-icon k-info"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span></div>
     <div class="kpi-value">{{ counts.LISTO_PARA_APROBAR }}</div><div class="kpi-sub">esperan decisión</div>
   </a>
   <a class="kpi {{ 'active' if estado_actual == 'REQUIERE_REVISION' }}" href="{{ kpi_href('REQUIERE_REVISION')|trim }}" aria-pressed="{{ 'true' if estado_actual == 'REQUIERE_REVISION' else 'false' }}">
@@ -41,7 +41,7 @@
 <div class="chips">
   <span class="chips-label">Estado</span>
   <a class="chip {{ 'active' if not estado_actual }}" href="/casos?rol={{ rol }}">Todos <span class="n">{{ counts.total }}</span></a>
-  {% for est, lbl in [('LISTO_PARA_APROBAR','Listo p/ aprobar'),('REQUIERE_REVISION','Requiere revisión'),('APROBADO','Aprobado'),('RECHAZADO','Rechazado')] %}
+  {% for est, lbl in [('LISTO_PARA_APROBAR','Listo para decisión'),('REQUIERE_REVISION','Requiere revisión'),('APROBADO','Aprobado'),('RECHAZADO','Rechazado')] %}
   <a class="chip {{ 'active' if estado_actual == est }}" href="/casos?estado={{ est }}&rol={{ rol }}">{{ lbl }} <span class="n">{{ counts[est] }}</span></a>
   {% endfor %}
 </div>
@@ -71,7 +71,7 @@
     <div class="muted" style="font-size:12.5px">{{ f.ramo }}</div>
     <div>{{ ui.estado_badge(c.estado.value) }}</div>
     <div>{% if c.dictamen %}{{ ui.dict_badge(c.dictamen.resultado.value) }}{% else %}<span class="cell-sub">—</span>{% endif %}</div>
-    <div>{% if c.alerta_fraude %}{{ ui.fraude_badge(c.alerta_fraude.severidad) }}{% else %}<span class="cell-sub">—</span>{% endif %}</div>
+    <div>{% if c.alerta_fraude %}{{ ui.fraude_badge(c.alerta_fraude.severidad) }}{% if f.senal_fraude %}<div class="cell-sub" style="margin-top:3px">{{ f.senal_fraude }}</div>{% endif %}{% else %}<span class="cell-sub">—</span>{% endif %}</div>
     <div class="cell-num">{% if _monto == '—' %}—{% else %}${{ _monto }}{% endif %}</div>
   </a>
   {% else %}

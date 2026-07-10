@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1 class="title">Panel de trazas</h1>
-    <p class="subtitle">Ejecución del pipeline agéntico por caso · consumo, tokens y guardrails (rol Cumplimiento).</p>
+    <p class="subtitle">Ejecución del pipeline agéntico por caso · consumo, tokens y trazabilidad de cumplimiento — EU AI Act Art. 14 / NAIC (rol Cumplimiento).</p>
   </div>
 </div>
 
@@ -49,14 +49,16 @@
 
 <!-- GARANTÍAS (invariantes, NO métricas medidas) -->
 <div class="card" style="padding:15px 18px;margin-bottom:18px">
-  <div class="section-label">Garantías (invariantes verificadas por validador/tests — no medición)</div>
+  <div class="section-label">Garantías &amp; trazabilidad — supervisión humana EU AI Act Art. 14 / NAIC Model Bulletin</div>
   <div class="guardrails">
     {% set sellos = [
-      'Dictámenes terminales con cláusula: ' ~ m.clausula_ok ~ '/' ~ m.clausula_total ~ ' (RULE-CTR-03)',
+      'Human-in-the-Loop, decide y firma el humano (P1 · EU AI Act Art. 14)',
+      'Cobertura por reglas determinísticas, no LLM (P2)',
+      'Dictámenes terminales con cláusula citada: ' ~ m.clausula_ok ~ '/' ~ m.clausula_total ~ ' (RULE-CTR-03)',
+      'Trayectorias evaluadas con juez Claude en CI: faithfulness · tool-correctness (pytest -m agentic)',
       'Terminación dentro de cotas (P4) — aserción en evals (RNF-09)',
-      'Human-in-the-Loop, decide el humano (P1)',
-      'Cobertura por reglas, no LLM (P2)',
       'PII minimizada (P5)',
+      'Registro de auditoría exportable por caso (Export JSON · PIA)',
     ] %}
     {% for s in sellos %}
     <span class="badge k-ok" style="padding:5px 12px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>{{ s }}</span>

@@ -82,6 +82,84 @@ def ramo_de(caso) -> str:
     return "—"
 
 
+# Señal de fraude en lenguaje plano para la bandeja (el "por qué"). P6: informativo, no decide.
+# P5: se devuelve una etiqueta FIJA, nunca el `referencia` crudo (que trae montos/fechas).
+_SENAL_FRAUDE = {
+    "MONTO_EXCEDE_SUMA": "monto excede la suma",
+    "FECHA_FUTURO": "fecha en el futuro",
+    "FECHA_ANTERIOR_VIGENCIA": "fecha antes de vigencia",
+    "FECHA_POSTERIOR_VIGENCIA": "fecha fuera de vigencia",
+    "TIPO_NO_CUBIERTO": "tipo no cubierto",
+}
+
+
+def senal_fraude(caso) -> str | None:
+    """Etiqueta legible de la inconsistencia de fraude principal. None si no hay alerta (P6)."""
+    fr = caso.alerta_fraude
+    if not fr or not fr.inconsistencias:
+        return None
+    tipo = (fr.inconsistencias[0].referencia or "").split(":", 1)[0].strip()
+    return _SENAL_FRAUDE.get(tipo, "señal detectada")
+
+
+# --------------------------------------- N · Visibilidad Tier-1 (todo determinístico, P7)
+
+_COB_TERMINAL = {"CUBIERTO", "CUBIERTO_PARCIAL", "NO_CUBIERTO"}
+
+
+def verificacion_trayectoria(caso, traza) -> list[dict]:
+    """Checks DETERMINÍSTICOS de calidad de la trayectoria, en runtime. Cero LLM en vivo, cero fabricación.
+
+    El juez Claude (faithfulness/tool-correctness) corre OFFLINE en CI (`pytest -m agentic`) — aquí solo
+    se comprueban hechos verificables del caso + su traza (P7). Cada ítem: {label, ok, detalle}.
+    """
+    eventos = traza.get("trace_events", []) if traza else []
+    presentes = [c for c in (caso.extraccion.campos if caso.extraccion else []) if not c.ausente and c.valor is not None]
+    con_origen = [c for c in presentes if c.origen is not None]
+    d = caso.dictamen
+    es_terminal_cob = d is not None and d.resultado.value in _COB_TERMINAL
+    return [
+        {"label": "Recorrió el pipeline agéntico", "ok": len(eventos) > 0,
+         "detalle": f"{len(eventos)} nodos" if eventos else "sin traza"},
+        {"label": "Sin campos inventados (todos con origen)", "ok": len(con_origen) == len(presentes) and bool(presentes),
+         "detalle": f"{len(con_origen)}/{len(presentes)} con origen" if presentes else "sin campos"},
+        {"label": "El dictamen cita cláusula", "ok": bool(d and d.clausula),
+         "detalle": (d.clausula.id if d and d.clausula else ("no aplica" if not es_terminal_cob else "sin cláusula"))},
+    ]
+
+
+def latencia_caso(traza) -> str | None:
+    """Latencia total del pipeline (suma de `latencia_ms` de la traza). None si no hay traza."""
+    if not traza:
+        return None
+    total = sum((ev.get("latencia_ms") or 0) for ev in traza.get("trace_events", []))
+    if total <= 0:
+        return None
+    return f"{total / 1000:.1f} s" if total >= 1000 else f"{total} ms"
+
+
+def razon_escalamiento(caso) -> str | None:
+    """Por qué se escaló a humano (solo en REQUIERE_REVISION). None si no está escalado."""
+    if caso.estado != EstadoCaso.REQUIERE_REVISION:
+        return None
+    falt = _faltantes(caso)
+    if falt:
+        return f"faltan datos: {', '.join(falt)}"
+    if getattr(caso, "motivo_escalamiento", None):
+        return caso.motivo_escalamiento
+    return "escalado a revisión humana (dato ambiguo o póliza sin match)"
+
+
+def tipo_carta(caso) -> str | None:
+    """Qué carta aplica según el estado (Unit M): 'resolucion' | 'datos' | None. Passive."""
+    est = caso.estado  # var local para comparar el enum sin el patrón de mutación (passive)
+    if est in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO):
+        return "resolucion"
+    if est == EstadoCaso.REQUIERE_REVISION and _faltantes(caso):
+        return "datos"
+    return None
+
+
 def _nivel_conf(x: float) -> str:
     return "ok" if x >= 0.9 else ("warn" if x >= 0.7 else "bad")
 

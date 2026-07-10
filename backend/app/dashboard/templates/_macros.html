@@ -3,7 +3,7 @@
 
 {% macro estado_badge(estado, lg=false) %}
 {%- set k = {'LISTO_PARA_APROBAR':'info','REQUIERE_REVISION':'warn','APROBADO':'ok','RECHAZADO':'bad','RECIBIDO':'neutral','EN_PROCESO':'neutral'}.get(estado,'neutral') -%}
-{%- set l = {'LISTO_PARA_APROBAR':'Listo p/ aprobar','REQUIERE_REVISION':'Requiere revisión','APROBADO':'Aprobado','RECHAZADO':'Rechazado','RECIBIDO':'Recibido','EN_PROCESO':'En proceso'}.get(estado,estado) -%}
+{%- set l = {'LISTO_PARA_APROBAR':'Listo para decisión','REQUIERE_REVISION':'Requiere revisión','APROBADO':'Aprobado','RECHAZADO':'Rechazado','RECIBIDO':'Recibido','EN_PROCESO':'En proceso'}.get(estado,estado) -%}
 <span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ l }}</span>
 {%- endmacro %}
 

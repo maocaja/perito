@@ -256,6 +256,88 @@ def test_p7_bandeja_sin_id_fabricado(client):
     assert "FNOL-" not in client.get("/casos").text
 
 
+# ---------- Unit L: coherencia de estados + fraude visible ----------
+
+def test_estado_listo_se_muestra_neutral(client):
+    """P1/coherencia: LISTO_PARA_APROBAR se muestra 'Listo para decisión', nunca 'Listo p/ aprobar'."""
+    html_bandeja = client.get("/casos").text
+    assert "Listo para decisión" in html_bandeja
+    assert "Listo p/ aprobar" not in html_bandeja
+    assert "Listos para decisión" in html_bandeja  # KPI reetiquetado
+    html_detalle = client.get(f"/casos/{_caso_listo().id}").text
+    assert "Listo p/ aprobar" not in html_detalle
+
+
+def test_fraude_no_cambia_estado(client):
+    """P6: un caso con fraude NO se fuerza a REQUIERE_REVISION — el fraude es ortogonal al estado."""
+    con_fraude = [c for c in get_caso_repository().list() if c.alerta_fraude]
+    assert con_fraude, "el seed debe traer al menos un caso con alerta de fraude"
+    # el fraude coexiste con LISTO_PARA_APROBAR (no lo escala): P6 puro
+    assert any(c.estado == EstadoCaso.LISTO_PARA_APROBAR for c in con_fraude)
+
+
+def test_senal_fraude_legible(client):
+    """La señal de fraude se resume en lenguaje plano; no expone el `referencia` crudo (P5)."""
+    con_fraude = next(c for c in get_caso_repository().list() if c.alerta_fraude)
+    senal = vista_caso.senal_fraude(con_fraude)
+    assert senal and senal in vista_caso._SENAL_FRAUDE.values()
+    # no filtra el texto técnico crudo (ej. 'MONTO_EXCEDE_SUMA: 15000000 > ...')
+    assert ">" not in senal and "_" not in senal
+
+
+def test_senal_fraude_none_sin_alerta(client):
+    """Sin alerta → None (no inventa señal)."""
+    sin = next(c for c in get_caso_repository().list() if not c.alerta_fraude)
+    assert vista_caso.senal_fraude(sin) is None
+
+
+# ---------- Unit N: visibilidad Tier-1 ----------
+
+def test_verificacion_trayectoria_cita_clausula(client):
+    """El check 'cita cláusula' es True en un caso cuyo dictamen cita cláusula (determinístico)."""
+    con_clausula = next(c for c in get_caso_repository().list() if c.dictamen and c.dictamen.clausula)
+    checks = {c["label"]: c for c in vista_caso.verificacion_trayectoria(con_clausula, get_replay_store().load(con_clausula.id))}
+    assert checks["El dictamen cita cláusula"]["ok"] is True
+
+
+def test_verificacion_trayectoria_sin_campos_inventados(client):
+    """El check de campos verifica que todo campo presente tiene origen (P7, sin fabricación)."""
+    caso = _caso_listo()
+    checks = {c["label"]: c for c in vista_caso.verificacion_trayectoria(caso, get_replay_store().load(caso.id))}
+    item = checks["Sin campos inventados (todos con origen)"]
+    presentes = [c for c in caso.extraccion.campos if not c.ausente and c.valor is not None]
+    esperado = all(c.origen is not None for c in presentes) and bool(presentes)
+    assert item["ok"] is esperado
+
+
+def test_latencia_de_traza(client):
+    """La latencia sale de la traza (suma de latencia_ms); None si no hay traza."""
+    caso = _caso_listo()
+    lat = vista_caso.latencia_caso(get_replay_store().load(caso.id))
+    assert lat is None or lat.endswith("s") or lat.endswith("ms")
+    assert vista_caso.latencia_caso(None) is None  # sin traza → None (no inventa)
+
+
+def test_razon_escalamiento_solo_en_revision(client):
+    """La razón de escalamiento aparece solo en REQUIERE_REVISION; None en otros estados."""
+    assert vista_caso.razon_escalamiento(_caso_revision()) is not None
+    assert vista_caso.razon_escalamiento(_caso_listo()) is None
+
+
+def test_p7_detalle_no_finge_score_de_juez_por_caso(client):
+    """P7: el detalle referencia el juez Claude como eval de CI, no como score por-caso en vivo."""
+    html = client.get(f"/casos/{_caso_listo().id}").text
+    assert "pytest -m agentic" in html  # referencia honesta a CI
+    assert "Verificación de la trayectoria" in html
+
+
+def test_panel_auditoria_eu_ai_act(client):
+    """El panel se reencuadra como trazabilidad de cumplimiento (EU AI Act / NAIC) + sello del juez Claude."""
+    html = client.get("/panel").text
+    assert "EU AI Act" in html
+    assert "juez Claude" in html
+
+
 # ---------- No regresión: bandeja en vivo (HTMX) ----------
 
 def test_bandeja_live_htmx_preservado(client, monkeypatch):
