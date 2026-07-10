@@ -14,6 +14,7 @@ from app.config import settings
 from app.dashboard.c11 import router as dashboard_router
 from app.api.ingest import router as ingest_router
 from app.api.hitl_actions import router as hitl_actions_router
+from app.api.cartas import router as cartas_router
 from app.demo.seed import seed_demo_casos
 from app.intake.poller import iniciar_poller
 
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(ingest_router)
     app.include_router(hitl_actions_router)
+    app.include_router(cartas_router)
 
     @app.get("/health", tags=["system"])
     def health_check() -> dict[str, str]:

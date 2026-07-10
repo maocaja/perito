@@ -220,6 +220,33 @@
       </div>
     </section>
 
+    <!-- N · VERIFICACIÓN DE TRAYECTORIA (checks determinísticos en runtime, P7) -->
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--text-3);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+        <h2>Verificación de la trayectoria</h2>
+        {% if latencia %}<span class="tag spacer">{{ latencia }}</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <div class="checklist" style="border-bottom:none;padding-bottom:0;margin-bottom:0">
+          {% for c in trayectoria %}
+          <div class="check-item">
+            {% if c.ok %}
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            {% else %}
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+            {% endif %}
+            <span class="check-lbl">{{ c.label }}</span>
+            <span class="check-detail {{ 'is-ok' if c.ok }}">{{ c.detalle }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% if razon_escalamiento %}<p class="hint" style="margin-top:12px">⤴ Escalado — {{ razon_escalamiento }}</p>{% endif %}
+        {% if latencia %}<p class="hint" style="margin-top:8px">Triado en <strong style="color:var(--text-2)">{{ latencia }}</strong> · vs ~4–6 min de intake manual (benchmark de industria).</p>{% endif %}
+        <p class="hint" style="margin-top:8px">Checks determinísticos en tiempo real. La fidelidad y la tool-correctness se puntúan además con un <strong>juez Claude</strong> sobre golden datasets en CI (<span class="mono">pytest -m agentic</span>) — evidencia, no vibes.</p>
+      </div>
+    </section>
+
     <section class="card accent">
       <div class="card-head brand">
         <span style="color:var(--brand);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg></span>
@@ -269,6 +296,43 @@
         {% endif %}
       </div>
     </section>
+
+    <!-- M · CARTA AL ASEGURADO (el copiloto redacta; el humano firma y envía — P1) -->
+    {% if carta_enviada %}
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--ok);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h2>Carta enviada al asegurado</h2>
+      </div>
+      <div class="card-body"><p class="hint">El correo salió del buzón demo. En producción respondería al asegurado real (unidad futura).</p></div>
+    </section>
+    {% elif carta_tipo %}
+    <section class="card">
+      <div class="card-head">
+        <span style="color:var(--text-3);display:flex"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></span>
+        <h2>{% if carta_tipo == 'datos' %}Pedir datos al asegurado{% else %}Carta de resolución{% endif %}</h2>
+        <span class="tag spacer">borrador · el humano firma</span>
+      </div>
+      <div class="card-body">
+        {% if carta_error %}<p class="error">{{ carta_error }}</p>{% endif %}
+        {% if borrador_carta %}
+        <form method="post" action="/casos/{{ caso.id }}/carta/enviar">
+          <input type="hidden" name="rol" value="{{ rol }}">
+          <textarea class="input textarea" name="contenido" aria-label="Borrador de la carta" style="min-height:180px">{{ borrador_carta }}</textarea>
+          <input class="input" type="text" name="usuario" placeholder="Tu usuario (firma) para enviar" aria-label="Tu usuario (firma) para enviar la carta" autocomplete="username" required style="margin-top:10px">
+          <button class="btn btn-primary btn-block" style="margin-top:9px" type="submit">Enviar al asegurado</button>
+          <p class="hint" style="margin-top:8px">El copiloto redactó el borrador citando el dictamen; tú lo revisas, editas y <strong>firmas el envío</strong> (P1). La cita de la cláusula es literal y verificada (P2).</p>
+        </form>
+        {% else %}
+        <form method="post" action="/casos/{{ caso.id }}/carta">
+          <input type="hidden" name="rol" value="{{ rol }}">
+          <button class="btn btn-block" type="submit">✍ Preparar carta{% if carta_tipo == 'datos' %} · pedir datos{% endif %}</button>
+          <p class="hint" style="margin-top:8px">El copiloto redacta un borrador; tú decides si enviarlo. <strong>Draft ≠ send</strong> (P1).</p>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
   </div>
 </div>
 

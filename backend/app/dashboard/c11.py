@@ -90,6 +90,10 @@ def _detalle_context(caso, rol: str) -> dict:
         "actividad": vista_caso.actividad_agentes(traza),
         "faltantes": vista_caso.faltantes(caso),  # banner + tabla fusionada + regla de habilitación
         "checklist": vista_caso.checklist_aprobacion(caso, traza),  # "Para aprobar se requiere"
+        "trayectoria": vista_caso.verificacion_trayectoria(caso, traza),  # N: checks determinísticos
+        "latencia": vista_caso.latencia_caso(traza),  # N: latencia real del pipeline
+        "razon_escalamiento": vista_caso.razon_escalamiento(caso),  # N: por qué escaló
+        "carta_tipo": vista_caso.tipo_carta(caso),  # M: qué carta aplica (o None)
     }
 
 
@@ -134,6 +138,7 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
         "hora": c.timestamp_actualizacion.strftime("%H:%M:%S"),
         "reciente": (ahora - c.timestamp_actualizacion).total_seconds() < 20,
         "ramo": vista_caso.ramo_de(c),  # derivado de tipo_siniestro (passive, P7)
+        "senal_fraude": vista_caso.senal_fraude(c),  # el "por qué" del fraude (passive, P6)
     } for c in casos]
 
     # Conteos para los KPIs y los chips (agregación de presentación, no lógica de dominio).
@@ -161,10 +166,14 @@ def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Qu
 
 
 @router.get("/casos/{caso_id}", response_class=HTMLResponse)
-def detalle(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value)):
+def detalle(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value),
+            enviado: Optional[str] = Query(None)):
     """H-20: detalle con evidencia enlazada (campo→origen, dictamen→cláusula) y aviso redactado (P5)."""
     caso = _get_o_404(caso_id)
-    return _TEMPLATES.TemplateResponse(request, "detalle.html", _detalle_context(caso, rol))
+    ctx = _detalle_context(caso, rol)
+    if enviado:  # PRG tras enviar la carta (Unit M)
+        ctx["carta_enviada"] = True
+    return _TEMPLATES.TemplateResponse(request, "detalle.html", ctx)
 
 
 @router.post("/casos/{caso_id}/aprobar", response_class=HTMLResponse)
