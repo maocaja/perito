@@ -117,6 +117,16 @@ def _procesar(correo) -> None:
         return
 
     # modo real — mismo cableado que demo_run (tier real), fail-closed a REQUIERE_REVISION (P1/P4).
+    # C0 Triage (U7): clasifica el correo ANTES del pipeline. Solo un NO_SINIESTRO con confianza
+    # suficiente se desvía a una cola aparte (no crea caso FNOL). Todo lo demás — incluido el
+    # escalamiento por baja confianza — sigue al pipeline: nunca se pierde un aviso (P1/P4).
+    from app.intake.triage import RutaCorreo, rutear, triage
+
+    ruta = rutear(triage(correo.asunto, correo.cuerpo))
+    if ruta is RutaCorreo.COLA_NO_SINIESTRO:
+        logger.info("Triage: correo %s → NO_SINIESTRO → cola aparte (sin caso FNOL).", correo.uid)
+        return
+
     from app.contracts.dictamen import Cotas
     from app.contracts.enums import CalidadDoc, EstadoCaso
     from app.contracts.extraccion import AvisoNormalizado

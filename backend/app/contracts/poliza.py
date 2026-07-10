@@ -64,6 +64,12 @@ class Poliza(Contract):
     # --- U3 product-aware (aditivo; si presente, gana sobre los campos planos) ---
     producto: str | None = None
     coberturas: list[CoberturaContratada] = Field(default_factory=list)
+    # --- U8 entity resolution (aditivo): claves alternativas para el fallback de C4 cuando no
+    # viene el número de póliza. Todas opcionales → retro-compat total. PII (P5): se muestran/loguean
+    # redactadas; aquí viven en el store de pólizas (dato de negocio), no en display.
+    placa: str | None = None
+    asegurado_cedula: str | None = None
+    asegurado_nombre: str | None = None
 
 
 class ResultadoPoliza(Contract):

@@ -47,7 +47,7 @@ FLAT_EXTRACTION_SCHEMA = {
 }
 
 
-def call_c2_extractor(texto_crudo: str) -> tuple[ExtraccionValidada, dict]:
+def call_c2_extractor(texto_crudo: str, feedback: str = "") -> tuple[ExtraccionValidada, dict]:
     """
     C2 Extractor: Extract structured data from insurance claim.
     
@@ -62,17 +62,19 @@ def call_c2_extractor(texto_crudo: str) -> tuple[ExtraccionValidada, dict]:
     
     Args:
         texto_crudo: Raw aviso text (potentially contains PII)
-    
+        feedback: Crítica textual del Verificador (C3) para la re-extracción reflexiva (U9). Son
+                  NOMBRES DE CAMPO a revisar (sin PII); se inyecta como contexto adicional del prompt.
+
     Returns:
         ExtraccionValidada with campos: [CampoExtraido(...)]
-    
+
     Raises:
         ExtractorError: If any step fails (fail-closed)
     """
-    
+
     # Step 1: Redact PII (Gate 4, P5)
     try:
-        prompt_redactado = build_extraction_prompt_u2(texto_crudo)
+        prompt_redactado = build_extraction_prompt_u2(texto_crudo, additional_context=feedback)
     except Exception as e:
         logger.error(f"Prompt building failed: {str(e)}")
         raise ExtractorError(f"Redaction failed (P5): {str(e)}") from e

@@ -46,9 +46,11 @@ re-correr los evals de terminación (0 loops, dentro de cotas).
 
 ## 7. Precisiones tras code-review
 
-- **Contrato de "crítica" C3→C2:** C3 ya emite `inconsistencias` (list[EvidenciaOrigen]) + `confianza`. La
-  crítica que se pasa a C2 = **los nombres de campo señalados + la referencia** — se pasa como feedback textual
-  al re-prompt del extractor. No se inventa un contrato nuevo pesado; se reusa lo que C3 ya produce.
+- **Contrato de "crítica" C3→C2:** C3 ya emite `inconsistencias` (`list[str]` = nombres de campo señalados,
+  en `VerificacionAdversarial`) + `confianza`. La crítica que se pasa a C2 = **los nombres de campo señalados**
+  (saneados: una línea, acotados) — como feedback textual al re-prompt del extractor. No se inventa un contrato
+  nuevo; se reusa lo que C3 ya produce. *(Corrección tras CÓMO: el contrato real es `list[str]`, no
+  `list[EvidenciaOrigen]`; la evidencia rica vive en `SeñalEscalamiento`, no en la crítica.)*
 - **Umbral de "baja fidelidad" (explícito):** re-extrae si `verif.confianza < UMBRAL_REEXTRACCION (0.7)` **y**
   hay al menos una inconsistencia sobre un campo. Configurable; no mágico.
 - **`max_rondas=2`:** cambio en `Cotas` (default sigue 1; el loop reflexivo usa 2). No relaja P4 — es un cap
@@ -58,7 +60,9 @@ re-correr los evals de terminación (0 loops, dentro de cotas).
   `extraccion` serializada). U9 **depende** de esa corrección (si no, el loop no tendría corte por ciclo real).
 - **🔒 Lock P2:** al re-extraer, **NUNCA se limpia `caso.dictamen`** ni se re-decide cobertura por el loop; el
   motor R1-R5 sigue siendo el único que dictamina, después del loop. Aserción fail-closed.
-- **Semántica de ronda:** ronda 1 = C2 original → C3; si baja fidelidad → ronda 2 = C2 re-extrae con feedback →
-  C3; si sigue mal → escala. Máximo una re-extracción.
+- **Semántica de ronda:** C2 original → C3; si baja fidelidad → C2 re-extrae con feedback → C3; si sigue mal →
+  escala. Máximo una re-extracción. *(Corrección tras CÓMO: la re-extracción reflexiva ocurre **intra-ronda**
+  —dentro de la misma iteración del while, acotada por el flag estructural `reextraido`—, no como una "ronda 2"
+  separada del contador. El cap `max_rondas≥2` es el **switch de habilitación**; `reextraido` es el bound duro.)*
 - **Orden:** construir **después de U3** (U3 vuelve `tipo_siniestro` product-aware; el loop no debe alterar la
   cobertura al re-extraer el tipo — el lock P2 lo garantiza).

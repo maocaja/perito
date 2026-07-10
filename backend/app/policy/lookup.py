@@ -90,36 +90,24 @@ def call_c4_policy_lookup(extraccion: ExtraccionValidada) -> ResultadoPoliza:
             None
         )
 
-        # Step 2: Handle missing/None numero_poliza (watch-item 2)
-        if not numero_poliza:
-            logger.info("Policy lookup: numero_poliza ausente/None → encontrada=False")
-            return ResultadoPoliza(
-                encontrada=False,
-                poliza=None,
-                candidatas=[]
-            )
+        # Step 2: Exact match por número (camino principal)
+        if numero_poliza:
+            poliza_exacta = _lookup_exact(numero_poliza)
+            if poliza_exacta is not None:
+                logger.info(f"Policy lookup: exact match for {numero_poliza}")
+                return ResultadoPoliza(encontrada=True, poliza=poliza_exacta)
 
-        # Step 3: Exact match (deterministic SQL simulation)
-        poliza_exacta = _lookup_exact(numero_poliza)
-        if poliza_exacta is not None:
-            logger.info(f"Policy lookup: exact match for {numero_poliza}")
-            return ResultadoPoliza(
-                encontrada=True,
-                poliza=poliza_exacta
-            )
+        # Step 3: FALLBACK U8 — sin número o sin match exacto → buscar por claves alternativas
+        # (placa → cédula → nombre). Determinístico; ambigüedad → escala (no fuerza match, P4).
+        resultado_alt = _lookup_por_claves_alternativas(extraccion)
+        if resultado_alt is not None:
+            return resultado_alt
 
-        # Step 4: No exact match → candidates by similarity (Trap 3: no forzar)
-        candidatas = _lookup_candidates(numero_poliza, limit=5)
-        logger.info(f"Policy lookup: no exact match, {len(candidatas)} candidates for {numero_poliza}")
-
-        resultado = ResultadoPoliza(
-            encontrada=False,
-            poliza=None,  # NEVER promote candidate to poliza (Trap 3)
-            candidatas=candidatas
-        )
-
-        # Step 5: Validate output against RULE-CTR-07 (Pydantic enforces)
-        return resultado
+        # Step 4: Sin número y sin claves alternativas útiles → candidatas por similitud del número
+        # (si lo había) o vacío. NUNCA promueve candidata a match (Trap 3 / P4).
+        candidatas = _lookup_candidates(numero_poliza, limit=5) if numero_poliza else []
+        logger.info("Policy lookup: sin match exacto ni por claves; %d candidatas.", len(candidatas))
+        return ResultadoPoliza(encontrada=False, poliza=None, candidatas=candidatas)
 
     except PolicyLookupError as e:
         logger.error(f"Policy lookup error: {str(e)}")
@@ -127,6 +115,74 @@ def call_c4_policy_lookup(extraccion: ExtraccionValidada) -> ResultadoPoliza:
     except Exception as e:
         logger.error(f"Policy lookup unexpected error: {str(e)}")
         raise PolicyLookupError(f"Lookup failed: {str(e)}") from e
+
+
+# ------------------------------------------------------------------ U8 entity resolution (fallback)
+
+def _norm_id(valor: Optional[str]) -> str:
+    """Normaliza placa/cédula: conserva SOLO alfanuméricos, en mayúscula.
+
+    'ABC-123' == 'abc123'; '1.020.3' == '10203'. Nota: `str.isalnum()` es unicode-aware, así que letras
+    acentuadas/no-ASCII se conservan (no se transliteran) — placa/cédula colombianas son ASCII en la
+    práctica, así que no hay sobre-normalización relevante. Ante cualquier duda de igualdad, P4 protege:
+    la ambigüedad (>1 match) escala, nunca fuerza."""
+    return "".join(ch for ch in (valor or "") if ch.isalnum()).upper()
+
+
+def _norm_nombre(valor: Optional[str]) -> str:
+    """Normaliza nombre: casefold + colapsa espacios (match exacto/normalizado; difuso queda fuera, U8 §4)."""
+    return " ".join((valor or "").split()).casefold()
+
+
+def _campo_alt(extraccion: ExtraccionValidada, *nombres: str) -> Optional[str]:
+    """Lee la primera clave alternativa presente en la extracción (acepta alias)."""
+    for c in extraccion.campos:
+        if c.nombre in nombres and not c.ausente and c.valor:
+            return c.valor
+    return None
+
+
+def _lookup_por_claves_alternativas(extraccion: ExtraccionValidada) -> Optional["ResultadoPoliza"]:
+    """FALLBACK U8: resuelve por placa → cédula → nombre cuando no hay número/no hizo match.
+
+    Determinístico. Reglas (P4, no forzar):
+    - Clave FUERTE (placa/cédula) con **1** match normalizado → resuelve (encontrada=True).
+    - Clave fuerte con **>1** match → candidatas (ambigüedad → escala).
+    - Nombre: NUNCA auto-resuelve (no es único) → siempre candidatas (escala a confirmación humana).
+    Devuelve None SOLO si no hay ninguna clave alternativa (el caller sigue con la similitud del número).
+    """
+    # Nombre canónico del campo en la extracción = el primero de cada tupla; los siguientes son alias
+    # tolerados (U4 aún no fija el esquema rico — cuando lo haga, canonizar a: placa / cedula / nombre_asegurado).
+    placa = _campo_alt(extraccion, "placa")
+    cedula = _campo_alt(extraccion, "cedula", "asegurado_cedula", "cédula")
+    nombre = _campo_alt(extraccion, "nombre_asegurado", "asegurado_nombre", "nombre")
+    if not (placa or cedula or nombre):
+        return None  # sin claves alternativas → no aplica el fallback
+
+    polizas = list(_polizas_source().values())
+
+    # Claves fuertes (identificadores únicos): placa, luego cédula.
+    for valor, atributo in ((placa, "placa"), (cedula, "asegurado_cedula")):
+        objetivo = _norm_id(valor)
+        if not objetivo:
+            continue
+        matches = [p for p in polizas if _norm_id(getattr(p, atributo, None)) == objetivo]
+        if len(matches) == 1:
+            logger.info("Policy lookup: resuelto por clave alternativa '%s' (1 match).", atributo)
+            return ResultadoPoliza(encontrada=True, poliza=matches[0])
+        if len(matches) > 1:
+            logger.info("Policy lookup: '%s' ambiguo (%d) → candidatas, escala (P4).", atributo, len(matches))
+            return ResultadoPoliza(encontrada=False, poliza=None, candidatas=matches[:5])
+
+    # Nombre: identificador débil → siempre candidatas (nunca fuerza un match).
+    objetivo = _norm_nombre(nombre)
+    if objetivo:
+        matches = [p for p in polizas if _norm_nombre(getattr(p, "asegurado_nombre", None)) == objetivo]
+        logger.info("Policy lookup: nombre → %d candidata(s), escala (no único, P4).", len(matches))
+        return ResultadoPoliza(encontrada=False, poliza=None, candidatas=matches[:5])
+
+    # Había claves pero ninguna produjo match → escala (ninguna encontrada), no inventa.
+    return ResultadoPoliza(encontrada=False, poliza=None, candidatas=[])
 
 
 def _lookup_exact(numero_poliza: str) -> Optional[Poliza]:

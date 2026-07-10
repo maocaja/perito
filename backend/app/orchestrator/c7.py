@@ -23,6 +23,10 @@ from app.policy.lookup import call_c4_policy_lookup
 from app.rules.motor_r1_r5 import motor_cobertura
 from app.fraud.fraude import construir_alerta_fraude
 
+# U9 — Umbral de baja fidelidad para disparar la re-extracción reflexiva C2↔C3 (P4-owned, explícito).
+# El loop re-extrae SOLO si confianza < este umbral Y hay ≥1 inconsistencia de campo. Configurable.
+UMBRAL_REEXTRACCION = 0.7
+
 
 def orquestar_fnol(
     caso: Caso,
@@ -68,6 +72,7 @@ def orquestar_fnol(
         ronda = 0
         tokens_usados = 0
         snapshot_previo = None
+        reextraido = False  # U9: cap DURO — a lo sumo UNA re-extracción reflexiva por caso (P4)
         
         while not _es_terminal(caso.estado) and cotas is not None:
             ronda += 1
@@ -138,6 +143,44 @@ def orquestar_fnol(
                     if tracer:
                         tracer.emit("c3_verificador", f"confianza={verif.confianza}, señales={len(señales)}",
                                     tokens_in=usage["tokens_in"], tokens_out=usage["tokens_out"])
+                    # --- U9: Loop reflexivo C2↔C3 (evaluator-optimizer). Cap DURO por encima del framework ---
+                    # Si C3 marca BAJA FIDELIDAD (confianza < umbral Y ≥1 inconsistencia de campo), el cap lo
+                    # permite (max_rondas ≥ 2) y aún NO se ha re-extraído → C2 re-extrae UNA vez con la crítica
+                    # de C3 como feedback. `reextraido` es el bound estructural: es imposible re-extraer dos veces.
+                    # 🔒 P2: la re-extracción actualiza SOLO `extraccion` (campos); jamás toca cobertura ni
+                    # `dictamen` (aquí es None; el motor R1-R5 dictamina DESPUÉS y sigue siendo el único).
+                    if (señales and not reextraido and cotas.max_rondas >= 2
+                            and verif.confianza < UMBRAL_REEXTRACCION and verif.inconsistencias):
+                        reextraido = True
+                        señalados = list(verif.inconsistencias)
+                        critica = _critica_c3(verif)
+                        antes = _valores_campos(caso.extraccion, señalados)
+                        try:
+                            reextr, usage_r = call_c2_extractor(caso.aviso.texto_crudo, feedback=critica)
+                            caso = caso.model_copy(update={"extraccion": reextr})  # 🔒 P2: solo extraccion
+                            tokens_usados += usage_r["tokens_in"] + usage_r["tokens_out"]
+                            texto_red2 = redact_pii_spans_es_co(caso.aviso.texto_crudo)
+                            verif, usage_v = call_c3_verifier_capa1(caso.extraccion, texto_red2)
+                            _consistencia, señales = call_c3_verifier_capa2(caso.extraccion, verif)
+                            tokens_usados += usage_v["tokens_in"] + usage_v["tokens_out"]
+                            if tracer:
+                                despues = _valores_campos(caso.extraccion, señalados)
+                                tracer.emit("c2_reextraccion",
+                                            f"Extractor re-extrajo tras crítica del Verificador: {antes} → {despues}",
+                                            tokens_in=usage_r["tokens_in"], tokens_out=usage_r["tokens_out"])
+                                tracer.emit("c3_reverificacion",
+                                            f"confianza={verif.confianza}, señales={len(señales)}",
+                                            tokens_in=usage_v["tokens_in"], tokens_out=usage_v["tokens_out"])
+                        except Exception as e:
+                            caso = hitl_service.transicionar(
+                                caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
+                                motivo=f"Re-extracción reflexiva falló: {str(e)}"
+                            )
+                            if tracer:
+                                tracer.emit("c2_reextraccion", "Re-extracción falló", error=str(e))
+                            break
+
+                    # Tras la posible re-extracción: si SIGUE habiendo señales → escala (como hoy). No loopea.
                     if señales:
                         caso = hitl_service.transicionar(
                             caso, EstadoCaso.REQUIERE_REVISION, actor="SISTEMA",
@@ -232,6 +275,30 @@ def orquestar_fnol(
         if tracer:
             tracer.emit("orquestador", "Excepción no capturada", error=str(e))
         raise RuntimeError(f"Orquestador failed: {str(e)}") from e
+
+
+def _critica_c3(verif) -> str:
+    """U9: arma la crítica textual C3→C2 para la re-extracción. Solo NOMBRES DE CAMPO (sin PII).
+
+    Reusa lo que C3 ya produce (`confianza` + `inconsistencias`); no inventa un contrato nuevo.
+    """
+    # Defensivo: los nombres vienen de C3 (confiable) pero se sanean igual antes de entrar al prompt —
+    # una sola línea, sin caracteres de control, acotados (evita inyección por un nombre malformado).
+    limpios = [" ".join(str(n).split())[:60] for n in (verif.inconsistencias or []) if str(n).strip()]
+    campos = ", ".join(limpios[:10]) if limpios else "algunos campos"
+    return (
+        f"REVISIÓN DEL VERIFICADOR (C3): la confianza fue baja ({verif.confianza:.2f}) y se señalaron "
+        f"posibles inconsistencias en: {campos}. Vuelve a leer el aviso con cuidado y corrige SOLO esos "
+        f"campos si el texto los respalda. No inventes valores; si no están, márcalos ausentes."
+    )
+
+
+def _valores_campos(extraccion, nombres) -> dict:
+    """Valores actuales de los campos señalados (para el 'antes → después' del feed, U9). Sin PII externa."""
+    if extraccion is None:
+        return {}
+    quiere = set(nombres or [])
+    return {c.nombre: c.valor for c in extraccion.campos if c.nombre in quiere}
 
 
 def _es_terminal(estado: EstadoCaso) -> bool:

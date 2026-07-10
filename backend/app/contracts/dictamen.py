@@ -56,6 +56,12 @@ class AlertaFraude(Contract):
     severidad: str = Field(min_length=1)
     inconsistencias: list[EvidenciaOrigen] = Field(min_length=1)
     explicacion: str = Field(min_length=1)
+    # --- U6 cross-claim (aditivo): toda señal lleva confianza; un falso positivo es
+    # sugerencia con confianza, NUNCA verdad (P7). `lt=1.0` cierra la puerta: ninguna señal —
+    # ni el chequeo duro intra-caso, ni la foto idéntica — es veredicto absoluto (spec U6 §7).
+    # Default 0.99 (capas 1-2): señal fuerte de un hecho cierto, pero sigue siendo sugerencia (P6/P7).
+    confianza: float = Field(default=0.99, ge=0.0, lt=1.0)
+    capa: int = Field(default=1, ge=1, le=4)  # 1-2 intra-caso · 4 cross-claim (U6)
 
 
 class Cotas(Contract):
