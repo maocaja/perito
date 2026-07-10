@@ -39,6 +39,8 @@ loop reflexivo interno.
 | **U7** | Triage (¿es siniestro? nuevo/existente) | 🤖 | P1, P5 | redacción de cuerpo | Producto |
 | **U8** | Entity resolution (fallback placa/cédula/nombre) | ⚙️+🤖 | — | U4 | Producto |
 | **U9** | Loop reflexivo C2↔C3 (evaluator-optimizer) | 🤖 | 🔒 P4 (`orchestrator/`) | — | Interno |
+| **U10** | Wiring del fraude cross-claim al pipeline (visible en bandeja) | ⚙️ det | 🔒 P4 + P6 | U5, U6 | Producto |
+| **GOV** | Reglas enforceable P5 (PII) y P6 (fraude sugiere) | — docs | — | — | Gobernanza |
 
 **Orden de ataque sugerido:** U1 → U2 → U3 (fase demo) → U4 → U8 → U5 → U6 → U7 → U9.
 Notas de orden (tras code-review del QUÉ): **U9 después de U3** (U9 toca `tipo_siniestro`, que U3 vuelve
