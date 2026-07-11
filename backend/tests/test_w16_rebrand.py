@@ -133,11 +133,15 @@ def test_filtro_por_estado_en_el_workbench(client):
     assert r.text.count("data-caso-id=") == esperado
 
 
-# ---------- acciones con color ----------
+# ---------- acciones: una primaria, el resto secundario (V1·5) ----------
 
-def test_acciones_con_clases_de_color(client):
+def test_acciones_una_primaria_resto_secundario(client):
+    """V1·5 (colega senior): Radicar es la ÚNICA primaria (verde/go); las demás son secundarias calmas
+    (btn-ghost), no botones de color fuera de paleta (antes azul .btn-solicitar / morado .btn-escalar)."""
     html = client.get(f"/workbench/caso/{get_caso_repository().list()[0].id}").text
-    assert "btn-radicar" in html and "btn-solicitar" in html and "btn-escalar" in html
+    assert "btn-radicar" in html          # la primaria (verde = firmar/go)
+    assert "btn-ghost" in html            # las secundarias calmas
+    assert "btn-solicitar" not in html and "btn-escalar" not in html  # sin azul/morado fuera de paleta
 
 
 # ---------- retro-compat ----------

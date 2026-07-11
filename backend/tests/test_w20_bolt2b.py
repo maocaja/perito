@@ -76,7 +76,8 @@ def test_a3_wb_doc_abre_visor(client):
     caso = get_caso_repository().list()[0]
     html = client.get(f"/workbench/caso/{caso.id}").text
     assert f'hx-get="/workbench/documento/{caso.id}?doc=0"' in html
-    assert 'role="button"' in html and 'hx-target="#wb-drawer"' in html
+    # V1·4: el documento es un <button> nativo (teclado-first: Enter/Espacio disparan el click sin role/tabindex).
+    assert '<button class="wb-doc"' in html and 'hx-target="#wb-drawer"' in html
 
 
 def test_a3_visor_muestra_etiqueta_y_no_media_cruda(client):
@@ -180,8 +181,9 @@ def test_encode_not_hide_timeline_no_colapsa(client):
     """El timeline agent-native (W18) sigue VISIBLE (condensado, no colapsado a una línea)."""
     caso = get_caso_repository().list()[0]
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "Lo que hizo la IA" in html          # el timeline sigue presente
-    assert "wb-tl-h" in html                     # y renderiza sus nodos, no un resumen de una línea
+    assert "Actividad del caso" in html          # V1·6: la cronología (humana) sigue presente, no colapsada
+    assert "wb-crono-step" in html               # renderiza sus pasos (no un resumen de una línea)
+    assert "Ver actividad técnica" in html       # el rastro técnico REAL sigue accesible a un click (encode-not-hide)
 
 
 if __name__ == "__main__":

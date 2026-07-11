@@ -126,10 +126,10 @@ def test_valores_redactados_email_y_telefono():
 def test_render_panel(client):
     caso = _con_extraccion() or get_caso_repository().list()[0]
     html = client.get(f"/workbench/caso/{caso.id}").text
-    # Fase 0: la tabla se fusionó en 'Datos del siniestro' (antes duplicada con 'Información extraída').
+    # V1·3: los datos son campos-OBJETO (no una tabla): [glifo] · [label+valor] · [estado calmo · fuente].
     assert "Datos del siniestro" in html
-    assert "wb-campo-conf" in html          # columna de confianza (codificada)
-    assert "wb-campo-fuente" in html        # columna de fuente (P3: dato·confianza·fuente)
+    assert "wb-field-state" in html         # estado del campo (confianza en calma / "Verificado")
+    assert "wb-field-src" in html           # la fuente (P3: dato·confianza·fuente como objeto)
     assert "badge-demo" in html             # los ricos rotulados
 
 

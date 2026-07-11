@@ -40,6 +40,19 @@ def test_hermetico_usa_fallback_base():
     assert texto == vista_caso.resumen_narrativo(caso)
 
 
+# ---------- V1·2: la historia se rinde como prosa; la IA es invisible ----------
+
+def test_v1_historia_se_rinde_sin_exponer_la_ia(client):
+    """V1·2: el resumen aparece como HISTORIA (prosa), y la IA es INVISIBLE — sin badge 'Summary Agent'/'agente'
+    gritón. El contenido (la explicación) sí se muestra: la IA aparece cuando explica, no como marketing."""
+    caso = _un_caso()
+    html = client.get(f"/workbench/caso/{caso.id}").text
+    assert "wb-narrativa" in html                       # la historia se rinde como prosa
+    assert vista_caso.resumen_ejecutivo(caso)["texto"][:24] in html  # el contenido real está presente
+    assert "wb-agente-tag" not in html                  # sin el badge de IA (invisible)
+    assert "Summary Agent" not in html                  # sin exponer la orquestación (manifiesto V1)
+
+
 # ---------- agente real (mock) ----------
 
 def test_agente_redacta_cuando_llm_valido(monkeypatch):
@@ -133,10 +146,13 @@ def test_prompt_no_incluye_texto_crudo_y_redacta():
 
 # ---------- render ----------
 
-def test_render_muestra_tag_de_origen(client):
+def test_render_muestra_la_historia(client):
+    """V1·2: la historia aparece con su eyebrow calmo ('Resumen del caso'); ya NO hay badge de agente/origen
+    (la IA es invisible — el origen LLM/base se comunica, si acaso, con una nota sutil, no un badge)."""
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
-    assert "wb-agente-tag" in html
-    assert "Resumen ejecutivo" in html
+    assert "wb-historia" in html
+    assert "Resumen del caso" in html
+    assert "wb-agente-tag" not in html and "Summary Agent" not in html
 
 
 if __name__ == "__main__":

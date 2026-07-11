@@ -85,9 +85,9 @@ def test_tokens_en_pasos_de_agente():
 
 def test_render_horizontal_y_demo_distinto(client):
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
-    assert "wb-tl-h" in html            # timeline horizontal
-    assert "is-demo" in html            # los pasos demo llevan la clase distintiva
-    assert "rastro real" in html         # el encabezado nombra la orquesta
+    assert "wb-crono" in html            # V1·6: cronología HUMANA (vertical), no un strip técnico horizontal
+    assert "badge-demo" in html          # los pasos demo (conteos) van rotulados
+    assert "Ver actividad técnica" in html  # el rastro técnico real sigue a un click (drawer, encode-not-hide)
 
 
 # ---------- Fase 1 · drawer de actividad (encode-not-hide: timeline condensado + detalle a un click) ----------

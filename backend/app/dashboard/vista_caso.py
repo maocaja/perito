@@ -692,7 +692,7 @@ def recomendacion(caso) -> dict:
     faltantes = _faltantes(caso)
     est = caso.estado  # var local: comparación de enum sin el patrón de mutación (passive)
     if est in _TERMINALES:
-        quien = f" por {caso.aprobado_por}" if getattr(caso, "aprobado_por", None) else ""
+        quien = f" por {_red(caso.aprobado_por)}" if getattr(caso, "aprobado_por", None) else ""  # P5: redacta en el boundary
         rec = {"icono": "🔒", "titulo": "Caso resuelto", "texto": f"Decisión humana registrada{quien}.", "tono": "neutral"}
     elif est == EstadoCaso.REQUIERE_REVISION:
         if faltantes:

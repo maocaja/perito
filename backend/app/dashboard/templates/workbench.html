@@ -51,7 +51,11 @@
     {% if detalle %}
       {% include "workbench_caso.html" %}
     {% else %}
-      <div class="wb-empty wb-caso-empty">Selecciona un caso de la cola para verlo aquí.</div>
+      <div class="wb-caso-empty">
+        <div class="wb-caso-empty-ic" aria-hidden="true">✦</div>
+        <div class="wb-caso-empty-title">Todo bajo control</div>
+        <div class="wb-caso-empty-sub">Selecciona un caso de la cola. Perito ya lo preparó — solo tienes que revisar y decidir.</div>
+      </div>
     {% endif %}
   </div>
 
@@ -102,8 +106,9 @@
     if(!drawer) return;
     document.body.addEventListener('htmx:afterSwap', function(e){
       if(e.target.id === 'wb-drawer' && e.target.children.length && !drawer.open){ drawer.showModal(); }
-      // al cambiar de caso (#wb-caso se re-renderiza), cierra el drawer para no mostrar contenido del caso anterior
-      else if(e.target.id === 'wb-caso' && drawer.open){ drawer.close(); }
+      // al cambiar de caso (#wb-caso se re-renderiza): cierra el drawer y sube el scroll (V1·6: el título enorme
+      // del caso nuevo queda visible, no bajo el topbar).
+      else if(e.target.id === 'wb-caso'){ if(drawer.open){ drawer.close(); } var m=document.querySelector('.main'); if(m){ m.scrollTop=0; } }
     });
     drawer.addEventListener('click', function(e){ if(e.target === drawer){ drawer.close(); } });  // click en el backdrop
   })();
