@@ -14,10 +14,6 @@
 <body>
 {% set rol_val = rol|default('ANALISTA') %}
 {% set path = request.url.path %}
-{% set is_workbench = path.startswith('/workbench') %}
-{% set is_bandeja = (path == '/' or path.startswith('/casos')) %}
-{% set is_nuevo = path.startswith('/nuevo') %}
-{% set is_panel = path.startswith('/panel') %}
 <div class="app">
 
   <aside class="sidebar">
@@ -62,7 +58,7 @@
       <div class="topbar-right">
         <div class="pill-status"><span class="dot" style="background:var(--ok)"></span>API · en línea</div>
         <div class="seg">
-          <a class="{{ 'active' if rol_val == 'ANALISTA' }}" href="/casos?rol=ANALISTA">Analista</a>
+          <a class="{{ 'active' if rol_val == 'ANALISTA' }}" href="/workbench?rol=ANALISTA">Analista</a>
           <a class="{{ 'active' if rol_val == 'CUMPLIMIENTO' }}" href="/panel?rol=CUMPLIMIENTO">Cumplimiento</a>
         </div>
         <button class="icon-btn" id="bell" type="button" onclick="clearBell()" title="Notificaciones de nuevos casos" aria-label="Notificaciones de nuevos casos" style="position:relative">

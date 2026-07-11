@@ -1,0 +1,25 @@
+{# Vista comparativa multi-correo (Fase 1): se abre en el drawer desde "Comparar correos". Mock rotulado; el
+   clustering real llega con U7/U8/M1. P5: resúmenes redactados. #}
+<div class="wb-drawer-inner">
+  <header class="wb-drawer-head">
+    <h2>Vista comparativa <span class="hint">· {{ comparativa.fuentes|length }} correos</span> <span class="badge-demo" title="Agrupación multi-correo de demostración; el clustering real llega con U7/U8/M1">demo</span></h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar vista comparativa">✕</button>
+  </header>
+  <div class="wb-drawer-body">
+    {% if comparativa.disponible %}
+    <div class="wb-comp">
+      <div class="wb-comp-fuentes">
+        {% for f in comparativa.fuentes %}
+        <div class="wb-comp-fuente"><div class="wb-comp-f-top"><strong>{{ f.etiqueta }}</strong><span class="hint">{{ f.fecha }}</span></div><div class="wb-comp-f-res">{{ f.resumen|redact }}</div></div>
+        {% endfor %}
+      </div>
+      <div class="wb-comp-cambios">
+        <div class="hint">Cambios detectados por la IA</div>
+        <ul>{% for c in comparativa.cambios %}<li><span aria-hidden="true">{{ c.icono }}</span> {{ c.texto|redact }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+    {% else %}
+    <div class="wb-ev-empty">Un solo correo — no hay nada que comparar.</div>
+    {% endif %}
+  </div>
+</div>

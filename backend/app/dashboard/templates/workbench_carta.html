@@ -1,0 +1,24 @@
+{# Carta al asegurado (W20/A7): portada de `detalle` a un drawer de la Workbench. P1: el agente REDACTA el
+   borrador; el humano lo FIRMA y ENVÍA (usuario obligatorio). P2/P7: la carta de resolución cita el dictamen
+   literal (guardrail en cartas.py). Demo-scope: destinatario fijo al buzón demo. #}
+<div class="wb-drawer-inner">
+  <header class="wb-drawer-head">
+    <h2>{% if carta_enviada %}Carta enviada{% elif carta_tipo == 'datos' %}Pedir datos al asegurado{% else %}Carta de resolución{% endif %}
+      <span class="badge-demo" title="Envío a buzón de demostración; el correo real al asegurado es de producción">demo</span></h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar carta">✕</button>
+  </header>
+  <div class="wb-drawer-body">
+    {% if carta_enviada %}
+      <div class="wb-carta-ok">✅ La carta se envió al asegurado (buzón demo). El caso no cambió — enviar es una acción de comunicación, no una decisión (P1).</div>
+    {% else %}
+      {% if carta_error %}<p class="error">{{ carta_error }}</p>{% endif %}
+      <form method="post" action="/casos/{{ caso.id }}/carta/enviar" hx-post="/casos/{{ caso.id }}/carta/enviar"
+            hx-target="#wb-drawer" hx-swap="innerHTML" class="wb-carta-form">
+        <label class="hint" for="wb-carta-cuerpo">Borrador (editable antes de enviar)</label>
+        <textarea id="wb-carta-cuerpo" class="wb-carta-cuerpo" name="contenido" aria-label="Borrador de la carta">{{ borrador }}</textarea>
+        <input class="wb-carta-firma" type="text" name="usuario" placeholder="Tu nombre (firma, P1) para enviar" autocomplete="off" required>
+        <button class="btn btn-primary" type="submit">Enviar al asegurado</button>
+      </form>
+    {% endif %}
+  </div>
+</div>

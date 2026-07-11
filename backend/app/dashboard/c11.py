@@ -1,4 +1,7 @@
-"""C11 Dashboard router — bandeja (H-19), detalle (H-20), acciones HITL, panel (H-21).
+"""C11 Dashboard router — Workbench (W1, `/workbench`), detalle (H-20), acciones HITL, panel (H-21).
+
+W20/A6: el board legacy (`bandeja.html`, `/casos`) se retiró; `/` redirige a la Workbench (única superficie
+del operador). `detalle` (`/casos/{id}`) se conserva hasta que Bolt-2 porte carta+rechazar a la Workbench.
 
 INVARIANTES:
 - Passive: NO importa `rules/` ni `orchestrator/`; no contiene lógica de dominio.
@@ -12,13 +15,12 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.contracts.enums import EstadoCaso, ResultadoCobertura, RolUsuario
 from app.security.redaction import redact_pii_spans_es_co
-from app.hitl.c8 import aprobar as hitl_aprobar, rechazar as hitl_rechazar
 from app.observability.replay import get_replay_store
 from app.dashboard.store import get_caso_repository
 from app.dashboard import vista_caso
@@ -118,6 +120,8 @@ def _detalle_context(caso, rol: str) -> dict:
         "resumen_ejecutivo": vista_caso.resumen_ejecutivo(caso),  # W19: Summary Agent (LLM) + fallback
         "riesgos": vista_caso.riesgos(caso),  # W5: 'Riesgos a revisar' (P6, solo sugiere)
         "campos_extraidos": vista_caso.campos_extraidos(caso),  # W17: dato·confianza·fuente (real+demo)
+        "datos_principales": vista_caso.datos_principales(caso),  # Fase 0: tabla única (presentes + REQUERIDO)
+        "campos_corregibles": vista_caso.campos_corregibles(caso),  # Fase 2: valores para la corrección inline
         "health": vista_caso.health_check(caso, traza),  # W6: % completo + checklist unificado
         "cobertura": vista_caso.explicacion_cobertura(caso),  # W7: 'por qué' del dictamen (P2, presenta)
         "docs_checklist": vista_caso.checklist_documentos(caso),  # U2: documentos requeridos por producto
@@ -150,54 +154,11 @@ def _filtrar_bandeja(casos, estado: Optional[str]):
     return [c for c in casos if c.estado == e]
 
 
-@router.get("/", response_class=HTMLResponse)
-@router.get("/casos", response_class=HTMLResponse)
-def bandeja(request: Request, estado: Optional[str] = Query(None), rol: str = Query(RolUsuario.ANALISTA.value),
-            orden: Optional[str] = Query(None)):
-    """H-19: bandeja con filtro por estado + KPIs clicables + orden (recientes | prioridad, U1)."""
-    repo = get_caso_repository()
-    todos = repo.list()
-    casos = _filtrar_bandeja(todos, estado)
-    # Más reciente arriba (efecto "van entrando") + hora de proceso + flag de recién llegado (<20s).
-    casos = sorted(casos, key=lambda c: c.timestamp_actualizacion, reverse=True)
-    ahora = datetime.now(timezone.utc)
-    filas = [{
-        "caso": c,
-        "hora": c.timestamp_actualizacion.strftime("%H:%M:%S"),
-        "reciente": (ahora - c.timestamp_actualizacion).total_seconds() < 20,
-        "ramo": vista_caso.ramo_de(c),  # derivado de tipo_siniestro (passive, P7)
-        "senal_fraude": vista_caso.senal_fraude(c),  # el "por qué" del fraude (passive, P6)
-        "prioridad": vista_caso.prioridad(c),  # U1: nivel de prioridad (chip + acento)
-    } for c in casos]
-    # Orden secundario OPT-IN por prioridad (default: cronológico, para no romper el efecto en vivo).
-    if orden == "prioridad":
-        _rank = {"ALTA": 0, "MEDIA": 1, "BAJA": 2}
-        filas.sort(key=lambda f: (_rank.get(f["prioridad"]["nivel"], 3),
-                                  -f["caso"].timestamp_actualizacion.timestamp()))
-
-    # Conteos para los KPIs y los chips (agregación de presentación, no lógica de dominio).
-    def _n(e):
-        return sum(1 for c in todos if c.estado == e)
-    counts = {
-        "total": len(todos),
-        "LISTO_PARA_APROBAR": _n(EstadoCaso.LISTO_PARA_APROBAR),
-        "REQUIERE_REVISION": _n(EstadoCaso.REQUIERE_REVISION),
-        "APROBADO": _n(EstadoCaso.APROBADO),
-        "RECHAZADO": _n(EstadoCaso.RECHAZADO),
-        "fraude_alta": sum(1 for c in todos if c.alerta_fraude and c.alerta_fraude.severidad == "ALTA"),
-    }
-    counts["resueltos"] = counts["APROBADO"] + counts["RECHAZADO"]
-
-    return _TEMPLATES.TemplateResponse(request, "bandeja.html", {
-        "casos": casos,
-        "filas": filas,
-        "counts": counts,
-        "nav_total": counts["total"],
-        "estado_actual": estado or "",
-        "orden": orden or "",
-        "rol": rol,
-        "en_vivo": settings.demo_live != "off",  # Unit H: activa el auto-refresh de la bandeja
-    })
+@router.get("/", response_class=RedirectResponse)
+def raiz(rol: str = Query(RolUsuario.ANALISTA.value)):
+    """W20/A6: la Workbench es la única superficie del operador. La raíz redirige a la estación (el board
+    legacy `/casos` + `bandeja.html` se retiraron; su cola vive en `/workbench`)."""
+    return RedirectResponse(f"/workbench?rol={rol}", status_code=303)
 
 
 def _tiempo_relativo(ts, ahora) -> str:
@@ -287,7 +248,6 @@ def workbench(request: Request, rol: str = Query(RolUsuario.ANALISTA.value),
         "q_actual": q or "",
         "estado_wb": estado or "",
         "filtrado": bool(carril or estado or (q and q.strip())),  # hay un filtro activo en la cola
-        "productividad": _productividad.productividad(rol),  # W14: métricas del operador (real + mock)
         "nav_total": len(casos),
         "en_vivo": settings.demo_live != "off",
         "caso_activo_id": activo.id if activo else None,
@@ -317,6 +277,39 @@ def workbench_evidencia(request: Request, caso_id: str, campo: str = Query(...),
     return _TEMPLATES.TemplateResponse(request, "workbench_evidencia.html", ctx)
 
 
+@router.get("/workbench/actividad/{caso_id}", response_class=HTMLResponse)
+def workbench_actividad(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value)):
+    """Fase 1: parcial (drawer) de la actividad detallada de la orquesta (tokens/hora por AGENTE real)."""
+    caso = _get_o_404(caso_id)
+    traza = get_replay_store().load(caso.id)
+    ctx = {"actividad": vista_caso.actividad_agentes(traza), "latencia": vista_caso.latencia_caso(traza)}
+    return _TEMPLATES.TemplateResponse(request, "workbench_actividad.html", ctx)
+
+
+@router.get("/workbench/comparativa/{caso_id}", response_class=HTMLResponse)
+def workbench_comparativa(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value)):
+    """Fase 1: parcial (drawer) de la vista comparativa multi-correo (mock rotulado)."""
+    caso = _get_o_404(caso_id)
+    return _TEMPLATES.TemplateResponse(request, "workbench_comparativa.html", {"comparativa": _comparativa.comparativa_de(caso)})
+
+
+@router.post("/workbench/corregir/{caso_id}", response_class=HTMLResponse)
+def workbench_corregir(request: Request, caso_id: str,
+                       usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value),
+                       numero_poliza: Optional[str] = Form(None), fecha_siniestro: Optional[str] = Form(None),
+                       tipo_siniestro: Optional[str] = Form(None), monto_reclamado: Optional[str] = Form(None)):
+    """Fase 2: corrección inline. Delega en `aplicar_correccion` (SERVER re-corre C4 + motor determinístico,
+    P2; firma P1; 409 si terminal) y devuelve el partial `#wb-caso` re-renderizado (sin recarga)."""
+    from app.api.hitl_actions import _validar_corregible, aplicar_correccion
+    caso = _validar_corregible(caso_id, usuario)  # P1 firma · 404 · 409 · 400
+    actualizado = aplicar_correccion(caso, usuario.strip(), {
+        "numero_poliza": numero_poliza, "fecha_siniestro": fecha_siniestro,
+        "tipo_siniestro": tipo_siniestro, "monto_reclamado": monto_reclamado,
+    })
+    ctx = {"rol": rol, "detalle": _detalle_context(actualizado, rol), "caso_activo_id": actualizado.id}
+    return _TEMPLATES.TemplateResponse(request, "workbench_caso.html", ctx)
+
+
 @router.get("/workbench/caso/{caso_id}", response_class=HTMLResponse)
 def workbench_caso(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value)):
     """W1: parcial del caso (centro + derecha) para el swap HTMX al seleccionar en la cola."""
@@ -325,45 +318,9 @@ def workbench_caso(request: Request, caso_id: str, rol: str = Query(RolUsuario.A
     return _TEMPLATES.TemplateResponse(request, "workbench_caso.html", ctx)
 
 
-@router.get("/casos/{caso_id}", response_class=HTMLResponse)
-def detalle(request: Request, caso_id: str, rol: str = Query(RolUsuario.ANALISTA.value),
-            enviado: Optional[str] = Query(None)):
-    """H-20: detalle con evidencia enlazada (campo→origen, dictamen→cláusula) y aviso redactado (P5)."""
-    caso = _get_o_404(caso_id)
-    ctx = _detalle_context(caso, rol)
-    if enviado:  # PRG tras enviar la carta (Unit M)
-        ctx["carta_enviada"] = True
-    return _TEMPLATES.TemplateResponse(request, "detalle.html", ctx)
-
-
-@router.post("/casos/{caso_id}/aprobar", response_class=HTMLResponse)
-def aprobar(request: Request, caso_id: str, usuario: Optional[str] = Form(None)):
-    """H-12: delega en hitl.aprobar. P1: usuario obligatorio (firma humana) → 400 si falta."""
-    if not usuario or not usuario.strip():
-        raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
-    caso = _get_o_404(caso_id)
-    try:
-        actualizado = hitl_aprobar(caso, usuario)  # única vía de mutación de estado (C8)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    get_caso_repository().save(actualizado)
-    return _TEMPLATES.TemplateResponse(request, "detalle.html", _detalle_context(actualizado, RolUsuario.ANALISTA.value))
-
-
-@router.post("/casos/{caso_id}/rechazar", response_class=HTMLResponse)
-def rechazar(request: Request, caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None)):
-    """H-12: delega en hitl.rechazar. P1: usuario + motivo obligatorios."""
-    if not usuario or not usuario.strip():
-        raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
-    if not motivo or not motivo.strip():
-        raise HTTPException(status_code=400, detail="motivo requerido para rechazar")
-    caso = _get_o_404(caso_id)
-    try:
-        actualizado = hitl_rechazar(caso, usuario, motivo)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    get_caso_repository().save(actualizado)
-    return _TEMPLATES.TemplateResponse(request, "detalle.html", _detalle_context(actualizado, RolUsuario.ANALISTA.value))
+# W20/A6+A7: la página `detalle` y sus acciones legacy (`aprobar`/`rechazar` que renderizaban detalle) se
+# retiraron. La Workbench es la única superficie: radicar (→APROBADO) y rechazar (→RECHAZADO) viven en
+# `hitl_actions.py` y redirigen a `/workbench` (PRG). La carta se porta como drawer (cartas.py).
 
 
 @router.get("/panel", response_class=HTMLResponse)
@@ -372,7 +329,11 @@ def panel(request: Request, rol: str = Query(RolUsuario.CUMPLIMIENTO.value)):
     store = get_replay_store()
     replays = [r for r in (store.load(cid) for cid in store.get_all_cases()) if r is not None]
     metricas = calcular_metricas(get_caso_repository().list(), replays)
-    return _TEMPLATES.TemplateResponse(request, "panel.html", {"replays": replays, "rol": rol, "metricas": metricas})
+    # W20/A1: la productividad del operador vive aquí (Reportes), no en la Workbench (estación de decisión).
+    return _TEMPLATES.TemplateResponse(request, "panel.html", {
+        "replays": replays, "rol": rol, "metricas": metricas,
+        "productividad": _productividad.productividad(rol),
+    })
 
 
 @router.get("/panel/export/{caso_id}")

@@ -23,7 +23,9 @@
     </div>
     <div class="wb-cola-list">
       {% for f in filas %}
-      {# Tarjeta rica de la cola (como el mockup). Real: póliza, %. Mock rotulado: asegurado, placa, conteos. #}
+      {# Tarjeta de cola simple (escaneo rápido): prioridad · tiempo · asegurado · tipo · alerta. Fase 0: se
+         quitaron placa/conteos/pct (eran mock) — menos ruido y más honestidad P7. Read-only (vive en la región
+         poleada): SOLO navegación; conserva data-caso-id para la persistencia de selección. #}
       <a class="wb-cola-item row-link {{ 'active' if f.caso.id == caso_activo_id }}"
          href="/workbench?rol={{ rol }}&caso_id={{ f.caso.id }}"
          hx-get="/workbench/caso/{{ f.caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML"
@@ -34,15 +36,8 @@
           <span class="chip chip-{{ f.prioridad.nivel|lower }}">{{ f.prioridad.nivel }}</span>
           <span class="wb-card-hace mono">🕒 {{ f.hace }}</span>
         </div>
-        <div class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</div>
-        <div class="wb-card-aseg">{{ f.resumen.asegurado }} <span class="badge-demo">demo</span></div>
-        <div class="wb-card-tipo">{{ f.clasificacion.tipo|replace('_',' ')|title }}</div>
-        <div class="wb-card-pol mono">{{ f.resumen.poliza }} <span class="dim">|</span> {{ f.resumen.placa }}</div>
-        <div class="wb-card-counts">
-          <span title="correos">✉ {{ f.resumen.correos }}</span>
-          <span title="documentos">🖼 {{ f.resumen.docs }}</span>
-          <span class="wb-card-pct" title="completitud">✓ {{ f.resumen.pct }}%</span>
-        </div>
+        <div class="wb-card-aseg">{{ f.resumen.asegurado }}</div>
+        <div class="wb-card-tipo">{{ f.clasificacion.tipo|replace('_',' ')|title }} <span class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</span></div>
         {% if f.senal_fraude %}<div class="wb-card-flag">🕵️ {{ f.senal_fraude }}</div>{% endif %}
       </a>
       {% else %}
@@ -62,23 +57,12 @@
 
 </div>
 
-{# W14 · Productividad del operador (nivel operador, no por caso). Real: casos/pendientes · demo: tiempo/SLA #}
-<section class="card wb-prod">
-  <div class="card-head"><h2>Tu productividad hoy</h2><span class="hint">{{ branding.vendor if branding }} · Operaciones</span></div>
-  <div class="card-body wb-prod-body">
-    <div class="wb-prod-kpis">
-      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.casos }}</div><div class="hint">Casos procesados</div></div>
-      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.tiempo_prom }} <span class="badge-demo">demo</span></div><div class="hint">Tiempo promedio</div></div>
-      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.errores }} <span class="badge-demo">demo</span></div><div class="hint">Errores</div></div>
-      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.pendientes }}</div><div class="hint">Pendientes</div></div>
-      <div class="wb-prod-kpi"><div class="wb-prod-n" style="color:var(--ok)">{{ productividad.sla }}% <span class="badge-demo">demo</span></div><div class="hint">SLA cumplimiento</div></div>
-    </div>
-    <svg class="wb-prod-chart" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Casos procesados por hora (demostración)">
-      <polyline fill="none" stroke="var(--brand)" stroke-width="1.6"
-        points="{% for v in productividad.serie %}{{ (loop.index0 * 100 / (productividad.serie|length - 1))|round(1) }},{{ (29 - (v / productividad.serie_max * 27))|round(1) }} {% endfor %}"/>
-    </svg>
-  </div>
-</section>
+{# Fase 1 · Drawer raíz para lo secundario (evidencia, comparativa, actividad). FUERA de #wb-cola y #wb-caso →
+   inmune al auto-poll y al swap del caso. Se llena por HTMX y se abre con <dialog> nativo (JS mínimo, ADR-001). #}
+<dialog id="wb-drawer" class="wb-drawer" role="dialog" aria-label="Panel de detalle"></dialog>
+
+{# W20·A1: la Productividad del operador se movió a Reportes (`/panel`) — la Workbench es la estación de decisión,
+   enfocada solo en el caso y su siguiente acción (no en métricas de jornada). #}
 
 <script>
   // W9 · JS mínimo (ADR-001): copia la firma compartida a las acciones antes del POST. El gate real es el
@@ -89,6 +73,19 @@
     var firma = firmaEl ? firmaEl.value : '';
     f.querySelectorAll('.wb-firma-in').forEach(function(i){ i.value = firma; });
   });
+
+  // Fase 1 · Drawer: se abre cuando HTMX le mete contenido; se cierra con ✕, ESC (nativo <dialog>) o click fuera.
+  // ADR-001: JS SOLO de disclosure/navegación — el contenido y toda decisión son server-rendered.
+  (function(){
+    var drawer = document.getElementById('wb-drawer');
+    if(!drawer) return;
+    document.body.addEventListener('htmx:afterSwap', function(e){
+      if(e.target.id === 'wb-drawer' && e.target.children.length && !drawer.open){ drawer.showModal(); }
+      // al cambiar de caso (#wb-caso se re-renderiza), cierra el drawer para no mostrar contenido del caso anterior
+      else if(e.target.id === 'wb-caso' && drawer.open){ drawer.close(); }
+    });
+    drawer.addEventListener('click', function(e){ if(e.target === drawer){ drawer.close(); } });  // click en el backdrop
+  })();
 
   // Persistencia de la selección: el caso activo se re-resalta tras cada refresco de la cola (cada 3s en vivo),
   // así el resaltado de la cola SIEMPRE coincide con el caso mostrado en el centro (arregla "no renderiza lo mismo").

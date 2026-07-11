@@ -23,9 +23,9 @@ def client():
 
 
 def _caso_del_redirect(r):
-    """Extrae el caso creado a partir del Location del 303 (/casos/{id}?rol=...)."""
-    loc = r.headers["location"]
-    cid = loc.split("/casos/")[1].split("?")[0]
+    """Extrae el caso creado del Location del 303. W20/A6: ahora aterriza en /workbench?...&caso_id={id}."""
+    from urllib.parse import urlparse, parse_qs
+    cid = parse_qs(urlparse(r.headers["location"]).query)["caso_id"][0]
     return get_caso_repository().get(cid)
 
 

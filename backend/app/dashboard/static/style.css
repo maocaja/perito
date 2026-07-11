@@ -158,8 +158,6 @@ h1.title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
 .cell-strong { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cell-sub { font-size:11.5px; color:var(--text-3); }
 .cell-num { text-align:right; font-family:var(--mono); font-size:12.5px; font-weight:500; }
-.grid-bandeja { grid-template-columns:150px 1.4fr 90px 168px 150px 118px 130px; }
-.grid-bandeja.row-link { padding:16px 18px; }  /* filas más aireadas (estilo prototipo) */
 .grid-panel { grid-template-columns:34px 1.5fr 120px 96px 1.2fr; }
 
 /* ---------- Buttons ---------- */
@@ -275,8 +273,6 @@ a.kpi:hover { border-color:var(--border-strong); }
 a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak); }
 
 /* U1 · Prioridad + Routing */
-.grid-bandeja.prio-alta { box-shadow:inset 3px 0 0 var(--bad); }
-.grid-bandeja.prio-media { box-shadow:inset 3px 0 0 var(--warn); }
 .routing-line { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:14px 0 4px; }
 .routing-sep { color:var(--text-3); }
 .prio-badge { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; padding:3px 9px; border-radius:999px; border:1px solid transparent; }
@@ -380,9 +376,6 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-strip-item.nivel-warn .wb-strip-val{color:var(--warn)}
 table.datos { width:100%; border-collapse:collapse; }
 table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:top; }
-.datos-k { color:var(--text-2); width:38%; }
-.datos-src { color:var(--text-3); font-size:11px; margin-left:6px; }
-.datos-conf { color:var(--ok); font-size:11px; font-weight:600; margin-left:8px; }
 .row-ausente { background:var(--warn-bg); }
 .req-tag { font-size:10.5px; font-weight:700; color:var(--warn); background:var(--warn-bg);
   border:1px solid var(--warn-bd); border-radius:5px; padding:1px 6px; }
@@ -617,3 +610,73 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-chat-form { display:flex; gap:6px; }
 .wb-chat-form input { flex:1; padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
 .wb-chat-form .btn { padding:8px 12px; }
+
+/* ═══════════ Fase 0 · Declutter (estación de decisión) ═══════════ */
+/* Confianza CODIFICADA (encode-not-hide, P7): el % SIEMPRE visible, pero su peso refleja la incertidumbre —
+   tenue cuando es alta, fuerte/ámbar cuando es baja. Nunca se oculta la señal (solo se gradúa la prominencia). */
+.wb-conf-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--text-3); }
+.wb-conf-pct { font-size:11px; font-variant-numeric:tabular-nums; }
+.conf-alta  .wb-conf-dot { background:var(--ok); }
+.conf-alta  .wb-conf-pct { color:var(--text-3); font-weight:500; }         /* alta → tenue (no grita) */
+.conf-media .wb-conf-dot { background:var(--warn); }
+.conf-media .wb-conf-pct { color:var(--warn); font-weight:700; }
+.conf-baja  .wb-conf-dot { background:var(--bad); }
+.conf-baja  .wb-conf-pct { color:var(--bad);  font-weight:700; }           /* baja → fuerte (pide atención) */
+.conf-baja  { background:var(--warn-bg); }                                  /* la fila de baja confianza resalta */
+/* M3 · campo confirmado por varias fuentes (Evidence Correlator) */
+.wb-campo-ok { color:var(--ok); font-weight:700; font-size:11px; margin-left:4px; }
+/* Evidencia inline (reemplaza la tarjeta vacía permanente): solo ocupa espacio cuando tiene contenido */
+.wb-evidencia-slot:empty { display:none; }
+.wb-evidencia-slot { margin-top:12px; border-top:1px dashed var(--border); padding-top:12px; }
+/* Health compacto (barra de preparación): el detalle va en el tooltip, no en una fila aparte */
+.wb-health-compact .wb-hc { padding:3px 0; }
+.wb-health-compact .wb-hc-det { display:none; }
+/* Panel de Decisión: leve énfasis (es donde el operador actúa y firma) */
+.wb-decidir { border-color:var(--brand); }
+
+/* ═══════════ Fase 1 · Drawer (panel lateral on-demand, <dialog> nativo) ═══════════ */
+/* Panel anclado a la derecha, full-height. Modal nativo → ESC + focus-trap + backdrop gratis (accesible). */
+.wb-drawer { position:fixed; inset:0 0 0 auto; margin:0; height:100dvh; width:min(480px,94vw); max-width:94vw;
+  border:none; border-left:1px solid var(--border); padding:0; background:var(--surface); color:var(--text);
+  box-shadow:var(--shadow-lg); }
+.wb-drawer::backdrop { background:rgba(16,24,40,.38); }
+:root[data-theme="dark"] .wb-drawer::backdrop { background:rgba(0,0,0,.55); }
+.wb-drawer[open] { animation:drawerIn .18s ease both; }
+@keyframes drawerIn { from{ transform:translateX(16px); opacity:.4 } to{ transform:none; opacity:1 } }
+.wb-drawer-inner { display:flex; flex-direction:column; height:100dvh; }
+.wb-drawer-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; border-bottom:1px solid var(--border); }
+.wb-drawer-head h2 { font-size:15px; font-weight:600; }
+.wb-drawer-x { border:none; background:var(--sunken); color:var(--text-2); width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:14px; flex:none; }
+.wb-drawer-x:hover { background:var(--border); color:var(--text); }
+.wb-drawer-body { padding:18px; overflow-y:auto; flex:1; }
+/* Disparadores de drawer (links/botones que abren el panel) */
+.wb-drawer-trigger { background:none; border:none; cursor:pointer; font:inherit; color:var(--brand); margin-left:auto; font-size:12.5px; font-weight:600; }
+.wb-drawer-trigger:hover { color:var(--brand-strong); }
+/* Actividad detallada (feed por agente) */
+.wb-act { list-style:none; display:flex; flex-direction:column; margin-top:12px; }
+.wb-act-item { display:flex; gap:10px; align-items:flex-start; padding:10px 4px; border-bottom:1px solid var(--border); }
+.wb-act-item.is-error { background:var(--bad-bg); border-radius:8px; }
+.wb-act-ic { font-size:16px; flex:none; line-height:1.3; }
+.wb-act-main { flex:1; min-width:0; }
+.wb-act-top { display:flex; gap:8px; align-items:baseline; justify-content:space-between; }
+.wb-act-res { color:var(--text-2); font-size:12.5px; margin-top:2px; }
+.wb-act-err { color:var(--bad); font-size:12px; margin-top:3px; }
+.wb-act-tok { color:var(--text-3); font-size:11px; flex:none; white-space:nowrap; }
+/* Aviso de comparativa (banner → botón, en vez del bloque inline) */
+.wb-comp-aviso-body { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.wb-comp-aviso-body .btn { flex:none; }
+
+/* ═══════════ Fase 2 · Corrección inline (server-authoritative) ═══════════ */
+.wb-corregir-form { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; align-items:end; }
+.wb-corregir-campo { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--text-2); font-weight:600; }
+.wb-corregir-campo input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
+.wb-corregir-firma { grid-column:1 / -1; }
+.wb-corregir-form .btn { grid-column:1 / -1; }
+
+/* ═══════════ W20/A7 · Rechazar (terminal, P1) + Carta al asegurado (drawer) ═══════════ */
+.wb-rechazar-form { display:flex; flex-direction:column; gap:6px; }
+.wb-rechazar-form input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; }
+.wb-carta-form { display:flex; flex-direction:column; gap:10px; }
+.wb-carta-cuerpo { min-height:200px; padding:11px 13px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; line-height:1.5; resize:vertical; }
+.wb-carta-firma { padding:9px 11px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
+.wb-carta-ok { padding:14px 16px; border-radius:10px; background:var(--ok-soft, rgba(34,197,94,.12)); color:var(--text); font-size:13.5px; line-height:1.5; }

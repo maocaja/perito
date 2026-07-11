@@ -68,7 +68,7 @@ def test_campos_son_clickables_al_visor(client):
     """Los campos de Información extraída disparan el visor por HTMX (salto a la fuente)."""
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
     assert 'hx-get="/workbench/evidencia/' in html
-    assert 'hx-target="#wb-evidencia"' in html
+    assert 'hx-target="#wb-drawer"' in html  # Fase 1: la evidencia se abre en el drawer raíz
 
 
 @pytest.mark.parametrize("campo", ["Vehículo", "Lugar", "Teléfono", "Fecha del evento"])

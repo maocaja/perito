@@ -1,0 +1,18 @@
+{# W14/W20·A1 · Productividad del operador (nivel operador, no por caso). Real: casos/pendientes · demo: tiempo/SLA.
+   Partial reutilizable: vive en Reportes (`/panel`), fuera de la Workbench (estación de decisión). #}
+<section class="card wb-prod">
+  <div class="card-head"><h2>Tu productividad hoy</h2><span class="hint">{{ branding.vendor if branding }} · Operaciones</span></div>
+  <div class="card-body wb-prod-body">
+    <div class="wb-prod-kpis">
+      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.casos }}</div><div class="hint">Casos procesados</div></div>
+      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.tiempo_prom }} <span class="badge-demo">demo</span></div><div class="hint">Tiempo promedio</div></div>
+      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.errores }} <span class="badge-demo">demo</span></div><div class="hint">Errores</div></div>
+      <div class="wb-prod-kpi"><div class="wb-prod-n">{{ productividad.pendientes }}</div><div class="hint">Pendientes</div></div>
+      <div class="wb-prod-kpi"><div class="wb-prod-n" style="color:var(--ok)">{{ productividad.sla }}% <span class="badge-demo">demo</span></div><div class="hint">SLA cumplimiento</div></div>
+    </div>
+    <svg class="wb-prod-chart" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Casos procesados por hora (demostración)">
+      <polyline fill="none" stroke="var(--brand)" stroke-width="1.6"
+        points="{% for v in productividad.serie %}{{ (loop.index0 * 100 / (productividad.serie|length - 1))|round(1) }},{{ (29 - (v / productividad.serie_max * 27))|round(1) }} {% endfor %}"/>
+    </svg>
+  </div>
+</section>

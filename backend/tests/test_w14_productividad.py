@@ -36,12 +36,19 @@ def test_metricas_no_medidas_van_demo():
 
 
 def test_render_productividad(client):
-    html = client.get("/workbench").text
+    # W20/A1: la productividad se movió de la Workbench a Reportes (`/panel`). La Workbench es la estación de
+    # decisión, enfocada en el caso; la productividad es una vista de jornada, no de caso.
+    html = client.get("/panel").text
     assert "Tu productividad hoy" in html
     assert "Casos procesados" in html
     assert "SLA cumplimiento" in html
     assert "wb-prod-chart" in html      # el gráfico
     assert "badge-demo" in html          # métricas mock rotuladas
+
+
+def test_productividad_no_esta_en_workbench(client):
+    # A1 fail-closed: la Workbench NO muestra la franja de productividad (declutter — estación de decisión).
+    assert "wb-prod-chart" not in client.get("/workbench").text
 
 
 if __name__ == "__main__":

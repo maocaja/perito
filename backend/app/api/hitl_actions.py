@@ -39,17 +39,8 @@ def _alerta_capas12(extraccion: ExtraccionValidada, poliza) -> Optional[AlertaFr
     )
 
 
-@router.post("/casos/{caso_id}/corregir", response_class=RedirectResponse)
-def corregir(
-    caso_id: str,
-    usuario: Optional[str] = Form(None),
-    rol: str = Form(RolUsuario.ANALISTA.value),
-    numero_poliza: Optional[str] = Form(None),
-    fecha_siniestro: Optional[str] = Form(None),
-    tipo_siniestro: Optional[str] = Form(None),
-    monto_reclamado: Optional[str] = Form(None),
-):
-    """Corrige campos + re-dictamina (determinístico). P1: firma obligatoria, nunca terminal, 409 si decidido."""
+def _validar_corregible(caso_id: str, usuario: Optional[str]):
+    """Precondiciones de una corrección (P1 firma · 404 · 409 terminal · 400 sin extracción). Devuelve el caso."""
     if not usuario or not usuario.strip():
         raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
     caso = get_caso_repository().get(caso_id)
@@ -59,13 +50,17 @@ def corregir(
         raise HTTPException(status_code=409, detail="El caso ya fue decidido; no se puede corregir (P1)")
     if caso.extraccion is None:
         raise HTTPException(status_code=400, detail="El caso no tiene extracción para corregir")
+    return caso
 
-    correcciones = {
-        "numero_poliza": numero_poliza, "fecha_siniestro": fecha_siniestro,
-        "tipo_siniestro": tipo_siniestro, "monto_reclamado": monto_reclamado,
-    }
+
+def aplicar_correccion(caso: Caso, usuario: str, correcciones: dict) -> Caso:
+    """Aplica correcciones de campos + re-dictamina DETERMINÍSTICO (motor R1-R5; C4 solo si cambió la póliza) y
+    persiste. **Server-authoritative (P2: la cobertura la recalcula el MOTOR, jamás el cliente).** NUNCA terminal
+    (P1); el campo corregido queda `origen=HUMANO` (auditable, P3). Reusada por el redirect clásico y el HTMX.
+
+    Precondición: `caso` ya validado por `_validar_corregible` (firma/estado/extracción). Fail-closed: una
+    corrección inválida → 400 (caso intacto), nunca 500."""
     base = {c.nombre: c for c in caso.extraccion.campos}
-
     campos: list[CampoExtraido] = []
     cambiados: list[str] = []
     for nombre in _CAMPOS:
@@ -116,7 +111,11 @@ def corregir(
         raise HTTPException(status_code=400, detail=f"Corrección inválida: {e}")
 
     get_caso_repository().save(actualizado)
-    return RedirectResponse(f"/casos/{caso_id}?rol={rol}", status_code=303)
+    return actualizado
+
+
+# W20/A6: el `corregir` legacy (redirigía a `detalle`) se retiró junto con la página detalle. La corrección
+# inline vive en `/workbench/corregir` (c11.py, HTMX, re-pinta el panel sin recarga).
 
 
 # ============================================================================
@@ -162,6 +161,26 @@ def radicar(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(R
         raise HTTPException(status_code=409, detail="El caso no está listo para radicar (P1)")
     try:
         actualizado = hitl_aprobar(caso, firma)  # única vía a APROBADO (exige aprobado_por)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    get_caso_repository().save(actualizado)
+    return _volver(caso_id, rol)
+
+
+@router.post("/casos/{caso_id}/rechazar", response_class=RedirectResponse)
+def rechazar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
+             rol: str = Form(RolUsuario.ANALISTA.value)):
+    """Rechazar = negar el siniestro (→ RECHAZADO, `hitl.rechazar`). 🔒 P1: exige `usuario` (firma) + `motivo`;
+    409 si el caso ya fue decidido. El humano SÍ puede negar, no solo aprobar (W20/A7)."""
+    from app.hitl.c8 import rechazar as hitl_rechazar
+    firma = _firma(usuario)
+    if not motivo or not motivo.strip():
+        raise HTTPException(status_code=400, detail="motivo requerido para rechazar")
+    caso = _get_activo(caso_id)
+    if caso.estado in _TERMINALES:
+        raise HTTPException(status_code=409, detail="El caso ya fue decidido (P1)")
+    try:
+        actualizado = hitl_rechazar(caso, firma, motivo.strip())  # única vía a RECHAZADO (exige aprobado_por)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     get_caso_repository().save(actualizado)

@@ -37,18 +37,24 @@ def test_comparativa_devuelve_fuentes_y_cambios():
 
 
 def test_comparativa_redacta_en_el_render(client):
-    """P5: fuentes/cambios pasan por |redact (estructura presente, sin PII cruda)."""
-    html = client.get(f"/workbench/caso/{_un_caso().id}").text
+    """P5: fuentes/cambios pasan por |redact (estructura presente, sin PII cruda). Fase 1: en el drawer."""
+    html = client.get(f"/workbench/comparativa/{_un_caso().id}").text
     assert 'class="wb-comp-f-res"' in html  # la estructura del resumen redactado
     assert "Cambios detectados por la IA" in html
 
 
 def test_render_comparativa(client):
-    html = client.get(f"/workbench/caso/{_un_caso().id}").text
-    assert "Vista comparativa" in html
-    assert "Cambios detectados por la IA" in html
-    assert "Se adjuntó la factura de reparación." in html
-    assert "wb-comp" in html
+    caso = _un_caso()
+    # Fase 1: el caso muestra un AVISO con el trigger; la comparativa completa vive en el drawer (endpoint).
+    caso_html = client.get(f"/workbench/caso/{caso.id}").text
+    assert "Comparar correos" in caso_html
+    assert 'hx-get="/workbench/comparativa/' in caso_html
+    # el contenido completo lo sirve el endpoint del drawer
+    drawer = client.get(f"/workbench/comparativa/{caso.id}").text
+    assert "Vista comparativa" in drawer
+    assert "Cambios detectados por la IA" in drawer
+    assert "Se adjuntó la factura de reparación." in drawer
+    assert "wb-comp" in drawer
 
 
 def test_comparativa_rotulada_demo(client):

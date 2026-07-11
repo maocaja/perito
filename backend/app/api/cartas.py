@@ -12,11 +12,11 @@
 from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from app.config import settings
 from app.contracts.enums import RolUsuario
-from app.dashboard.c11 import _detalle_context, _get_o_404, _TEMPLATES
+from app.dashboard.c11 import _get_o_404, _TEMPLATES
 from app.dashboard import vista_caso
 from app.intake.mailbox import Mailbox
 
@@ -110,24 +110,24 @@ def pulir_prosa(texto: str, caso, tipo: str) -> str:
         return texto
 
 
-def _render_detalle(request, caso, rol, **extra):
-    ctx = _detalle_context(caso, rol)
-    ctx.update(extra)
-    return _TEMPLATES.TemplateResponse(request, "detalle.html", ctx)
+def _render_carta_drawer(request, caso, **extra):
+    """W20/A7: la carta se muestra en el drawer de la Workbench (ya no re-renderiza la página detalle)."""
+    ctx = {"caso": caso, **extra}
+    return _TEMPLATES.TemplateResponse(request, "workbench_carta.html", ctx)
 
 
 @router.post("/casos/{caso_id}/carta", response_class=HTMLResponse)
 def preparar_carta(request: Request, caso_id: str, rol: str = Form(RolUsuario.ANALISTA.value)):
-    """Genera el borrador on-demand y re-renderiza el detalle con el textarea editable."""
+    """Genera el borrador on-demand y abre el drawer de carta con el textarea editable (P1: draft ≠ send)."""
     caso = _get_o_404(caso_id)
     tipo = vista_caso.tipo_carta(caso)
     if tipo is None:
         raise HTTPException(status_code=400, detail="No aplica carta para este estado")
     borrador = pulir_prosa(plantilla_carta(caso, tipo), caso, tipo)
-    return _render_detalle(request, caso, rol, borrador_carta=borrador, carta_tipo=tipo)
+    return _render_carta_drawer(request, caso, borrador=borrador, carta_tipo=tipo)
 
 
-@router.post("/casos/{caso_id}/carta/enviar")
+@router.post("/casos/{caso_id}/carta/enviar", response_class=HTMLResponse)
 def enviar_carta(request: Request, caso_id: str,
                  usuario: Optional[str] = Form(None), contenido: Optional[str] = Form(None),
                  rol: str = Form(RolUsuario.ANALISTA.value)):
@@ -141,6 +141,7 @@ def enviar_carta(request: Request, caso_id: str,
     cuerpo = (contenido or "").strip() or plantilla_carta(caso, tipo)
     try:
         Mailbox.from_settings().enviar(asunto=f"Su siniestro {caso.id[:8]} — Perito", cuerpo=cuerpo)
-    except Exception as e:  # fail-safe (P): caso intacto, sin 500
-        return _render_detalle(request, caso, rol, carta_error=f"No se pudo enviar la carta: {e}")
-    return RedirectResponse(f"/casos/{caso_id}?rol={rol}&enviado=1", status_code=303)
+    except Exception as e:  # fail-safe (P): caso intacto, sin 500 — se re-muestra el borrador con el error
+        return _render_carta_drawer(request, caso, borrador=cuerpo, carta_tipo=tipo,
+                                    carta_error=f"No se pudo enviar la carta: {e}")
+    return _render_carta_drawer(request, caso, carta_enviada=True)

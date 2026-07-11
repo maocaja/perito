@@ -26,6 +26,27 @@ def _con_extraccion():
     return None
 
 
+# ---------- Fase 0 · tabla fusionada `datos_principales` ----------
+
+def test_datos_principales_fusiona_presentes_y_faltantes(client):
+    """La tabla única lista los campos presentes (con confianza/fuente) + los faltantes como REQUERIDO,
+    sin duplicar labels (fusión de 'Datos del siniestro' + 'Información extraída')."""
+    caso = _con_extraccion() or get_caso_repository().list()[0]
+    datos = vista_caso.datos_principales(caso)
+    labels = [d.label for d in datos]
+    assert len(labels) == len(set(labels)), "no debe duplicar labels"
+    assert any(not d.ausente for d in datos)  # hay presentes
+
+
+def test_datos_principales_sin_extraccion_no_revienta(client):
+    """Edge: con extraccion=None la tabla no crashea; marca todos los campos base como REQUERIDO (ausente)."""
+    caso = get_caso_repository().list()[0].model_copy(update={"extraccion": None})
+    datos = vista_caso.datos_principales(caso)
+    requeridos = {d.label for d in datos if d.ausente}
+    esperados = {vista_caso._LABEL_CAMPO[n] for n in vista_caso.CAMPOS}
+    assert esperados <= requeridos  # los 4 campos base salen como REQUERIDO
+
+
 # ---------- reales vs demo ----------
 
 def test_campos_reales_marcados_real_con_confianza_verdadera():
@@ -105,9 +126,10 @@ def test_valores_redactados_email_y_telefono():
 def test_render_panel(client):
     caso = _con_extraccion() or get_caso_repository().list()[0]
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "Información extraída" in html
-    assert "wb-campo-conf" in html          # columna de confianza
-    assert "Ver todos los campos" in html
+    # Fase 0: la tabla se fusionó en 'Datos del siniestro' (antes duplicada con 'Información extraída').
+    assert "Datos del siniestro" in html
+    assert "wb-campo-conf" in html          # columna de confianza (codificada)
+    assert "wb-campo-fuente" in html        # columna de fuente (P3: dato·confianza·fuente)
     assert "badge-demo" in html             # los ricos rotulados
 
 

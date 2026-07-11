@@ -123,7 +123,7 @@ def test_enviar_fail_safe_no_rompe_el_caso(client, monkeypatch):
 
 
 def test_enviar_ok_con_firma(client, monkeypatch):
-    """Con firma y SMTP ok → 303 (PRG) y el cuerpo se envió."""
+    """Con firma y SMTP ok → W20/A7: drawer de confirmación (200) y el cuerpo se envió."""
     enviado = {}
     class _OkMailbox:
         @classmethod
@@ -134,8 +134,7 @@ def test_enviar_ok_con_firma(client, monkeypatch):
     monkeypatch.setattr(cartas, "Mailbox", _OkMailbox)
     caso = _caso_revision()
     r = client.post(f"/casos/{caso.id}/carta/enviar",
-                    data={"usuario": "diana", "contenido": "Estimado asegurado, falta el monto."},
-                    follow_redirects=False)
-    assert r.status_code == 303
-    assert "enviado=1" in r.headers["location"]
-    assert enviado.get("cuerpo")
+                    data={"usuario": "diana", "contenido": "Estimado asegurado, falta el monto."})
+    assert r.status_code == 200
+    assert "Carta enviada" in r.text          # drawer de confirmación (no recarga)
+    assert enviado.get("cuerpo") == "Estimado asegurado, falta el monto."

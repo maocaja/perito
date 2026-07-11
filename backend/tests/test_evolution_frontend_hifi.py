@@ -40,31 +40,36 @@ def _caso_revision():
 
 # ---------- Regla de habilitación (P1 azúcar de UI) ----------
 
-def test_aprobar_deshabilitado_si_no_listo(client):
-    """REQUIERE_REVISION → el botón 'Aprobar dictamen' trae `disabled`."""
-    html = client.get(f"/casos/{_caso_revision().id}").text
-    assert "disabled>Aprobar dictamen" in html
-    assert "Completa los datos faltantes y re-dictamina" in html  # lock-hint visible
+# W20/A6+A7: la decisión vive en el panel de la Workbench. 'Radicar caso' (→APROBADO) está deshabilitado salvo
+# LISTO_PARA_APROBAR; 'Rechazar siniestro' (→RECHAZADO) está disponible mientras el caso no sea terminal (P1).
+
+def test_radicar_deshabilitado_si_no_listo(client):
+    """REQUIERE_REVISION → 'Radicar caso' trae `disabled`."""
+    html = client.get(f"/workbench/caso/{_caso_revision().id}").text
+    assert "disabled>Radicar caso" in html
 
 
-def test_aprobar_habilitado_si_listo(client):
-    """LISTO_PARA_APROBAR → 'Aprobar dictamen' SIN `disabled`."""
-    html = client.get(f"/casos/{_caso_listo().id}").text
-    assert "disabled>Aprobar dictamen" not in html
-    assert ">Aprobar dictamen" in html
+def test_radicar_habilitado_si_listo(client):
+    """LISTO_PARA_APROBAR → 'Radicar caso' SIN `disabled`."""
+    html = client.get(f"/workbench/caso/{_caso_listo().id}").text
+    assert "disabled>Radicar caso" not in html
+    assert ">Radicar caso" in html
 
 
-def test_rechazar_siempre_disponible(client):
-    """'Rechazar' nunca se deshabilita, ni siquiera en REQUIERE_REVISION (P1)."""
+def test_rechazar_disponible_si_no_terminal(client):
+    """'Rechazar siniestro' se ofrece mientras el caso no sea terminal (P1: el humano puede negar)."""
     for caso in (_caso_listo(), _caso_revision()):
-        html = client.get(f"/casos/{caso.id}").text
-        assert 'type="submit">Rechazar</button>' in html
+        html = client.get(f"/workbench/caso/{caso.id}").text
+        assert "Rechazar siniestro" in html
 
 
 # ---------- Pseudo-filtros de los KPIs clicables ----------
 
-def test_kpi_filtro_fraude_alta_igual_agregado(client):
-    """`?estado=FRAUDE_ALTA` lista EXACTAMENTE los casos con alerta severidad ALTA.
+# W20/A6: el board `bandeja.html` se retiró; el filtrado (`_filtrar_bandeja`) que alimentaba sus KPIs sigue
+# vivo (lo usa la cola de la Workbench por estado). Se verifica directo sobre la función (sin la UI del board).
+
+def test_filtro_fraude_alta_igual_agregado(client):
+    """`_filtrar_bandeja(..., 'FRAUDE_ALTA')` == EXACTAMENTE los casos con alerta severidad ALTA.
 
     Se inyecta una alerta ALTA (el seed trae MEDIA) para ejercitar el caso positivo, no solo la exclusión.
     """
@@ -74,36 +79,21 @@ def test_kpi_filtro_fraude_alta_igual_agregado(client):
         update={"alerta_fraude": con_alerta.alerta_fraude.model_copy(update={"severidad": "ALTA"})}
     )
     repo.save(alta_caso)
-
-    alta = {c.id for c in repo.list() if c.alerta_fraude and c.alerta_fraude.severidad == "ALTA"}
-    otros = {c.id for c in repo.list()} - alta
-    assert alta_caso.id in alta  # el positivo existe (test no vacuo)
-    html = client.get("/casos", params={"estado": "FRAUDE_ALTA"}).text
-    for cid in alta:
-        assert f"/casos/{cid}" in html
-    for cid in otros:
-        assert f"/casos/{cid}?" not in html
+    todos = repo.list()
+    esperado = {c.id for c in todos if c.alerta_fraude and c.alerta_fraude.severidad == "ALTA"}
+    assert alta_caso.id in esperado  # el positivo existe (test no vacuo)
+    assert {c.id for c in c11._filtrar_bandeja(todos, "FRAUDE_ALTA")} == esperado
 
 
-def test_kpi_filtro_resueltos_igual_terminales(client):
-    """`?estado=RESUELTOS` == APROBADO+RECHAZADO. Se aprueba uno para tener un terminal real."""
+def test_filtro_resueltos_igual_terminales(client):
+    """`_filtrar_bandeja(..., 'RESUELTOS')` == APROBADO+RECHAZADO. Se radica uno para tener un terminal real."""
     listo = _caso_listo()
-    assert client.post(f"/casos/{listo.id}/aprobar", data={"usuario": "diana"}).status_code == 200
-    repo = get_caso_repository()
-    terminales = {c.id for c in repo.list() if c.estado in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO)}
-    no_term = {c.id for c in repo.list()} - terminales
-    html = client.get("/casos", params={"estado": "RESUELTOS"}).text
-    assert listo.id in terminales
-    for cid in terminales:
-        assert f"/casos/{cid}" in html
-    for cid in no_term:
-        assert f"/casos/{cid}?" not in html
-
-
-def test_kpi_activo_marca_aria_pressed(client):
-    """El KPI del filtro activo se marca (toggle) — apoyo de accesibilidad."""
-    html = client.get("/casos", params={"estado": "REQUIERE_REVISION"}).text
-    assert 'aria-pressed="true"' in html
+    assert client.post(f"/casos/{listo.id}/radicar", data={"usuario": "diana"},
+                       follow_redirects=False).status_code == 303
+    todos = get_caso_repository().list()
+    esperado = {c.id for c in todos if c.estado in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO)}
+    assert listo.id in esperado
+    assert {c.id for c in c11._filtrar_bandeja(todos, "RESUELTOS")} == esperado
 
 
 # ---------- Checklist de aprobación (passive, P1/P7) ----------
@@ -140,7 +130,7 @@ def test_checklist_completo_en_caso_listo(client):
 
 def test_detalle_sin_literales_del_prototipo(client):
     """P7: el detalle se arma del Caso real; nada de los datos fabricados del handoff."""
-    html = client.get(f"/casos/{_caso_revision().id}").text
+    html = client.get(f"/workbench/caso/{_caso_revision().id}").text
     for literal in ("María Restrepo", "FNOL-2026-0142", "#1e91208b", "1.976 tokens"):
         assert literal not in html
 
@@ -154,10 +144,10 @@ def test_banner_titulo_refleja_conteo_faltantes(client):
     assert rec["tono"] == "warn"
 
 
-def test_detalle_usa_etiquetas_humanas(client):
-    """La tabla de datos muestra etiquetas humanas ('N.º de póliza'), no el nombre técnico."""
-    html = client.get(f"/casos/{_caso_revision().id}").text
-    assert "N.º de póliza" in html
+def test_caso_usa_etiquetas_humanas(client):
+    """La tabla de datos del caso muestra etiquetas humanas ('Póliza', 'Monto reclamado'), no el nombre técnico."""
+    html = client.get(f"/workbench/caso/{_caso_revision().id}").text
+    assert "Póliza" in html
     assert "Monto reclamado" in html
 
 
@@ -171,23 +161,16 @@ def test_strip_extraccion_muestra_completitud(client):
 # ---------- Batch de pulido UX (honestidad) ----------
 
 def test_hint_aprobar_honesto_sin_faltantes(client):
-    """P7: si el bloqueo NO es por faltantes (póliza/cobertura), el hint NO dice 'completa los datos'."""
-    repo = get_caso_repository()
+    """P7: si el bloqueo NO es por faltantes, la recomendación NO dice 'completa los datos' (unit sobre la fuente).
+
+    Se prueba `recomendacion()` directamente (el banner de la Workbench la renderiza); robusto al markup.
+    """
     listo = _caso_listo()  # todos los campos presentes
     escalado = listo.model_copy(update={"estado": EstadoCaso.REQUIERE_REVISION})
-    repo.save(escalado)
     assert not vista_caso.faltantes(escalado)  # sin faltantes, pero no aprobable
-    html = client.get(f"/casos/{escalado.id}").text
-    assert "Completa los datos faltantes" not in html  # no miente
-    assert "resuelve lo indicado" in html
-
-
-def test_evidencia_placeholder_se_limpia(client):
-    """La evidencia técnica del extractor/preset ('span:…', 'extracted from…') se muestra legible."""
-    html = client.get(f"/casos/{_caso_listo().id}").text
-    assert "extraído del aviso" in html
-    assert "span:numero_poliza" not in html
-    assert "extracted from redacted_texto" not in html
+    rec = vista_caso.recomendacion(escalado)
+    blob = f"{rec['titulo']} {rec.get('subtitulo', '')} {rec.get('detalle', '')}".lower()
+    assert "completa los datos faltantes" not in blob  # no miente sobre el bloqueo
 
 
 def test_deducible_oculto_sin_cobertura(client):
@@ -195,7 +178,7 @@ def test_deducible_oculto_sin_cobertura(client):
     revision = _caso_revision()
     if revision.dictamen:
         assert revision.dictamen.resultado.value not in ("CUBIERTO", "CUBIERTO_PARCIAL")
-    assert "Deducible calculado" not in client.get(f"/casos/{revision.id}").text
+    assert "Deducible calculado" not in client.get(f"/workbench/caso/{revision.id}").text
 
 
 def test_cobertura_humanizada_en_tira(client):
@@ -238,33 +221,15 @@ def test_ramo_ausente_es_guion(client):
     assert vista_caso.ramo_de(sin_tipo) == "—"
 
 
-def test_bandeja_columnas_nuevas(client):
-    """La bandeja muestra las columnas Póliza + Ramo (espejo del prototipo, con dato real)."""
-    html = client.get("/casos").text
-    assert "<div>Póliza</div>" in html and "<div>Ramo</div>" in html
-    assert "<div>Siniestro</div>" not in html  # la columna vieja se reemplazó
-
-
-def test_bandeja_filas_uniformes(client):
-    """Look uniforme como el prototipo: sin acento izquierdo ni atenuado (se quitó la jerarquía)."""
-    html = client.get("/casos").text
-    assert "row-accent" not in html and "row-muted" not in html
-
-
-def test_p7_bandeja_sin_id_fabricado(client):
-    """P7: el id del caso es el uuid real, no un 'FNOL-YYYY-NNNN' fabricado como el prototipo."""
-    assert "FNOL-" not in client.get("/casos").text
+# W20/A6: los tests de markup del board (columnas Póliza/Ramo, filas uniformes, id sin FNOL) se retiraron con
+# `bandeja.html`. La cola de la Workbench tiene su propia estructura (W8) y cobertura (test_w8/test_w16).
 
 
 # ---------- Unit L: coherencia de estados + fraude visible ----------
 
 def test_estado_listo_se_muestra_neutral(client):
-    """P1/coherencia: LISTO_PARA_APROBAR se muestra 'Listo para decisión', nunca 'Listo p/ aprobar'."""
-    html_bandeja = client.get("/casos").text
-    assert "Listo para decisión" in html_bandeja
-    assert "Listo p/ aprobar" not in html_bandeja
-    assert "Listos para decisión" in html_bandeja  # KPI reetiquetado
-    html_detalle = client.get(f"/casos/{_caso_listo().id}").text
+    """P1/coherencia: LISTO_PARA_APROBAR se muestra 'Listo p/ aprobar' nunca (etiqueta neutral en el detalle)."""
+    html_detalle = client.get(f"/workbench/caso/{_caso_listo().id}").text
     assert "Listo p/ aprobar" not in html_detalle
 
 
@@ -324,11 +289,9 @@ def test_razon_escalamiento_solo_en_revision(client):
     assert vista_caso.razon_escalamiento(_caso_listo()) is None
 
 
-def test_p7_detalle_no_finge_score_de_juez_por_caso(client):
-    """P7: el detalle referencia el juez Claude como eval de CI, no como score por-caso en vivo."""
-    html = client.get(f"/casos/{_caso_listo().id}").text
-    assert "pytest -m agentic" in html  # referencia honesta a CI
-    assert "Verificación de la trayectoria" in html
+# W20/A6: 'test_p7_detalle_no_finge_score_de_juez_por_caso' se retiró — probaba la sección "Verificación de la
+# trayectoria" de la página `detalle` (eliminada). El P7 del juez-como-eval-de-CI se verifica en el panel de
+# cumplimiento (test_panel_auditoria_eu_ai_act) y la lógica en test_verificacion_trayectoria_*.
 
 
 def test_panel_auditoria_eu_ai_act(client):
@@ -382,17 +345,8 @@ def test_clasificar_no_inventa_tipo(client):
     assert vista_caso.clasificar(sin_tipo)["tipo"] == "—"
 
 
-def test_orden_por_prioridad_no_rompe_filtro(client):
-    """El orden por prioridad es opt-in y preserva el filtro/HTMX (no rompe el efecto en vivo)."""
-    html = client.get("/casos", params={"orden": "prioridad"}).text
-    assert "orden=prioridad" in html  # el toggle/HTMX mantiene el orden
-    assert 'id="bandeja-live"' in html  # la bandeja sigue intacta
-
-
-def test_detalle_muestra_prioridad_y_equipo(client):
-    """El detalle renderiza la línea de routing (prioridad + equipo)."""
-    html = client.get(f"/casos/{_caso_listo().id}").text
-    assert "Prioridad" in html and "prio-badge" in html
+# W20/A6: 'test_detalle_muestra_prioridad_y_equipo' se retiró (render de la página `detalle`). La lógica de
+# prioridad/routing se prueba en test_prioridad_cita_regla / test_prioridad_fraude_alta_es_alta / test_equipo_*.
 
 
 # ---------- U2: documentos requeridos por producto ----------
@@ -413,25 +367,9 @@ def test_docs_producto_no_modelado_no_inventa(client):
         assert ck["docs"] == []
 
 
-def test_detalle_muestra_documentos(client):
-    """El detalle renderiza la sección con los documentos ESPECÍFICOS del producto."""
-    caso = next((c for c in get_caso_repository().list()
-                 if vista_caso.checklist_documentos(c)["disponible"]), None)
-    if caso:
-        html = client.get(f"/casos/{caso.id}").text
-        assert "Documentos requeridos" in html
-        ck = vista_caso.checklist_documentos(caso)
-        for it in ck["docs"]:  # cada documento del catálogo aparece renderizado
-            assert it["doc"] in html
+# W20/A6: 'test_detalle_muestra_documentos' se retiró (render de la sección de docs de la página `detalle`). El
+# catálogo de documentos por producto se prueba en test_docs_por_producto_distintos / test_docs_producto_no_modelado.
 
 
-# ---------- No regresión: bandeja en vivo (HTMX) ----------
-
-def test_bandeja_live_htmx_preservado(client, monkeypatch):
-    """Con `en_vivo` (demo_live != off) el bloque #bandeja-live conserva sus atributos HTMX."""
-    monkeypatch.setattr(c11.settings, "demo_live", "deterministic")
-    html = client.get("/casos").text
-    assert 'id="bandeja-live"' in html
-    assert 'hx-get="/casos' in html
-    assert 'hx-select="#bandeja-live"' in html
-    assert 'hx-swap="outerHTML"' in html
+# W20/A6: la no-regresión del auto-refresh en vivo ahora aplica a la cola de la Workbench (auto-poll cada 3s),
+# no al board retirado. Cubierto por los tests de la Workbench (test_w1/test_w8).

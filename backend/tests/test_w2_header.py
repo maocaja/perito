@@ -76,7 +76,7 @@ def test_header_muestra_tipo_confianza_y_tiempo(client):
     r = client.get(f"/workbench/caso/{caso.id}")
     assert r.status_code == 200
     assert "wb-header" in r.text
-    assert "tiempo est. de revisión" in r.text
+    assert "revisión est." in r.text        # Fase 0: etiqueta del tiempo estimado (más corta)
     assert "confianza" in r.text
 
 

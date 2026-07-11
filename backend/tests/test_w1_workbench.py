@@ -77,7 +77,8 @@ def test_workbench_caso_sin_extraccion_renderiza(client):
     r = client.get(f"/workbench/caso/{caso.id}")
     assert r.status_code == 200
     assert "Datos del siniestro" in r.text
-    assert "Sin datos extraídos" in r.text  # fallback, no crash
+    # Fase 0: sin extracción la tabla fusionada no revienta; muestra los requeridos como REQUERIDO (no crash).
+    assert "REQUERIDO" in r.text
 
 
 def test_cola_item_apunta_al_parcial_via_htmx(client):
@@ -109,9 +110,12 @@ def test_workbench_no_muta_estado(client):
 
 # ---------- retro-compat ----------
 
-def test_bandeja_y_detalle_siguen_vivos(client):
-    assert client.get("/casos").status_code == 200
-    assert client.get(f"/casos/{_un_caso().id}").status_code == 200
+def test_workbench_es_la_unica_superficie_del_operador(client):
+    # W20/A6+A7: el board `/casos` y la página `detalle` `/casos/{id}` se retiraron; `/` redirige a la Workbench.
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 303 and "/workbench" in r.headers["location"]
+    assert client.get("/casos").status_code == 404
+    assert client.get(f"/casos/{_un_caso().id}").status_code == 404
 
 
 def test_nav_incluye_workbench(client):

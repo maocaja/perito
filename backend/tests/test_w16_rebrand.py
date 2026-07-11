@@ -93,12 +93,15 @@ def test_nav_operacional_apunta_al_workbench(client):
     assert operacionales and all(i["ruta"].startswith("/workbench") for i in operacionales)
 
 
-def test_cola_tarjetas_ricas(client):
-    """La cola muestra tarjetas ricas (como el mockup): chip prioridad, #id, asegurado, tipo, póliza|placa, %."""
+def test_cola_tarjetas_simples(client):
+    """Fase 0: la cola es de escaneo rápido (chip prioridad · #id · asegurado · tipo). Se QUITARON los campos
+    mock (placa/conteos/pct) → menos ruido y más honestidad P7."""
     html = client.get("/workbench").text
-    for marca in ("wb-card-id", "wb-card-aseg", "wb-card-tipo", "wb-card-pol",
-                  "wb-card-counts", "wb-card-pct"):
+    for marca in ("wb-card-id", "wb-card-aseg", "wb-card-tipo"):
         assert marca in html, f"falta {marca} en la tarjeta de la cola"
+    # los campos mock se retiraron de la cola
+    for retirado in ("wb-card-pol", "wb-card-counts", "wb-card-pct"):
+        assert retirado not in html, f"{retirado} debería haberse retirado de la cola (era mock)"
 
 
 def test_clic_en_vivo_no_hereda_hx_select_del_poll(client, monkeypatch):
@@ -138,9 +141,8 @@ def test_acciones_con_clases_de_color(client):
 # ---------- retro-compat ----------
 
 def test_todas_las_paginas_vivas(client):
-    caso = get_caso_repository().list()[0]
-    assert client.get("/casos").status_code == 200
-    assert client.get(f"/casos/{caso.id}").status_code == 200
+    # W20/A6+A7: el board `/casos` y la página `detalle` se retiraron; superficies vivas = Workbench + panel + nuevo.
+    assert client.get("/workbench").status_code == 200
     assert client.get("/panel").status_code == 200
     assert client.get("/nuevo").status_code == 200  # branding inyectado también en intake
 

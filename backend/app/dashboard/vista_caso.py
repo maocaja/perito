@@ -477,6 +477,7 @@ class CampoUI:
     fuente: str
     origen: Literal["real", "demo"]
     clase: str = "extraido"  # extraido | validado | relacionado (conexión W11)
+    ausente: bool = False    # True ⇒ campo requerido aún no presente (fila REQUERIDO en la tabla fusionada)
 
 
 # Nombre técnico del campo → etiqueta humana del panel. Los campos ricos de M2 (vehiculo/lugar/telefono/
@@ -550,6 +551,32 @@ def campos_extraidos(caso) -> list[CampoUI]:
     demo = [CampoUI(label=lbl, valor=_red(str(gen(caso))), confianza=conf, fuente=fte, origen="demo")
             for (lbl, fte, conf, gen) in _CAMPOS_RICOS if lbl not in labels_reales]
     return reales + demo
+
+
+def datos_principales(caso) -> list[CampoUI]:
+    """Tabla ÚNICA de los datos del caso (Fase 0: fusiona 'Datos del siniestro' + 'Información extraída', antes
+    duplicadas en dos columnas): campos presentes (ricos, con confianza·fuente) PRIMERO, luego los FALTANTES
+    marcados REQUERIDO. Un solo lugar donde el operador lee los datos. Passive."""
+    presentes = campos_extraidos(caso)
+    labels_presentes = {c.label for c in presentes}
+    faltan = [CampoUI(label=_LABEL_CAMPO.get(n, n.replace("_", " ").capitalize()),
+                      valor=None, confianza=None, fuente="—", origen="real", ausente=True)
+              for n in faltantes(caso)
+              if _LABEL_CAMPO.get(n, n.replace("_", " ").capitalize()) not in labels_presentes]
+    return presentes + faltan
+
+
+def campos_corregibles(caso) -> list[dict]:
+    """Los 4 campos base editables para la corrección inline (Fase 2), con su valor actual (o '' si ausente).
+    El motor los re-dictamina en el servidor (P2); aquí solo se pre-llena el form. Passive."""
+    base = {c.nombre: c for c in caso.extraccion.campos} if caso.extraccion else {}
+    corregibles = []
+    for n in CAMPOS:
+        c = base.get(n)
+        # P5 defensa en profundidad: se redacta en el boundary (además del |redact del template).
+        corregibles.append({"nombre": n, "label": _LABEL_CAMPO.get(n, n),
+                            "valor": _red(c.valor) if (c and not c.ausente and c.valor) else ""})
+    return corregibles
 
 
 def tipo_carta(caso) -> str | None:

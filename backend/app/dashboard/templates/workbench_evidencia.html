@@ -1,24 +1,32 @@
-{# W12 · Visor de evidencia (salto a la fuente, estilo NotebookLM). Contenido MOCK/redactado — nunca PII cruda (P5).
-   Fail-closed: si el campo no tiene ancla → "sin fuente localizada", no un salto falso (P7). #}
-{% if ancla %}
-<div class="wb-ev">
-  <div class="wb-ev-doc" data-tipo="{{ ancla.tipo }}" aria-label="Vista de {{ ancla.documento }} (demostración)">
-    <div class="wb-ev-page">
-      {% for _ in range(9) %}<div class="wb-ev-line"></div>{% endfor %}
-      <div class="wb-ev-hl" style="top:{{ ancla.zona_top }}%; height:{{ ancla.zona_alto }}%"></div>
+{# W12 · Visor de evidencia (salto a la fuente, estilo NotebookLM) — se renderiza DENTRO del drawer raíz (Fase 1).
+   Contenido MOCK/redactado — nunca PII cruda (P5). Fail-closed: sin ancla → "sin fuente localizada" (P7). #}
+<div class="wb-drawer-inner">
+  <header class="wb-drawer-head">
+    <h2>Evidencia · {{ campo }}</h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar visor de evidencia">✕</button>
+  </header>
+  <div class="wb-drawer-body">
+    {% if ancla %}
+    <div class="wb-ev">
+      <div class="wb-ev-doc" data-tipo="{{ ancla.tipo }}" aria-label="Vista de {{ ancla.documento }} (demostración)">
+        <div class="wb-ev-page">
+          {% for _ in range(9) %}<div class="wb-ev-line"></div>{% endfor %}
+          <div class="wb-ev-hl" style="top:{{ ancla.zona_top }}%; height:{{ ancla.zona_alto }}%"></div>
+        </div>
+      </div>
+      <div class="wb-ev-meta">
+        <div class="hint">Campo extraído</div>
+        <div class="wb-ev-field">{{ campo }}</div>
+        {% if confianza is not none %}<div class="wb-ev-conf">{{ (confianza*100)|round|int }}% de confianza</div>{% endif %}
+        <div class="wb-ev-src">
+          📄 {{ ancla.documento }}{% if ancla.pagina is not none %} · pág. {{ ancla.pagina }}{% endif %}{% if ancla.linea is not none %} · línea {{ ancla.linea }}{% endif %}
+          <span class="badge-demo" title="Ubicación de demostración; el OCR real llega con Document AI (M1)">demo</span>
+        </div>
+        <button class="btn btn-ghost wb-ev-ctx" type="button" disabled title="Disponible con Document AI (M1)">Ver en contexto</button>
+      </div>
     </div>
-  </div>
-  <div class="wb-ev-meta">
-    <div class="hint">Campo extraído</div>
-    <div class="wb-ev-field">{{ campo }}</div>
-    {% if confianza is not none %}<div class="wb-ev-conf">{{ (confianza*100)|round|int }}% de confianza</div>{% endif %}
-    <div class="wb-ev-src">
-      📄 {{ ancla.documento }}{% if ancla.pagina is not none %} · pág. {{ ancla.pagina }}{% endif %}{% if ancla.linea is not none %} · línea {{ ancla.linea }}{% endif %}
-      <span class="badge-demo" title="Ubicación de demostración; el OCR real llega con Document AI (M1)">demo</span>
-    </div>
-    <button class="btn btn-ghost wb-ev-ctx" type="button" disabled title="Disponible con Document AI (M1)">Ver en contexto</button>
+    {% else %}
+    <div class="wb-ev-empty">Sin fuente localizada para “{{ campo }}”.</div>
+    {% endif %}
   </div>
 </div>
-{% else %}
-<div class="wb-ev-empty">Sin fuente localizada para “{{ campo }}”.</div>
-{% endif %}

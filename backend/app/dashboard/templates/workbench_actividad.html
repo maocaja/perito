@@ -1,0 +1,29 @@
+{# Actividad detallada de la orquesta (Fase 1): el rastro REAL por agente (tokens, hora, resultado). Se abre en
+   el drawer desde "Ver actividad". Encode-not-hide: el timeline condensado queda en el centro; AQUÍ vive el
+   detalle (tier 2, un click). Passive: solo presenta la traza real (P7, nunca fabrica). #}
+<div class="wb-drawer-inner">
+  <header class="wb-drawer-head">
+    <h2>Actividad de la orquesta <span class="hint">· rastro real</span></h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar panel de actividad">✕</button>
+  </header>
+  <div class="wb-drawer-body">
+    {% if actividad %}
+    <div class="hint">Un evento por AGENTE de la traza real{% if latencia %} · {{ latencia }} en total{% endif %}.</div>
+    <ol class="wb-act">
+      {% for a in actividad %}
+      <li class="wb-act-item {{ 'is-error' if a.error }}">
+        <span class="wb-act-ic" aria-hidden="true">{{ a.icono }}</span>
+        <div class="wb-act-main">
+          <div class="wb-act-top"><strong>{{ a.etiqueta }}</strong>{% if a.hora %}<span class="hint mono">{{ a.hora }}</span>{% endif %}</div>
+          <div class="wb-act-res">{{ a.resultado }}</div>
+          {% if a.error %}<div class="wb-act-err">⚠ {{ a.error|redact }}</div>{% endif %}
+        </div>
+        {% if a.tokens %}<span class="wb-act-tok mono">{{ a.tokens }} tok</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="wb-ev-empty">Sin traza registrada para este caso.</div>
+    {% endif %}
+  </div>
+</div>

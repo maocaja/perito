@@ -90,5 +90,27 @@ def test_render_horizontal_y_demo_distinto(client):
     assert "rastro real" in html         # el encabezado nombra la orquesta
 
 
+# ---------- Fase 1 · drawer de actividad (encode-not-hide: timeline condensado + detalle a un click) ----------
+
+def test_workbench_tiene_drawer_raiz(client):
+    """El <dialog id="wb-drawer"> raíz existe (fuera de la cola y el caso → inmune al poll)."""
+    html = client.get("/workbench").text
+    assert 'id="wb-drawer"' in html
+
+
+def test_timeline_tiene_trigger_ver_actividad(client):
+    """El timeline condensado ofrece 'Ver actividad' que abre el detalle en el drawer (no se ocultó, W18)."""
+    html = client.get(f"/workbench/caso/{_un_caso().id}").text
+    assert "Ver actividad" in html
+    assert 'hx-get="/workbench/actividad/' in html and 'hx-target="#wb-drawer"' in html
+
+
+def test_endpoint_actividad_detalle_real(client):
+    """El drawer de actividad sirve el rastro REAL por agente (tokens/hora), passive (P7)."""
+    html = client.get(f"/workbench/actividad/{_un_caso().id}").text
+    assert "wb-drawer-inner" in html and "Actividad de la orquesta" in html
+    assert "wb-act" in html
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-q"])
