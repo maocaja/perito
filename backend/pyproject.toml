@@ -4,16 +4,20 @@ version = "0.1.0"
 description = "Perito — copiloto agéntico de admisión FNOL (backend). U1: Fundaciones & Contratos."
 requires-python = ">=3.12"
 
-# Dependencias — TODAS confirmadas en Inception (RES-04) / tech-stack-decisions de U1.
-# No se introduce ninguna dep nueva fuera de las aprobadas.
+# Dependencias — confirmadas en Inception (RES-04) / tech-stack-decisions de U1.
+# pydantic-settings, python-multipart y anthropic ya se importaban en runtime; se declaran aquí para que
+# un `make setup` limpio levante la app sin ModuleNotFoundError (antes venían solo por instalación previa).
 dependencies = [
     "pydantic>=2.7",        # contratos tipados strict (H-17, RNF-13)
+    "pydantic-settings>=2.4", # config por entorno (app/config.py) — BaseSettings salió del core en pydantic v2
     "faker>=25.0",          # generador sintético es_CO (H-16) — SOLO en synthetic/, nunca en tests Hypothesis
     "psycopg[binary]>=3.1", # driver PostgreSQL
     "sqlalchemy>=2.0",      # Core: engine + tablas para persistencia (C1); antes transitivo vía pgvector
     "pgvector>=0.2",        # adaptador cliente de la extensión pgvector (RAG, M10)
     "fastapi>=0.110",       # scaffold API (superficie real en U4)
+    "python-multipart>=0.0.9", # FastAPI lo exige para parsear Form(...) — acciones HITL + corrección inline
     "uvicorn>=0.29",        # server de dev
+    "anthropic>=0.40",      # SDK Claude para los agentes reales de extracción/verificación (app/llm/)
     # langfuse: opcional (extra "obs" abajo) — solo se requiere si se configuran las keys de Langfuse (B1).
 ]
 
