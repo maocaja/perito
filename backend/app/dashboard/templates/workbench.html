@@ -51,7 +51,11 @@
     {% if detalle %}
       {% include "workbench_caso.html" %}
     {% else %}
-      <div class="wb-empty wb-caso-empty">Selecciona un caso de la cola para verlo aquí.</div>
+      <div class="wb-caso-empty">
+        <div class="wb-caso-empty-ic" aria-hidden="true">✦</div>
+        <div class="wb-caso-empty-title">Todo bajo control</div>
+        <div class="wb-caso-empty-sub">Selecciona un caso de la cola. Perito ya lo preparó — solo tienes que revisar y decidir.</div>
+      </div>
     {% endif %}
   </div>
 
@@ -68,10 +72,31 @@
   // W9 · JS mínimo (ADR-001): copia la firma compartida a las acciones antes del POST. El gate real es el
   // servidor (usuario requerido, P1); esto es solo comodidad de UI. Delegado → funciona tras swaps HTMX.
   document.addEventListener('submit', function(e){
-    var f = e.target.closest('.wb-firma-form'); if(!f) return;
-    var firmaEl = document.getElementById('wb-firma');
-    var firma = firmaEl ? firmaEl.value : '';
-    f.querySelectorAll('.wb-firma-in').forEach(function(i){ i.value = firma; });
+    var form = e.target;
+    var esFirmada = form.classList && form.classList.contains('wb-firma-form');
+    // Guarda de firma (comodidad de UI, NO reemplaza el gate P1 del servidor): las acciones firmadas usan el
+    // campo compartido #wb-firma. Si está vacío, NO dispares un POST condenado a un 400 crudo que te saca de la
+    // estación: enfoca la firma y señálala para que el operador escriba su nombre primero.
+    if(esFirmada){
+      var firmaEl = document.getElementById('wb-firma');
+      var firma = firmaEl ? firmaEl.value.trim() : '';
+      if(!firma){
+        e.preventDefault();
+        if(firmaEl){ firmaEl.focus(); firmaEl.classList.add('wb-firma-missing'); }
+        return;
+      }
+    }
+    // W20·A4: si el form pide confirmación (data-confirm), abre el diálogo NATIVO confirm() antes del POST.
+    // Sin lógica de decisión en cliente: solo fricción de confirmación; cancelar aborta el envío.
+    if(form.dataset && form.dataset.confirm && !window.confirm(form.dataset.confirm)){ e.preventDefault(); return; }
+    if(!esFirmada) return;
+    var el = document.getElementById('wb-firma');
+    var val = el ? el.value : '';
+    form.querySelectorAll('.wb-firma-in').forEach(function(i){ i.value = val; });
+  });
+  // Al escribir la firma, limpia la señal de "falta firma".
+  document.addEventListener('input', function(e){
+    if(e.target && e.target.id === 'wb-firma'){ e.target.classList.remove('wb-firma-missing'); }
   });
 
   // Fase 1 · Drawer: se abre cuando HTMX le mete contenido; se cierra con ✕, ESC (nativo <dialog>) o click fuera.
@@ -81,8 +106,9 @@
     if(!drawer) return;
     document.body.addEventListener('htmx:afterSwap', function(e){
       if(e.target.id === 'wb-drawer' && e.target.children.length && !drawer.open){ drawer.showModal(); }
-      // al cambiar de caso (#wb-caso se re-renderiza), cierra el drawer para no mostrar contenido del caso anterior
-      else if(e.target.id === 'wb-caso' && drawer.open){ drawer.close(); }
+      // al cambiar de caso (#wb-caso se re-renderiza): cierra el drawer y sube el scroll (V1·6: el título enorme
+      // del caso nuevo queda visible, no bajo el topbar).
+      else if(e.target.id === 'wb-caso'){ if(drawer.open){ drawer.close(); } var m=document.querySelector('.main'); if(m){ m.scrollTop=0; } }
     });
     drawer.addEventListener('click', function(e){ if(e.target === drawer){ drawer.close(); } });  // click en el backdrop
   })();

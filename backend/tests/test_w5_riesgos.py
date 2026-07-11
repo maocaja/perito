@@ -77,9 +77,10 @@ def test_p6_riesgo_no_cambia_estado_ni_firma(client):
     assert "Riesgos a revisar" in r.text
     # el estado NO cambió y la firma (Radicar) NO está deshabilitada por el riesgo
     assert get_caso_repository().get(caso.id).estado == EstadoCaso.LISTO_PARA_APROBAR
-    # Aísla el form de Radicar (action de aprobar → botón Radicar) y verifica que su botón no trae disabled.
-    ini = r.text.find('action="/casos/%s/aprobar"' % caso.id)
-    form_radicar = r.text[ini:r.text.find("Radicar", ini) + 10]
+    # Aísla el form de Radicar (W20/A7: la vía a APROBADO es 'radicar') y verifica que su botón no trae disabled.
+    ini = r.text.find('action="/casos/%s/radicar"' % caso.id)
+    assert ini != -1  # el form de Radicar existe en la Workbench
+    form_radicar = r.text[ini:r.text.find("Radicar caso", ini) + 12]
     assert 'disabled' not in form_radicar
 
 

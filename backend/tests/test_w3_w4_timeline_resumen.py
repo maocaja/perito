@@ -68,8 +68,8 @@ def test_timeline_usa_pasos_reales_de_traza():
 
 def test_render_timeline(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    assert "Lo que hizo la IA" in r.text
-    assert "wb-tl-h" in r.text
+    assert "Actividad del caso" in r.text   # V1·6: cronología humana (antes "Lo que hizo la IA")
+    assert "wb-crono" in r.text
     assert "badge-demo" in r.text  # los conteos van rotulados
 
 
@@ -111,7 +111,7 @@ def test_resumen_narrativo_redacta_pii():
 
 def test_render_resumen_narrativo(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    assert "Resumen ejecutivo" in r.text
+    assert "Resumen del caso" in r.text   # V1·2: eyebrow de la historia (antes "Resumen ejecutivo")
     assert "wb-narrativa" in r.text
 
 

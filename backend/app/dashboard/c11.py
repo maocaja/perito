@@ -293,6 +293,18 @@ def workbench_comparativa(request: Request, caso_id: str, rol: str = Query(RolUs
     return _TEMPLATES.TemplateResponse(request, "workbench_comparativa.html", {"comparativa": _comparativa.comparativa_de(caso)})
 
 
+@router.get("/workbench/documento/{caso_id}", response_class=HTMLResponse)
+def workbench_documento(request: Request, caso_id: str, doc: int = Query(...),
+                        rol: str = Query(RolUsuario.ANALISTA.value)):
+    """W20·A3: visor overlay (drawer) de un documento del caso. Reusa el drawer de W12. Fail-closed: índice
+    fuera de rango → 'documento no encontrado' (P7). P5: el visor sirve etiqueta/huella/mock redactado del
+    provider (`documentos_de`), NUNCA la media cruda con PII (la redacción visual real llega con M1)."""
+    caso = _get_o_404(caso_id)
+    docs = _documentos.documentos_de(caso)
+    documento = docs[doc] if 0 <= doc < len(docs) else None
+    return _TEMPLATES.TemplateResponse(request, "workbench_documento.html", {"documento": documento})
+
+
 @router.post("/workbench/corregir/{caso_id}", response_class=HTMLResponse)
 def workbench_corregir(request: Request, caso_id: str,
                        usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value),

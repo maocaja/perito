@@ -7,7 +7,11 @@
   --bg:#ffffff; --surface:#ffffff; --surface-2:#fbfbfc; --sunken:#f4f5f7;
   --border:#ecedf1; --border-strong:#dcdfe5;
   --text:#161a21; --text-2:#586074; --text-3:#8b93a3;
-  --brand:#d81e05; --brand-strong:#b3160a; --brand-weak:#fdece9; --brand-bd:#f6ccc5;  /* MAPFRE red (antes violeta) */
+  /* Perito V1 (W21) · primario INK calmo (Linear/Cursor): el chrome interactivo NO grita. El rojo (--brand/--bad)
+     se reserva a lo crítico (rechazo/fraude/bloqueo). Verde=listo, amarillo=revisar, gris=default. */
+  --primary:#1b2431; --primary-strong:#0f1620; --primary-weak:#f1f3f6; --primary-bd:#d7dce4;
+  --go:#15803d; --go-strong:#166534;  /* verde firmar/radicar (primaria "go") — oscuro para AA con texto blanco (~4.4:1); constante en ambos temas */
+  --brand:#d81e05; --brand-strong:#b3160a; --brand-weak:#fdece9; --brand-bd:#f6ccc5;  /* rojo Perito — SOLO crítico */
   --ok:#15803d; --ok-bg:#eafaf0; --ok-bd:#bfe7cc;
   --warn:#b45309; --warn-bg:#fdf4e5; --warn-bd:#f0d9a6;
   --bad:#b91c1c; --bad-bg:#fdecec; --bad-bd:#f3bfbf;
@@ -16,12 +20,16 @@
   --shadow-sm:0 1px 2px rgba(16,24,40,.05);
   --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
   --shadow-lg:0 12px 32px -8px rgba(16,24,40,.18);
+  /* escala tipográfica (el caso es enorme; el chrome, pequeño) + ritmo de motion calmo */
+  --fs-hero:30px; --fs-h1:21px; --fs-h2:16px; --fs-body:14px; --fs-sm:12.5px; --fs-xs:11px;
+  --transition:.15s cubic-bezier(.4,0,.2,1);
 }
 :root[data-theme="dark"] {
   --bg:#0b0d12; --surface:#14171e; --surface-2:#181c24; --sunken:#0f1218;
   --border:#242a35; --border-strong:#333c4a;
   --text:#e7eaef; --text-2:#98a2b2; --text-3:#69727f;
-  --brand:#f2492f; --brand-strong:#f2492f; --brand-weak:#2a1512; --brand-bd:#5a2a22;  /* MAPFRE red (dark) */
+  --primary:#e7eaef; --primary-strong:#ffffff; --primary-weak:#1a1f28; --primary-bd:#333c4a;
+  --brand:#f2492f; --brand-strong:#f2492f; --brand-weak:#2a1512; --brand-bd:#5a2a22;  /* rojo Perito (dark) — SOLO crítico */
   --ok:#4ade80; --ok-bg:#0f2419; --ok-bd:#1e4a30;
   --warn:#fbbf24; --warn-bg:#2a2008; --warn-bd:#523d10;
   --bad:#f87171; --bad-bg:#2a1414; --bad-bd:#552626;
@@ -33,14 +41,18 @@
 * { box-sizing:border-box; margin:0; padding:0; }
 html, body { height:100%; }
 body {
-  font-family:var(--sans); font-size:14px; line-height:1.5;
+  font-family:var(--sans); font-size:var(--fs-body); line-height:1.5;
   background:var(--bg); color:var(--text);
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   touch-action:manipulation;
 }
-a { color:var(--brand); text-decoration:none; }
-a:hover { color:var(--brand-strong); }
-::selection { background:var(--brand); color:#fff; }
+/* Motion calmo (Linear): transiciones sutiles en lo interactivo — nunca llamativo. Respeta reduced-motion (arriba). */
+.btn, .nav-item, a, .chip, .row-link, .icon-btn, .wb-cola-item, .wb-doc {
+  transition:background-color var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+a { color:var(--primary); text-decoration:none; }
+a:hover { color:var(--primary-strong); }
+::selection { background:color-mix(in srgb, var(--primary) 16%, transparent); color:var(--text); }
 
 /* a11y (Vercel Web Interface Guidelines): color-scheme, foco visible, reduced-motion */
 :root { color-scheme:light; }
@@ -48,7 +60,7 @@ a:hover { color:var(--brand-strong); }
 a:focus-visible, button:focus-visible, .nav-item:focus-visible, .chip:focus-visible,
 .preset:focus-visible, .btn:focus-visible, .icon-btn:focus-visible, .row-link:focus-visible,
 input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline:2px solid var(--brand); outline-offset:2px;
+  outline:2px solid var(--primary); outline-offset:2px;   /* foco calmo ink, no rojo (rojo = solo crítico) */
 }
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -64,9 +76,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
 }
 .sidebar-head { padding:20px 18px 16px; display:flex; align-items:center; gap:11px; border-bottom:1px solid var(--border); }
-.logo { width:34px; height:34px; border-radius:9px; background:var(--brand); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:17px; box-shadow:var(--shadow-sm); }
-.brand-name { font-weight:700; font-size:15.5px; letter-spacing:-.01em; }
-.brand-sub { font-size:11px; color:var(--text-3); }
 .nav { padding:14px 12px; flex:1; overflow:auto; }
 .nav-group { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); padding:6px 10px 8px; }
 .nav-item {
@@ -76,12 +85,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   cursor:pointer; margin-bottom:2px; text-decoration:none;
 }
 .nav-item:hover { background:var(--sunken); color:var(--text); }
-.nav-item.active { background:var(--brand-weak); color:var(--brand); }
+.nav-item.active { background:var(--primary-weak); color:var(--primary); }
 .nav-item svg { flex:none; opacity:.9; }
 .nav-count { margin-left:auto; font-family:var(--mono); font-size:11px; background:var(--sunken); color:var(--text-2); padding:1px 7px; border-radius:6px; }
 .sidebar-foot { padding:12px; border-top:1px solid var(--border); }
 .user { display:flex; align-items:center; gap:10px; padding:6px 8px; }
-.avatar { width:30px; height:30px; border-radius:50%; background:var(--brand-weak); border:1px solid var(--brand-bd); color:var(--brand); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; flex:none; }
+.avatar { width:30px; height:30px; border-radius:50%; background:var(--primary-weak); border:1px solid var(--primary-bd); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; flex:none; }
 
 .main { flex:1; min-width:0; height:100vh; overflow:auto; display:flex; flex-direction:column; }
 .topbar {
@@ -133,7 +142,7 @@ h1.title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
 .chips-label { font-size:11.5px; color:var(--text-3); font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-right:2px; }
 .chip { border:1px solid var(--border); background:var(--surface); font-family:inherit; font-size:12.5px; font-weight:500; padding:5px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:7px; color:var(--text); text-decoration:none; }
 .chip:hover { border-color:var(--border-strong); }
-.chip.active { background:var(--brand); color:#fff; border-color:var(--brand); }
+.chip.active { background:var(--primary); color:var(--bg); border-color:var(--primary); }  /* filtro activo calmo ink (V1) */
 .chip .n { font-family:var(--mono); font-size:11px; opacity:.7; }
 
 /* ---------- Cards ---------- */
@@ -163,8 +172,10 @@ h1.title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
 /* ---------- Buttons ---------- */
 .btn { border:1px solid var(--border-strong); background:var(--surface); color:var(--text); font-family:inherit; font-weight:600; font-size:13px; padding:10px 16px; border-radius:9px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; text-decoration:none; }
 .btn:hover { background:var(--surface-2); }
-.btn-primary { border:none; background:var(--brand); color:#fff; box-shadow:var(--shadow-sm); }
-.btn-primary:hover { background:var(--brand-strong); color:#fff; }
+/* Acción primaria: ink calmo (Cursor/Linear), no rojo. Verde=firmar/go (.btn-radicar), rojo=destructivo (.btn-danger).
+   color:var(--bg) = "on-primary": contrasta en ambos temas (ink oscuro/texto claro en light; ink claro/texto oscuro en dark) */
+.btn-primary { border:none; background:var(--primary); color:var(--bg); box-shadow:var(--shadow-sm); }
+.btn-primary:hover { background:var(--primary-strong); color:var(--bg); }
 .btn-ok { border:none; background:var(--ok); color:#fff; }
 .btn-ok:hover { filter:brightness(1.06); color:#fff; }
 .btn-danger { border:1px solid var(--bad-bd); background:var(--bad-bg); color:var(--bad); }
@@ -186,7 +197,7 @@ h1.title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
   padding:11px 12px; font-family:inherit; font-size:13px; color:var(--text);
 }
 .textarea { min-height:150px; resize:vertical; font-size:13.5px; line-height:1.6; padding:13px 14px; }
-.input:focus, .textarea:focus, .select:focus { border-color:var(--brand); outline:none; box-shadow:0 0 0 3px var(--brand-weak); }
+.input:focus, .textarea:focus, .select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px var(--primary-weak); }
 .form-actions { display:flex; gap:10px; margin-top:16px; align-items:center; flex-wrap:wrap; }
 .error { color:var(--bad); background:var(--bad-bg); border:1px solid var(--bad-bd); padding:9px 12px; border-radius:9px; font-size:12.5px; margin-bottom:14px; }
 .hint { font-size:11.5px; color:var(--text-3); }
@@ -344,7 +355,8 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-cola-item { display:block; padding:11px 13px; border:1px solid var(--border); border-radius:10px;
   text-decoration:none; color:var(--text); cursor:pointer; background:var(--surface); transition:border-color .12s, box-shadow .12s; }
 .wb-cola-item:hover { border-color:var(--border-strong); }
-.wb-cola-item.active { border-color:var(--brand-bd); box-shadow:inset 3px 0 0 var(--brand), var(--shadow-sm); background:var(--brand-weak); }
+/* Selección de la cola: calma ink, no rojo (el rojo se reserva a lo crítico — manifiesto V1) */
+.wb-cola-item.active { border-color:var(--primary-bd); box-shadow:inset 3px 0 0 var(--primary), var(--shadow-sm); background:var(--primary-weak); }
 .wb-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
 .wb-card-hace { font-size:11px; color:var(--text-3); }
 .wb-card-id { font-size:11px; color:var(--text-3); font-weight:600; }
@@ -359,13 +371,29 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-centro { display:flex; flex-direction:column; gap:12px; min-width:0; }
 .wb-slot[data-slot="header"] { display:flex; align-items:center; gap:8px; }
 .wb-caso-id { font-size:13px; color:var(--text-3); font-weight:600; }
-.wb-banner { display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-radius:12px;
-  border:1px solid var(--brand-bd); background:var(--brand-weak); }
-.wb-banner.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
-.wb-banner.tone-warn { border-color:var(--warn-bd); background:var(--warn-bg); }
-.wb-banner-ic { font-size:22px; line-height:1; }
-.wb-banner-title { font-weight:700; }
-.wb-banner-text { color:var(--text-2); font-size:13px; margin-top:2px; }
+/* V1·1 · Banner de ESTADO: grande, una línea, color por estado (verde=listo · amarillo=revisar · gris=resuelto).
+   Es lo segundo que ve el ojo tras el título. El color solo aquí tiene semántica de estado (manifiesto V1). */
+.wb-status { display:flex; align-items:center; gap:13px; padding:15px 18px; border-radius:14px;
+  border:1px solid var(--border-strong); background:var(--sunken); }
+.wb-status-ic { font-size:20px; line-height:1; flex:none; }
+.wb-status-body { display:flex; flex-direction:column; flex:1; min-width:0; }
+.wb-status-label { font-size:var(--fs-h1); font-weight:700; letter-spacing:-.01em; color:var(--text); }
+.wb-status-sub { font-size:var(--fs-sm); color:var(--text-2); margin-top:2px; }
+.wb-status.nivel-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
+.wb-status.nivel-ok .wb-status-ic { color:var(--ok); }
+.wb-status.nivel-warn { border-color:var(--warn-bd); background:var(--warn-bg); }
+.wb-status.nivel-warn .wb-status-ic { color:var(--warn); }
+.wb-status.nivel-neutral .wb-status-ic { color:var(--text-3); }
+
+/* W20·A2 · Bloque héroe "Necesitas revisar": banner + campo editable embebido (corrige aquí, sin bajar al panel) */
+.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:12px; padding:14px 16px;
+  display:flex; flex-direction:column; gap:12px; }
+.wb-revisar.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
+.wb-revisar-head { display:flex; gap:12px; align-items:flex-start; }
+.wb-revisar-ic { font-size:22px; line-height:1; }
+.wb-revisar-title { font-weight:700; }
+.wb-revisar-text { color:var(--text-2); font-size:13px; margin-top:2px; }
+.wb-revisar-form { border-top:1px dashed var(--border); padding-top:12px; margin-top:2px; }
 .copilot-headline { font-weight:600; margin-bottom:8px; }
 .copilot-lines { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13.5px; color:var(--text-2); }
 .wb-strip { display:flex; gap:10px; flex-wrap:wrap; }
@@ -374,9 +402,6 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-strip-val { font-weight:700; margin-top:2px; }
 .wb-strip-item.nivel-ok .wb-strip-val{color:var(--ok)} .wb-strip-item.nivel-bad .wb-strip-val{color:var(--bad)}
 .wb-strip-item.nivel-warn .wb-strip-val{color:var(--warn)}
-table.datos { width:100%; border-collapse:collapse; }
-table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:top; }
-.row-ausente { background:var(--warn-bg); }
 .req-tag { font-size:10.5px; font-weight:700; color:var(--warn); background:var(--warn-bg);
   border:1px solid var(--warn-bd); border-radius:5px; padding:1px 6px; }
 .email-body { white-space:pre-wrap; font-size:12.5px; color:var(--text-2); max-height:260px; overflow-y:auto; }
@@ -392,6 +417,8 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-acciones form { display:flex; flex-direction:column; gap:7px; }
 .wb-acciones input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px;
   background:var(--surface); color:var(--text); font:inherit; }
+/* Señal "falta la firma": el operador debe escribir su nombre en #wb-firma antes de una acción firmada (P1) */
+#wb-firma.wb-firma-missing { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
 .wb-o { text-align:center; color:var(--text-3); font-size:12px; }
 
 /* Chips por prioridad / fraude */
@@ -405,25 +432,27 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .chip-fraude-baja{ background:var(--neutral-bg); color:var(--neutral); border-color:var(--neutral-bd); }
 
 .wb-empty { padding:28px 18px; text-align:center; color:var(--text-3); font-size:13.5px; }
-.wb-caso-empty { background:var(--surface); border:1px dashed var(--border-strong); border-radius:12px; }
+/* V1·6 · Empty state premium (calmo, nunca un contenedor muerto): el operador nunca parte de cero */
+.wb-caso-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  min-height:58vh; text-align:center; padding:24px; }
+.wb-caso-empty-ic { font-size:30px; color:var(--primary-bd); }
+.wb-caso-empty-title { font-size:var(--fs-h1); font-weight:700; color:var(--text); }
+.wb-caso-empty-sub { font-size:var(--fs-sm); color:var(--text-3); max-width:36ch; line-height:1.5; }
 
-/* W2 · Header del caso */
-.wb-header { display:flex; align-items:center; justify-content:space-between; gap:16px;
-  background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; box-shadow:var(--shadow-sm); }
-.wb-header-tipo { font-size:19px; font-weight:700; display:flex; align-items:center; gap:10px; }
-.wb-header-sub { display:flex; align-items:center; gap:8px; margin-top:4px; font-size:13px; color:var(--text-2); }
-.wb-header-aseg { font-weight:600; color:var(--text); }
-.wb-header-id { color:var(--text-3); font-size:11.5px; margin-left:2px; }
+/* V1·1 · Identidad del caso (hero): el CASO es enorme; el chrome se calla */
+.wb-hero { padding:2px 2px 0; }
+.wb-hero-title { font-size:var(--fs-hero); font-weight:700; letter-spacing:-.02em; line-height:1.12; color:var(--text); }
+.wb-hero-sub { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:var(--fs-sm); color:var(--text-2); }
+.wb-hero-aseg { font-weight:600; color:var(--text); }
 .badge-demo { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
   color:var(--neutral); background:var(--neutral-bg); border:1px dashed var(--neutral-bd); border-radius:5px; padding:1px 5px; }
-.wb-header-r { display:flex; gap:18px; text-align:right; flex-shrink:0; }
-.wb-conf-num, .wb-tiempo-num { font-size:20px; font-weight:800; line-height:1.1; }
-.wb-conf.nivel-ok .wb-conf-num{color:var(--ok)} .wb-conf.nivel-warn .wb-conf-num{color:var(--warn)}
-.wb-conf.nivel-bad .wb-conf-num{color:var(--bad)} .wb-conf.nivel-neutral .wb-conf-num{color:var(--text-3)}
-.wb-tiempo-num { color:var(--brand-strong); }
 
 /* W3 · Timeline visual · W4 · Resumen narrativo */
-.wb-narrativa { font-size:14.5px; line-height:1.6; color:var(--text); margin:0 0 10px; }
+/* V1·2 · La historia del caso: prosa legible (como un operador explicando), no una card/widget. IA invisible. */
+.wb-historia { padding:2px 2px 0; }
+.wb-eyebrow { font-size:var(--fs-xs); font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:8px; }
+.wb-narrativa { font-size:var(--fs-h2); line-height:1.65; color:var(--text); margin:0; max-width:68ch; }
+.wb-historia-por { font-size:var(--fs-xs); color:var(--text-3); margin-top:10px; }
 .copilot-lines { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--text-2); }
 .wb-timeline { list-style:none; margin:0; padding:0; position:relative; }
 .wb-timeline::before { content:""; position:absolute; left:13px; top:6px; bottom:6px; width:2px; background:var(--border-strong); }
@@ -441,9 +470,7 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-riesgo { font-size:13px; color:var(--text); background:var(--warn-bg); border:1px solid var(--warn-bd);
   border-radius:8px; padding:7px 10px; cursor:default; }
 
-/* W6 · Health Check */
-.wb-health-pct { font-weight:800; font-size:16px; }
-.wb-health-pct.nivel-ok{color:var(--ok)} .wb-health-pct.nivel-warn{color:var(--warn)} .wb-health-pct.nivel-bad{color:var(--bad)}
+/* W6 · Health Check (W20·A5: el % se sustituyó por la barra "N de M"; el checklist se conserva) */
 .wb-health { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .wb-hc { display:grid; grid-template-columns:18px 1fr auto; gap:8px; align-items:baseline; font-size:12.5px; }
 .wb-hc-ic { text-align:center; }
@@ -458,12 +485,27 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-cob dt { color:var(--text-3); }
 .wb-cob dd { margin:0; color:var(--text); font-weight:600; text-align:right; }
 
+/* W20·A5 · "Estado operativo": preparación + cobertura + riesgos fusionados en una sola tarjeta narrativa */
+.wb-eo-block + .wb-eo-block { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.wb-eo-block.warnborder { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:10px;
+  padding:11px 12px; margin-top:14px; }
+.wb-eo-h { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700;
+  font-size:13px; margin-bottom:7px; }
+.wb-eo-nm { font-size:12.5px; font-weight:700; }
+.wb-eo-nm.nivel-ok{color:var(--ok)} .wb-eo-nm.nivel-warn{color:var(--warn)} .wb-eo-nm.nivel-bad{color:var(--bad)}
+/* Barra "N de M verificaciones" — encode-not-hide: se ve lo completado y lo pendiente, no se colapsa a un % */
+.wb-eo-bar { height:8px; border-radius:999px; background:var(--sunken); border:1px solid var(--border);
+  overflow:hidden; margin-bottom:9px; }
+.wb-eo-bar-fill { height:100%; border-radius:999px; background:var(--primary); transition:width .2s; }  /* barra calma ink (los modifiers nivel-ok/warn/bad la tiñen si aplica) */
+.wb-eo-bar-fill.nivel-ok{background:var(--ok)} .wb-eo-bar-fill.nivel-warn{background:var(--warn)}
+.wb-eo-bar-fill.nivel-bad{background:var(--bad)}
+
 /* W8 · Cola por carriles */
 .wb-carriles { display:flex; flex-wrap:wrap; gap:5px; padding:9px 12px; border-bottom:1px solid var(--border); background:var(--surface-2); }
 .wb-carril { font-size:11.5px; text-decoration:none; color:var(--text-2); background:var(--surface);
   border:1px solid var(--border); border-radius:999px; padding:3px 9px; display:inline-flex; align-items:center; gap:5px; }
 .wb-carril:hover { border-color:var(--border-strong); }
-.wb-carril.active { background:var(--brand-weak); color:var(--brand-strong); border-color:var(--brand-bd); font-weight:600; }
+.wb-carril.active { background:var(--primary-weak); color:var(--primary); border-color:var(--primary-bd); font-weight:600; }  /* carril activo calmo ink (V1) */
 .wb-carril-n { font-variant-numeric:tabular-nums; color:var(--text-3); font-weight:600; }
 .wb-cola-carril { font-size:12px; }
 
@@ -482,26 +524,25 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
   border-radius:4px; padding:0 4px; color:var(--text-2); }
 
 /* ============================================================================
-   W16 · REBRAND "Claims Copilot" (MAPFRE) — rojo de acento + sidebar navy
+   Marca Perito — rojo de acento + sidebar navy
    ============================================================================ */
-:root { --mapfre-red:#d81e05; --mapfre-red-weak:#fdecea;
-  --sidebar-bg:#0f1d3a; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#8792ad; --sidebar-active:#182a52; }
-:root[data-theme="dark"] { --mapfre-red:#f2492f; --mapfre-red-weak:#2a1512;
-  --sidebar-bg:#0a1428; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#7c88a6; --sidebar-active:#15213f; }
+:root { --sidebar-bg:#0f1d3a; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#8792ad; --sidebar-active:#1c2f57; }
+:root[data-theme="dark"] { --sidebar-bg:#0a1428; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#7c88a6; --sidebar-active:#15213f; }
 
 /* Sidebar navy (marca, constante en ambos temas) */
 .sidebar { background:var(--sidebar-bg); border-right:1px solid rgba(255,255,255,.06); color:var(--sidebar-fg); }
-.sidebar .logo { background:var(--mapfre-red); color:#fff; font-weight:800; }
-.sidebar .brand-name { color:#fff; }
-.brand-ai { font-size:10px; font-weight:700; color:#fff; background:var(--mapfre-red); border-radius:4px; padding:1px 5px; margin-left:3px; vertical-align:middle; }
-.sidebar .brand-sub { color:var(--sidebar-fg-dim); }
+/* Logo Perito: el asset ya trae nombre + tagline → chip claro para leerse sobre el navy oscuro */
+.sidebar-head { justify-content:center; }
+.sidebar .brand { display:block; width:100%; }
+.brand-logo { display:block; width:100%; max-width:172px; height:auto; margin:0 auto;
+  background:#fff; border-radius:12px; padding:12px 14px; box-shadow:var(--shadow-sm); }
 .sidebar .nav-item { color:var(--sidebar-fg); border-radius:8px; }
 .sidebar .nav-item:hover { background:var(--sidebar-active); color:#fff; }
-.sidebar .nav-item.active { background:var(--sidebar-active); color:#fff; box-shadow:inset 3px 0 0 var(--mapfre-red); }
+.sidebar .nav-item.active { background:var(--sidebar-active); color:#fff; box-shadow:inset 2px 0 0 var(--sidebar-fg); }
 .sidebar .nav-item.nav-disabled { opacity:.45; pointer-events:none; }
-.sidebar .nav-count { background:var(--mapfre-red); color:#fff; }
+.sidebar .nav-count { background:var(--sidebar-active); color:var(--sidebar-fg); }
 .sidebar .sidebar-foot { border-top:1px solid rgba(255,255,255,.06); }
-.sidebar .user .avatar { background:var(--mapfre-red); color:#fff; }
+.sidebar .user .avatar { background:var(--sidebar-active); color:var(--sidebar-fg); }
 .sidebar .user div[style] { color:var(--sidebar-fg) !important; }
 
 /* Búsqueda global superior */
@@ -510,65 +551,68 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .topbar-search input { flex:1; border:none; background:transparent; font:inherit; font-size:13px; color:var(--text); outline:none; }
 .topbar-search kbd { font-family:var(--mono); font-size:10px; background:var(--surface); border:1px solid var(--border-strong); border-radius:4px; padding:1px 5px; color:var(--text-3); }
 
-/* Acciones con color semántico (mockup) */
-.btn-radicar { background:#16a34a; border-color:#15803d; color:#fff; }
-.btn-radicar:hover:not(:disabled) { background:#15803d; }
-.btn-solicitar { background:#2563eb; border-color:#1d4ed8; color:#fff; }
-.btn-solicitar:hover { background:#1d4ed8; }
-.btn-escalar { background:#7c3aed; border-color:#6d28d9; color:#fff; }
-.btn-escalar:hover { background:#6d28d9; }
+/* V1·5 · Acción primaria = Radicar (verde=firmar/go). Las demás acciones son secundarias calmas (.btn-ghost);
+   el azul/morado de solicitar/escalar se retiró (color con significado: gris·verde·amarillo·rojo). */
+.btn-radicar { background:var(--go); border-color:var(--go-strong); color:#fff; }
+.btn-radicar:hover:not(:disabled) { background:var(--go-strong); }
+.btn-lg { padding:11px 14px; font-size:14px; font-weight:600; }
 
 /* W17 · Información Extraída (dato · confianza · fuente) */
-.wb-link { font-size:12px; color:var(--brand-strong); text-decoration:none; }
-.wb-campos { width:100%; border-collapse:collapse; }
-.wb-campos td { padding:6px 4px; border-bottom:1px solid var(--border); font-size:12.5px; vertical-align:baseline; }
-.wb-campo { cursor:default; }
-.wb-campo:hover { background:var(--surface-2); }
-.wb-campo-label { color:var(--text-2); white-space:nowrap; }
-.wb-campo-valor { color:var(--text); font-weight:600; }
-.wb-campo-conf { color:var(--ok); font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
-.wb-campo-fuente { color:var(--text-3); font-size:11px; text-align:right; white-space:nowrap; }
-.wb-campos-foot { margin-top:8px; font-size:12px; color:var(--brand-strong); cursor:pointer; }
+.wb-link { font-size:12px; color:var(--primary); text-decoration:none; }
+/* V1·3 · Campos como OBJETOS (se escanean, no se leen). Fila: [glifo estado] · [label + valor] · [estado a la
+   derecha]. Alta confianza = tranquila (✓ Verificado, % tenue); media/baja/ausente = resaltada (⚠, % fuerte). */
+.wb-datos-foot { margin-top:10px; font-size:var(--fs-xs); color:var(--text-3); }
+.wb-fields { display:flex; flex-direction:column; }
+.wb-field { display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:12px; width:100%;
+  text-align:left; padding:10px; border:none; border-bottom:1px solid var(--border); background:none; font:inherit;
+  color:var(--text); border-radius:8px; }
+.wb-field:last-child { border-bottom:none; }
+.wb-field-click { cursor:pointer; }
+.wb-field-click:hover { background:var(--surface-2); }
+.wb-field-ic { font-size:13px; line-height:1; text-align:center; color:var(--text-3); }
+.wb-field.conf-alta .wb-field-ic { color:var(--ok); }
+.wb-field.conf-media .wb-field-ic, .wb-field.is-falta .wb-field-ic { color:var(--warn); }
+.wb-field.conf-baja .wb-field-ic { color:var(--bad); }
+.wb-field-main { display:flex; align-items:baseline; gap:10px; min-width:0; }
+.wb-field-label { color:var(--text-2); font-size:var(--fs-sm); white-space:nowrap; }
+.wb-field-value { color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wb-field-state { display:flex; align-items:baseline; gap:8px; justify-self:end; font-size:var(--fs-xs); white-space:nowrap; }
+.wb-field-ok { color:var(--ok); font-weight:600; }
+.wb-field-flag { color:var(--warn); font-weight:600; }
+.wb-field-src { color:var(--text-3); }
+.wb-field-vv { color:var(--ok); font-weight:700; font-size:11px; margin-left:4px; }
+/* la ATENCIÓN salta: media/baja/ausente con un tinte sutil; alta queda tranquila (plain) */
+.wb-field.conf-media, .wb-field.is-falta { background:var(--warn-bg); }
+.wb-field.conf-baja { background:color-mix(in srgb, var(--bad) 8%, transparent); }
 
-/* W17 · indicador de origen (real=verde · demo=gris) */
-.wb-campo-ic { width:8px; padding-right:0 !important; }
-.wb-campo-ic::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; }
-.wb-ic-real::before { background:var(--ok); }
-.wb-ic-demo::before { background:var(--text-3); }
-
-/* W18 · Timeline agent-native (horizontal) */
-.wb-tl-h { list-style:none; margin:0; padding:6px 0 2px; display:flex; gap:0; overflow-x:auto; }
-.wb-tl-h-step { flex:1 0 92px; min-width:92px; display:flex; flex-direction:column; align-items:center; text-align:center; position:relative; padding:0 4px; }
-.wb-tl-h-step::before { content:""; position:absolute; top:14px; left:-50%; width:100%; height:2px; background:var(--ok-bd); z-index:0; }
-.wb-tl-h-step:first-child::before { display:none; }
-.wb-tl-h-step.estado-bad::before, .wb-tl-h-step.estado-warn::before { background:var(--warn-bd); }
-.wb-tl-h-dot { width:29px; height:29px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-size:14px; background:var(--ok-bg); border:2px solid var(--ok-bd); z-index:1; }
-.wb-tl-h-step.estado-bad .wb-tl-h-dot { background:var(--bad-bg); border-color:var(--bad-bd); }
-.wb-tl-h-step.is-demo .wb-tl-h-dot { background:var(--surface); border-style:dashed; border-color:var(--border-strong); }
-.wb-tl-h-step.is-demo::before { background:var(--border-strong); border-top:1px dashed var(--border-strong); background:transparent; }
-.wb-tl-h-label { font-size:10.5px; color:var(--text-2); margin-top:5px; line-height:1.25; }
-.wb-tl-h-meta { font-size:9.5px; color:var(--text-3); font-variant-numeric:tabular-nums; margin-top:2px; }
-
-/* W19 · Summary Agent — tag de origen */
-.wb-agente-tag { font-size:10px; font-weight:600; color:var(--brand-strong); background:var(--brand-weak);
-  border:1px solid var(--brand-bd); border-radius:5px; padding:1px 6px; }
+/* V1·6 · Cronología humana (vertical, calma): [icono] evento [hora]. Lo técnico (tokens/nodos) vive en el drawer */
+.wb-crono-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.wb-crono-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.wb-crono-step { display:grid; grid-template-columns:20px 1fr auto; align-items:baseline; gap:10px; padding:6px 0; position:relative; }
+/* línea conectora sutil entre pasos (timeline calmo) */
+.wb-crono-step:not(:last-child)::before { content:""; position:absolute; left:9px; top:18px; bottom:-6px; width:1px; background:var(--border); }
+.wb-crono-dot { text-align:center; font-size:12px; line-height:1.3; position:relative; z-index:1; }
+.wb-crono-label { color:var(--text); font-size:var(--fs-sm); line-height:1.3; }
+.wb-crono-time { color:var(--text-3); font-size:var(--fs-xs); }
+.wb-crono-step.estado-bad .wb-crono-label { color:var(--bad); }
 
 /* W11 · Galería de documentos */
-.wb-galeria { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:10px; }
-.wb-doc { border:1px solid var(--border); border-radius:10px; padding:8px; text-align:center; background:var(--surface); cursor:pointer; transition:border-color .12s; }
-.wb-doc:hover { border-color:var(--brand-bd); }
-.wb-doc-thumb { font-size:26px; height:44px; display:flex; align-items:center; justify-content:center;
-  background:var(--sunken); border-radius:7px; margin-bottom:6px; }
-.wb-doc-label { font-size:11px; color:var(--text); line-height:1.2; min-height:26px; }
-.wb-doc-estado { font-size:9px; text-transform:uppercase; letter-spacing:.4px; margin-top:4px; font-weight:600; }
-.wb-doc-estado.estado-validado { color:var(--ok); }
-.wb-doc-estado.estado-extraido { color:var(--info); }
+/* V1·4 · Galería tipo Notion: documentos con peso visual (preview grande), no adjuntos minúsculos */
+.wb-galeria { display:grid; grid-template-columns:repeat(auto-fill, minmax(148px,1fr)); gap:12px; }
+.wb-doc { display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden;
+  background:var(--surface); cursor:pointer; text-align:left; padding:0; font:inherit; color:var(--text); }
+.wb-doc:hover { border-color:var(--primary-bd); box-shadow:var(--shadow); transform:translateY(-1px); }  /* lift calmo (Linear) */
+.wb-doc:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.wb-doc-preview { height:96px; display:flex; align-items:center; justify-content:center; background:var(--sunken); border-bottom:1px solid var(--border); }
+.wb-doc-ic { font-size:32px; opacity:.85; }
+.wb-doc-meta { display:flex; flex-direction:column; gap:3px; padding:9px 11px; }
+.wb-doc-label { font-size:12px; color:var(--text); line-height:1.25; font-weight:500; }
+.wb-doc-estado { font-size:9px; text-transform:uppercase; letter-spacing:.4px; font-weight:700; }
+.wb-doc-estado.estado-validado { color:var(--ok); }              /* verde = confirmado (semántico) */
+.wb-doc-estado.estado-extraido { color:var(--text-2); }          /* gris calmo (extraído no es crítico, V1) */
 .wb-doc-estado.estado-relacionado { color:var(--text-3); }
 
 /* W12 · Visor de evidencia (salto a la fuente) */
-.wb-campo-click { cursor:pointer; }
-.wb-campo-click:hover { background:var(--brand-weak); }
 .wb-ev { display:grid; grid-template-columns:1fr 200px; gap:14px; align-items:start; }
 .wb-ev-doc { background:var(--sunken); border:1px solid var(--border); border-radius:8px; padding:14px; }
 .wb-ev-page { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:4px;
@@ -612,27 +656,30 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-chat-form .btn { padding:8px 12px; }
 
 /* ═══════════ Fase 0 · Declutter (estación de decisión) ═══════════ */
-/* Confianza CODIFICADA (encode-not-hide, P7): el % SIEMPRE visible, pero su peso refleja la incertidumbre —
-   tenue cuando es alta, fuerte/ámbar cuando es baja. Nunca se oculta la señal (solo se gradúa la prominencia). */
-.wb-conf-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--text-3); }
+/* Confianza EN CALMA (§4 encode-not-hide): el % SIEMPRE en el DOM; tenue cuando es alta (junto a "Verificado"),
+   fuerte cuando importa (media ámbar / baja roja). Nunca se oculta la señal — se gradúa la prominencia. */
 .wb-conf-pct { font-size:11px; font-variant-numeric:tabular-nums; }
-.conf-alta  .wb-conf-dot { background:var(--ok); }
-.conf-alta  .wb-conf-pct { color:var(--text-3); font-weight:500; }         /* alta → tenue (no grita) */
-.conf-media .wb-conf-dot { background:var(--warn); }
+.wb-conf-muted { color:var(--text-3); font-weight:500; }                    /* alta → tenue (no grita) */
 .conf-media .wb-conf-pct { color:var(--warn); font-weight:700; }
-.conf-baja  .wb-conf-dot { background:var(--bad); }
 .conf-baja  .wb-conf-pct { color:var(--bad);  font-weight:700; }           /* baja → fuerte (pide atención) */
-.conf-baja  { background:var(--warn-bg); }                                  /* la fila de baja confianza resalta */
-/* M3 · campo confirmado por varias fuentes (Evidence Correlator) */
-.wb-campo-ok { color:var(--ok); font-weight:700; font-size:11px; margin-left:4px; }
 /* Evidencia inline (reemplaza la tarjeta vacía permanente): solo ocupa espacio cuando tiene contenido */
 .wb-evidencia-slot:empty { display:none; }
 .wb-evidencia-slot { margin-top:12px; border-top:1px dashed var(--border); padding-top:12px; }
 /* Health compacto (barra de preparación): el detalle va en el tooltip, no en una fila aparte */
 .wb-health-compact .wb-hc { padding:3px 0; }
 .wb-health-compact .wb-hc-det { display:none; }
-/* Panel de Decisión: leve énfasis (es donde el operador actúa y firma) */
-.wb-decidir { border-color:var(--brand); }
+/* Panel de Decisión: leve énfasis ink (donde el operador actúa/firma) — NO rojo (rojo = solo crítico, V1) */
+.wb-decidir { border-color:var(--primary-bd); }
+/* V1·5 · Colega senior: la acción recomendada como CONSEJO (no decisión, P1) + esfuerzo estimado */
+.wb-reco { display:flex; gap:11px; padding:13px 14px; border-radius:12px; border:1px solid var(--border-strong);
+  background:var(--sunken); margin-bottom:14px; }
+.wb-reco.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
+.wb-reco.tone-warn { border-color:var(--warn-bd); background:var(--warn-bg); }
+.wb-reco-ic { font-size:18px; line-height:1.2; flex:none; }
+.wb-reco-eyebrow { font-size:var(--fs-xs); font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+.wb-reco-title { font-weight:700; font-size:var(--fs-h2); letter-spacing:-.01em; margin-top:2px; }
+.wb-reco-text { font-size:var(--fs-sm); color:var(--text-2); margin-top:4px; line-height:1.5; }
+.wb-reco-effort { font-size:var(--fs-xs); color:var(--text-3); margin-top:8px; }
 
 /* ═══════════ Fase 1 · Drawer (panel lateral on-demand, <dialog> nativo) ═══════════ */
 /* Panel anclado a la derecha, full-height. Modal nativo → ESC + focus-trap + backdrop gratis (accesible). */
@@ -650,8 +697,9 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-drawer-x:hover { background:var(--border); color:var(--text); }
 .wb-drawer-body { padding:18px; overflow-y:auto; flex:1; }
 /* Disparadores de drawer (links/botones que abren el panel) */
-.wb-drawer-trigger { background:none; border:none; cursor:pointer; font:inherit; color:var(--brand); margin-left:auto; font-size:12.5px; font-weight:600; }
-.wb-drawer-trigger:hover { color:var(--brand-strong); }
+/* Enlace a drawer (Ver actividad / Comparar correos): calmo ink, no rojo (V1) */
+.wb-drawer-trigger { background:none; border:none; cursor:pointer; font:inherit; color:var(--text-2); margin-left:auto; font-size:12.5px; font-weight:600; }
+.wb-drawer-trigger:hover { color:var(--text); }
 /* Actividad detallada (feed por agente) */
 .wb-act { list-style:none; display:flex; flex-direction:column; margin-top:12px; }
 .wb-act-item { display:flex; gap:10px; align-items:flex-start; padding:10px 4px; border-bottom:1px solid var(--border); }

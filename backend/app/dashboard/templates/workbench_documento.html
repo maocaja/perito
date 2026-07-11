@@ -1,0 +1,39 @@
+{# W20·A3 · Visor de documento (overlay) — se renderiza DENTRO del drawer raíz (reusa el layout de W12). P5: el
+   visor sirve la ETIQUETA + huella + un mock redactado del documento, NUNCA la media cruda con PII (la redacción
+   visual real de imágenes llega con M1). Fail-closed (P7): documento inexistente → aviso, sin visor falso. #}
+<div class="wb-drawer-inner">
+  <header class="wb-drawer-head">
+    <h2>Documento · {{ documento.etiqueta if documento else 'no encontrado' }}</h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar visor de documento">✕</button>
+  </header>
+  <div class="wb-drawer-body">
+    {% if documento %}
+    <div class="wb-ev">
+      <div class="wb-ev-doc" data-tipo="{{ documento.tipo }}" aria-label="Vista de {{ documento.etiqueta }} (demostración)">
+        <div class="wb-ev-page">
+          {% for _ in range(9) %}<div class="wb-ev-line"></div>{% endfor %}
+        </div>
+      </div>
+      <div class="wb-ev-meta">
+        <div class="hint">Adjunto del caso</div>
+        <div class="wb-ev-field">{{ documento.etiqueta }}</div>
+        <div class="wb-ev-src">
+          {{ documento.tipo|icono_tipo }} {{ documento.tipo|capitalize }} · <span class="estado-{{ documento.estado }}">{{ documento.estado }}</span>
+          {% if documento.origen == 'demo' %}<span class="badge-demo" title="Adjunto de demostración; los reales llegan con Document AI (M1)">demo</span>{% endif %}
+        </div>
+        {% if documento.huella %}
+        <div class="wb-ev-src mono" title="Huella perceptual (P5: la huella, no la imagen)">🔗 {{ documento.huella[:16] }}…</div>
+        {% else %}
+        <div class="hint">Sin huella (mock) — se poblará con Document AI (M1)</div>
+        {% endif %}
+        {# 'Usar este valor' extrae un dato del documento a un campo: requiere OCR real → disponible con M1 (P7:
+           no se promete una extracción que aún no producimos). #}
+        <button class="btn btn-ghost wb-ev-ctx" type="button" disabled
+                title="La extracción de valores del documento llega con Document AI (M1)">Usar este valor</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="wb-ev-empty">Documento no encontrado.</div>
+    {% endif %}
+  </div>
+</div>

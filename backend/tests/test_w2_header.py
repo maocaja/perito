@@ -1,7 +1,7 @@
-"""Tests W2 — Header del caso (tipo + asegurado + confianza% + tiempo estimado).
+"""Tests W2/V1·1 — Header del caso: IDENTIDAD (título enorme) + BANNER de estado.
 
-Invariantes: P7 (asegurado mock rotulado 'demo'; tiempo 'estimado'), P1 (informativo), reproducibilidad
-del mock (determinístico por caso).
+Invariantes: P7 (asegurado mock rotulado 'demo'; tiempo 'estimado' — el view-model sigue vivo, se rinde en la
+Decisión, V1·5), P1 (informativo), reproducibilidad del mock (determinístico por caso).
 """
 
 import pytest
@@ -71,13 +71,16 @@ def test_tiempo_estimado_rotulado_y_crece_con_faltantes():
 
 # ---------- render en la workbench ----------
 
-def test_header_muestra_tipo_confianza_y_tiempo(client):
+def test_header_muestra_identidad_y_estado(client):
+    """V1·1: el header es la IDENTIDAD del caso (título enorme) + un BANNER de estado grande a color.
+    La confianza global y el tiempo estimado salieron del header (confianza invisible salvo que importe;
+    el esfuerzo estimado vive en el panel de Decisión, V1·5)."""
     caso = _un_caso()
     r = client.get(f"/workbench/caso/{caso.id}")
     assert r.status_code == 200
-    assert "wb-header" in r.text
-    assert "revisión est." in r.text        # Fase 0: etiqueta del tiempo estimado (más corta)
-    assert "confianza" in r.text
+    assert "wb-hero-title" in r.text          # el caso es enorme (identidad)
+    assert "wb-status" in r.text              # banner de estado (verde listo / amarillo revisar / resuelto)
+    assert "wb-status-label" in r.text        # el estado aparece como etiqueta legible
 
 
 def test_header_asegurado_demo_lleva_badge(client):
