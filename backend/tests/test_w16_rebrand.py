@@ -1,7 +1,8 @@
-"""Tests W16 — Rebrand "Claims Copilot" (MAPFRE): marca config-driven, nav de íconos, búsqueda.
+"""Tests W16 — Rebrand a Perito: marca config-driven, nav de íconos, búsqueda.
 
-Invariantes: config-driven (branding único), retro-compat (todas las páginas siguen vivas), P7 (MAPFRE es
-contexto de demo). Clean Code: la marca vive en un solo módulo (branding.py), sin literales dispersos.
+Invariantes: config-driven (branding único), retro-compat (todas las páginas siguen vivas), P7 (Perito es la
+marca actual, sin referencias a demo/MAPFRE). Clean Code: la marca vive en un solo módulo (branding.py), sin
+literales dispersos.
 """
 
 import pytest
@@ -21,10 +22,11 @@ def client():
 
 # ---------- marca config-driven ----------
 
-def test_marca_claims_copilot(client):
+def test_marca_perito(client):
     html = client.get("/workbench").text
-    assert branding.BRANDING["producto"] in html   # "Claims Copilot"
-    assert branding.BRANDING["vendor"] in html      # "MAPFRE"
+    assert branding.BRANDING["producto"] in html    # "Perito" (topbar/título)
+    assert branding.BRANDING["logo"] in html         # el logo de marca se referencia (sidebar)
+    assert "MAPFRE" not in html                       # la marca de demo se retiró por completo
 
 
 def test_nav_desde_branding(client):

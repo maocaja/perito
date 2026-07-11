@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 236 96" role="img" aria-label="Perito">
+  <!-- Placeholder de marca Perito (navy + rojo). Reemplazar por el asset definitivo (logo-perito.png). -->
+  <!-- líneas de velocidad -->
+  <rect x="4"  y="30" width="26" height="7" rx="3.5" fill="#e11d0c"/>
+  <rect x="0"  y="43" width="19" height="7" rx="3.5" fill="#e11d0c"/>
+  <rect x="8"  y="56" width="26" height="7" rx="3.5" fill="#e11d0c"/>
+  <!-- mark: P + lupa con check -->
+  <path d="M42 14h30a26 26 0 0 1 0 52H58v22H42z" fill="#132844"/>
+  <rect x="50" y="66" width="8" height="20" rx="4" transform="rotate(45 54 76)" fill="#132844"/>
+  <circle cx="72" cy="40" r="20" fill="#fff"/>
+  <circle cx="72" cy="40" r="20" fill="none" stroke="#132844" stroke-width="4"/>
+  <path d="M63 40l7 7 12-14" fill="none" stroke="#e11d0c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- wordmark -->
+  <text x="112" y="66" font-family="'IBM Plex Sans',system-ui,sans-serif" font-size="46" font-weight="700" fill="#132844">perito</text>
+</svg>

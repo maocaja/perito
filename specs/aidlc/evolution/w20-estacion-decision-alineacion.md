@@ -187,3 +187,39 @@ en vivo: Rechazar→RECHAZADO (PRG a `/workbench`), Carta drawer preparar→envi
 - ✅ **B2a-fix:** `test_p1_rechazar_ok` afirmaba `==200` (pasaba siguiendo el redirect) → apretado a `303` +
   `location` + estado, consistente con el sibling `radicar`.
 - ✅ **detalle eliminado:** ya no hay páginas duplicadas; carta+rechazar portadas sin pérdida de capacidad (P1).
+
+### Ronda 4 — code-review de Bolt-2b (A2–A5: recomposición de jerarquía)
+
+**Alcance:** solo UI (plantillas Jinja/HTMX + CSS) + **una ruta GET nueva** (`/workbench/documento/{id}`, A3). NO
+toca `rules/` ni `orchestrator/`. Implementado:
+- **A2** — bloque héroe **"Necesitas revisar"** con el campo editable EMBEBIDO cuando el caso está bloqueado
+  (`REQUIERE_REVISION`); banner calmo si no. La corrección reusa `/workbench/corregir` (firma P1, 409 si terminal,
+  nunca terminal). Un solo form de corrección visible a la vez (hero XOR colapsable `LISTO_PARA_APROBAR`).
+- **A3** — los documentos abren un **visor overlay** (drawer, reusa W12) vía `hx-get`; ruta nueva sirve
+  etiqueta/huella/mock. Fail-closed a "Documento no encontrado" (índice inválido). P5: nunca media cruda ni el
+  nombre de archivo; "Usar este valor" deshabilitado (extracción real → M1, P7).
+- **A4** — confirmación **nativa** (`data-confirm` + `confirm()`) antes de radicar/rechazar/escalar/fraude; el gate
+  real sigue en el servidor (P1). ADR-001: sin lógica de decisión en cliente.
+- **A5** — Health+Cobertura+Riesgos fusionados en un solo bloque **"Estado operativo"**; health como barra
+  **"N de M verificaciones"** (encode-not-hide, no un %). Contratos de datos intactos (W5/W6/W7 se calculan igual).
+
+**Veredicto:** 🟢 **verde — 0 violaciones P1–P6.** El reviewer verificó (✅): P1 (radicar/rechazar/corregir exigen
+firma, 409 si terminal, la confirmación A4 no sustituye el gate del servidor); P2 (cobertura sigue del motor,
+"no el LLM"); P5 (visor sin media cruda ni nombre de archivo, boundary redactado); **P6/P1 fail-closed** (la fusión
+A5 NO convierte alerta ALTA + cobertura REQUIERE_REVISION + health bajo en un bloqueo — la firma sigue habilitada,
+el estado intacto); encode-not-hide (`%` visible en todo campo incl. 100%, timeline no colapsado); Clean Code/SOLID
+(nombres dicientes, sin código muerto, DIP: el visor depende del provider `documentos_de`). "Commit seguro para
+merge." Sin findings que aplicar.
+
+**Tests (fail-closed):** `test_w20_bolt2b.py` (12) — A2 hero-vs-banner + exclusión mutua del form · A3
+visor/fail-closed/404/P5-sin-nombre-crudo · A4 `data-confirm` + gate del servidor intacto · A5 fusión + barra
+"N de M" + **combinación P6/P1 no bloquea** · encode-not-hide bidireccional (`%` al 100% + timeline visible).
+Migrados: `test_w6_health` (Health→"Estado operativo"/barra N-de-M), `test_w5_riesgos` (fix de un assert latente
+que buscaba `/aprobar`, retirado en Bolt-2a → apuntado a `/radicar`). Suite: **538 passed, 3 skipped** (`make test`).
+
+**Validación en navegador (Playwright, server fresco):** confirmado A2 (hero "Necesitas revisar — Falta 1 dato"
+con campos + firma + "Corregir y recalcular"), A5 ("Estado operativo" con barra "N de M" + cobertura P2 + riesgos
+condicional), A3 (visor overlay "Denuncia Policía" con huella/mock, "Usar este valor" off, sin nombre crudo), A4
+(los `confirm()` disparan), encode-not-hide (`%` en todo campo, `[REDACTED]` en PII, timeline visible). **0 errores
+de consola.** Gotcha atrapado: el visor A3 dio 404 con el server **viejo** (código Python cacheado); reinicio del
+proceso → ruta registrada → 200. Los templates se leían frescos, pero una ruta nueva exige reiniciar el server.

@@ -17,13 +17,13 @@
 <div class="app">
 
   <aside class="sidebar">
-    {# W16 · marca desde la fuente única de branding (config-driven, DIP) #}
+    {# Marca desde la fuente única de branding (config-driven, DIP). El logo Perito ya trae nombre + tagline;
+       va en un chip claro para leerse sobre el sidebar oscuro. #}
     <div class="sidebar-head">
-      <div class="logo">{{ branding.vendor[0] if branding else 'P' }}</div>
-      <div>
-        <div class="brand-name">{{ branding.producto if branding else 'Perito' }} <span class="brand-ai">{{ branding.sufijo if branding else '' }}</span></div>
-        <div class="brand-sub">{{ branding.vendor if branding else '' }} · {{ branding.subtitulo if branding else 'Admisión de siniestros' }}</div>
-      </div>
+      <a class="brand" href="/workbench?rol={{ rol_val }}" aria-label="{{ branding.producto if branding else 'Perito' }}">
+        <img class="brand-logo" src="{{ branding.logo if branding else '/static/logo-perito.png' }}"
+             alt="{{ branding.producto if branding else 'Perito' }} — {{ branding.subtitulo if branding else '' }}">
+      </a>
     </div>
     <nav class="nav">
       {% for item in sidebar %}

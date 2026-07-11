@@ -7,7 +7,7 @@
   --bg:#ffffff; --surface:#ffffff; --surface-2:#fbfbfc; --sunken:#f4f5f7;
   --border:#ecedf1; --border-strong:#dcdfe5;
   --text:#161a21; --text-2:#586074; --text-3:#8b93a3;
-  --brand:#d81e05; --brand-strong:#b3160a; --brand-weak:#fdece9; --brand-bd:#f6ccc5;  /* MAPFRE red (antes violeta) */
+  --brand:#d81e05; --brand-strong:#b3160a; --brand-weak:#fdece9; --brand-bd:#f6ccc5;  /* Perito red (antes violeta) */
   --ok:#15803d; --ok-bg:#eafaf0; --ok-bd:#bfe7cc;
   --warn:#b45309; --warn-bg:#fdf4e5; --warn-bd:#f0d9a6;
   --bad:#b91c1c; --bad-bg:#fdecec; --bad-bd:#f3bfbf;
@@ -21,7 +21,7 @@
   --bg:#0b0d12; --surface:#14171e; --surface-2:#181c24; --sunken:#0f1218;
   --border:#242a35; --border-strong:#333c4a;
   --text:#e7eaef; --text-2:#98a2b2; --text-3:#69727f;
-  --brand:#f2492f; --brand-strong:#f2492f; --brand-weak:#2a1512; --brand-bd:#5a2a22;  /* MAPFRE red (dark) */
+  --brand:#f2492f; --brand-strong:#f2492f; --brand-weak:#2a1512; --brand-bd:#5a2a22;  /* Perito red (dark) */
   --ok:#4ade80; --ok-bg:#0f2419; --ok-bd:#1e4a30;
   --warn:#fbbf24; --warn-bg:#2a2008; --warn-bd:#523d10;
   --bad:#f87171; --bad-bg:#2a1414; --bad-bd:#552626;
@@ -64,9 +64,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
 }
 .sidebar-head { padding:20px 18px 16px; display:flex; align-items:center; gap:11px; border-bottom:1px solid var(--border); }
-.logo { width:34px; height:34px; border-radius:9px; background:var(--brand); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:17px; box-shadow:var(--shadow-sm); }
-.brand-name { font-weight:700; font-size:15.5px; letter-spacing:-.01em; }
-.brand-sub { font-size:11px; color:var(--text-3); }
 .nav { padding:14px 12px; flex:1; overflow:auto; }
 .nav-group { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); padding:6px 10px 8px; }
 .nav-item {
@@ -366,6 +363,16 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-banner-ic { font-size:22px; line-height:1; }
 .wb-banner-title { font-weight:700; }
 .wb-banner-text { color:var(--text-2); font-size:13px; margin-top:2px; }
+
+/* W20·A2 · Bloque héroe "Necesitas revisar": banner + campo editable embebido (corrige aquí, sin bajar al panel) */
+.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:12px; padding:14px 16px;
+  display:flex; flex-direction:column; gap:12px; }
+.wb-revisar.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
+.wb-revisar-head { display:flex; gap:12px; align-items:flex-start; }
+.wb-revisar-ic { font-size:22px; line-height:1; }
+.wb-revisar-title { font-weight:700; }
+.wb-revisar-text { color:var(--text-2); font-size:13px; margin-top:2px; }
+.wb-revisar-form { border-top:1px dashed var(--border); padding-top:12px; margin-top:2px; }
 .copilot-headline { font-weight:600; margin-bottom:8px; }
 .copilot-lines { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13.5px; color:var(--text-2); }
 .wb-strip { display:flex; gap:10px; flex-wrap:wrap; }
@@ -392,6 +399,8 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-acciones form { display:flex; flex-direction:column; gap:7px; }
 .wb-acciones input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px;
   background:var(--surface); color:var(--text); font:inherit; }
+/* Señal "falta la firma": el operador debe escribir su nombre en #wb-firma antes de una acción firmada (P1) */
+#wb-firma.wb-firma-missing { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
 .wb-o { text-align:center; color:var(--text-3); font-size:12px; }
 
 /* Chips por prioridad / fraude */
@@ -441,9 +450,7 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-riesgo { font-size:13px; color:var(--text); background:var(--warn-bg); border:1px solid var(--warn-bd);
   border-radius:8px; padding:7px 10px; cursor:default; }
 
-/* W6 · Health Check */
-.wb-health-pct { font-weight:800; font-size:16px; }
-.wb-health-pct.nivel-ok{color:var(--ok)} .wb-health-pct.nivel-warn{color:var(--warn)} .wb-health-pct.nivel-bad{color:var(--bad)}
+/* W6 · Health Check (W20·A5: el % se sustituyó por la barra "N de M"; el checklist se conserva) */
 .wb-health { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .wb-hc { display:grid; grid-template-columns:18px 1fr auto; gap:8px; align-items:baseline; font-size:12.5px; }
 .wb-hc-ic { text-align:center; }
@@ -457,6 +464,21 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-cob > div { display:contents; }
 .wb-cob dt { color:var(--text-3); }
 .wb-cob dd { margin:0; color:var(--text); font-weight:600; text-align:right; }
+
+/* W20·A5 · "Estado operativo": preparación + cobertura + riesgos fusionados en una sola tarjeta narrativa */
+.wb-eo-block + .wb-eo-block { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.wb-eo-block.warnborder { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:10px;
+  padding:11px 12px; margin-top:14px; }
+.wb-eo-h { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700;
+  font-size:13px; margin-bottom:7px; }
+.wb-eo-nm { font-size:12.5px; font-weight:700; }
+.wb-eo-nm.nivel-ok{color:var(--ok)} .wb-eo-nm.nivel-warn{color:var(--warn)} .wb-eo-nm.nivel-bad{color:var(--bad)}
+/* Barra "N de M verificaciones" — encode-not-hide: se ve lo completado y lo pendiente, no se colapsa a un % */
+.wb-eo-bar { height:8px; border-radius:999px; background:var(--sunken); border:1px solid var(--border);
+  overflow:hidden; margin-bottom:9px; }
+.wb-eo-bar-fill { height:100%; border-radius:999px; background:var(--brand); transition:width .2s; }
+.wb-eo-bar-fill.nivel-ok{background:var(--ok)} .wb-eo-bar-fill.nivel-warn{background:var(--warn)}
+.wb-eo-bar-fill.nivel-bad{background:var(--bad)}
 
 /* W8 · Cola por carriles */
 .wb-carriles { display:flex; flex-wrap:wrap; gap:5px; padding:9px 12px; border-bottom:1px solid var(--border); background:var(--surface-2); }
@@ -482,26 +504,27 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
   border-radius:4px; padding:0 4px; color:var(--text-2); }
 
 /* ============================================================================
-   W16 · REBRAND "Claims Copilot" (MAPFRE) — rojo de acento + sidebar navy
+   Marca Perito — rojo de acento + sidebar navy
    ============================================================================ */
-:root { --mapfre-red:#d81e05; --mapfre-red-weak:#fdecea;
+:root { --perito-red:#d81e05; --perito-red-weak:#fdecea;
   --sidebar-bg:#0f1d3a; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#8792ad; --sidebar-active:#182a52; }
-:root[data-theme="dark"] { --mapfre-red:#f2492f; --mapfre-red-weak:#2a1512;
+:root[data-theme="dark"] { --perito-red:#f2492f; --perito-red-weak:#2a1512;
   --sidebar-bg:#0a1428; --sidebar-fg:#c7d1e6; --sidebar-fg-dim:#7c88a6; --sidebar-active:#15213f; }
 
 /* Sidebar navy (marca, constante en ambos temas) */
 .sidebar { background:var(--sidebar-bg); border-right:1px solid rgba(255,255,255,.06); color:var(--sidebar-fg); }
-.sidebar .logo { background:var(--mapfre-red); color:#fff; font-weight:800; }
-.sidebar .brand-name { color:#fff; }
-.brand-ai { font-size:10px; font-weight:700; color:#fff; background:var(--mapfre-red); border-radius:4px; padding:1px 5px; margin-left:3px; vertical-align:middle; }
-.sidebar .brand-sub { color:var(--sidebar-fg-dim); }
+/* Logo Perito: el asset ya trae nombre + tagline → chip claro para leerse sobre el navy oscuro */
+.sidebar-head { justify-content:center; }
+.sidebar .brand { display:block; width:100%; }
+.brand-logo { display:block; width:100%; max-width:172px; height:auto; margin:0 auto;
+  background:#fff; border-radius:12px; padding:12px 14px; box-shadow:var(--shadow-sm); }
 .sidebar .nav-item { color:var(--sidebar-fg); border-radius:8px; }
 .sidebar .nav-item:hover { background:var(--sidebar-active); color:#fff; }
-.sidebar .nav-item.active { background:var(--sidebar-active); color:#fff; box-shadow:inset 3px 0 0 var(--mapfre-red); }
+.sidebar .nav-item.active { background:var(--sidebar-active); color:#fff; box-shadow:inset 3px 0 0 var(--perito-red); }
 .sidebar .nav-item.nav-disabled { opacity:.45; pointer-events:none; }
-.sidebar .nav-count { background:var(--mapfre-red); color:#fff; }
+.sidebar .nav-count { background:var(--perito-red); color:#fff; }
 .sidebar .sidebar-foot { border-top:1px solid rgba(255,255,255,.06); }
-.sidebar .user .avatar { background:var(--mapfre-red); color:#fff; }
+.sidebar .user .avatar { background:var(--perito-red); color:#fff; }
 .sidebar .user div[style] { color:var(--sidebar-fg) !important; }
 
 /* Búsqueda global superior */
@@ -558,6 +581,7 @@ table.datos td { padding:7px 8px; border-bottom:1px solid var(--border); font-si
 .wb-galeria { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:10px; }
 .wb-doc { border:1px solid var(--border); border-radius:10px; padding:8px; text-align:center; background:var(--surface); cursor:pointer; transition:border-color .12s; }
 .wb-doc:hover { border-color:var(--brand-bd); }
+.wb-doc:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }  /* W20·A3: foco por teclado */
 .wb-doc-thumb { font-size:26px; height:44px; display:flex; align-items:center; justify-content:center;
   background:var(--sunken); border-radius:7px; margin-bottom:6px; }
 .wb-doc-label { font-size:11px; color:var(--text); line-height:1.2; min-height:26px; }

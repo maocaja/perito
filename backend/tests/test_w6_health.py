@@ -76,9 +76,11 @@ def test_verificacion_na_sin_traza():
 
 
 def test_render_health(client):
+    # W20·A5: el Health Check se fusionó en el bloque "Estado operativo"; el % dio paso a la barra "N de M
+    # verificaciones" (encode-not-hide). El checklist y el copy P1 informativo se conservan.
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    assert "Health check" in r.text
-    assert "wb-health-pct" in r.text
+    assert "Estado operativo" in r.text
+    assert "verificaciones" in r.text               # barra "N de M verificaciones" (reemplaza el %)
     assert "la aprobación la decides tú" in r.text  # P1 informativo
 
 

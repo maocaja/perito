@@ -4,20 +4,21 @@ Clean Code/SOLID: toda la config de marca vive aquí (SRP); las plantillas depen
 (DIP), no de literales dispersos. `registrar(templates)` la inyecta como globals de Jinja (DRY: una sola
 verdad para las dos instancias de templates, dashboard e intake).
 
-`WORKBENCH_BRAND` permite override por entorno; "MAPFRE" es el contexto de la demo (rotulado), no un dato de
-caso (P7).
+`WORKBENCH_BRAND` permite override por entorno si algún día se multi-tenant-iza.
 """
 
 from app.config import settings
 
 # Marca (override por entorno con WORKBENCH_BRAND si algún día se multi-tenant-iza).
-_MARCA = getattr(settings, "workbench_brand", None) or "claims_copilot"
+_MARCA = getattr(settings, "workbench_brand", None) or "perito"
 
 BRANDING = {
-    "producto": "Claims Copilot",
-    "sufijo": "AI",
-    "vendor": "MAPFRE",          # contexto de demo (P7)
-    "subtitulo": "Operaciones de siniestros",
+    "producto": "Perito",
+    "sufijo": "",
+    "vendor": "",                              # sin marca de cliente (el producto es Perito, no una demo de marca)
+    "subtitulo": "Entiende. Verifica. Resuelve.",
+    "logo": "/static/logo-perito.svg",         # logo de marca (servido desde app/dashboard/static/; placeholder
+                                               # hasta subir el asset definitivo logo-perito.png)
     "marca": _MARCA,
 }
 
@@ -33,7 +34,9 @@ SIDEBAR: list[dict] = [
     {"label": "Pendientes", "icono": "pendiente","ruta": "/workbench?carril=amarillo",           "habilitado": True},
     {"label": "Radicados",  "icono": "radicado", "ruta": "/workbench?estado=RESUELTOS",          "habilitado": True},
     {"label": "Escalados",  "icono": "escalado", "ruta": "/workbench?estado=REQUIERE_REVISION",  "habilitado": True},
-    {"label": "Historial",  "icono": "historial","ruta": "/panel",                              "habilitado": True},
+    # 'Radicados' (RESUELTOS) ya es el histórico de casos cerrados; `/panel` es Reportes/métricas + Cumplimiento
+    # (no un historial cronológico). Un solo ítem "Reportes" → `/panel` (antes 'Historial' y 'Reportes'
+    # duplicaban el mismo destino).
     {"label": "Reportes",   "icono": "reportes", "ruta": "/panel",                              "habilitado": True},
     {"label": "Ayuda",      "icono": "ayuda",    "ruta": "#",                                   "habilitado": False},
 ]
