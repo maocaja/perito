@@ -45,3 +45,6 @@ skills-lock.json
 .DS_Store
 .idea/
 .vscode/
+
+# Artefactos de Playwright MCP (capturas/snapshots de verificación local)
+.playwright-mcp/

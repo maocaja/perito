@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Workbench{% endblock %}
+{% block crumb %}Workbench{% endblock %}
+{% block content %}
+<div class="wb">
+
+  {# ── COLUMNA IZQUIERDA · cola inteligente por carriles (W8) ── #}
+  {# hx-disinherit: el auto-poll (abajo) usa hx-select="#wb-cola"; SIN esto los .wb-cola-item lo HEREDARÍAN y al
+     hacer clic htmx buscaría #wb-cola en la respuesta del caso (que no lo tiene) → swap vacío. Bug del clic en vivo. #}
+  <aside class="wb-cola" id="wb-cola"{% if en_vivo %} hx-disinherit="*" hx-get="/workbench?rol={{ rol }}{% if carril_actual %}&carril={{ carril_actual }}{% endif %}{% if estado_wb %}&estado={{ estado_wb }}{% endif %}" hx-trigger="every 3s" hx-select="#wb-cola" hx-target="#wb-cola" hx-swap="outerHTML"{% endif %}>
+    <div class="wb-cola-head">
+      <span>Cola de casos</span><span class="nav-count">{{ nav_total }}</span>
+    </div>
+    <div class="wb-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> navegar · <kbd>Enter</kbd> radicar · <kbd>E</kbd> escalar</div>
+    <div class="wb-carriles">
+      {% for c in carriles %}
+      <a class="wb-carril {{ 'active' if carril_actual == c.key }}"
+         href="/workbench?rol={{ rol }}{% if carril_actual != c.key %}&carril={{ c.key }}{% endif %}"
+         aria-pressed="{{ 'true' if carril_actual == c.key else 'false' }}" title="{{ c.etiqueta }}">
+        <span aria-hidden="true">{{ c.icono }}</span> {{ c.etiqueta }}{% if c.key == 'rojo' %} <span class="badge-demo" title="Detección por heurística de texto — la extracción real de personas llega con M2">heurística</span>{% endif %} <span class="wb-carril-n">{{ c.count }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="wb-cola-list">
+      {% for f in filas %}
+      {# Tarjeta de cola simple (escaneo rápido): prioridad · tiempo · asegurado · tipo · alerta. Fase 0: se
+         quitaron placa/conteos/pct (eran mock) — menos ruido y más honestidad P7. Read-only (vive en la región
+         poleada): SOLO navegación; conserva data-caso-id para la persistencia de selección. #}
+      <a class="wb-cola-item row-link {{ 'active' if f.caso.id == caso_activo_id }}"
+         href="/workbench?rol={{ rol }}&caso_id={{ f.caso.id }}"
+         hx-get="/workbench/caso/{{ f.caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML"
+         data-caso-id="{{ f.caso.id }}" data-titulo="{{ f.clasificacion.tipo|replace('_',' ')|title }}"
+         data-hora="{{ f.hora }}" data-fraude="{{ f.senal_fraude or '' }}"
+         title="{{ f.carril.etiqueta }} — {{ f.carril.motivo }}">
+        <div class="wb-card-top">
+          <span class="chip chip-{{ f.prioridad.nivel|lower }}">{{ f.prioridad.nivel }}</span>
+          <span class="wb-card-hace mono">🕒 {{ f.hace }}</span>
+        </div>
+        <div class="wb-card-aseg">{{ f.resumen.asegurado }}</div>
+        <div class="wb-card-tipo">{{ f.clasificacion.tipo|replace('_',' ')|title }} <span class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</span></div>
+        {% if f.senal_fraude %}<div class="wb-card-flag">🕵️ {{ f.senal_fraude }}</div>{% endif %}
+      </a>
+      {% else %}
+      <div class="wb-empty">{% if filtrado %}No hay casos que coincidan con este filtro. <a href="/workbench?rol={{ rol }}">Ver todos</a>.{% else %}Sin casos en la cola. Entran automáticamente desde el correo.{% endif %}</div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  {# ── CENTRO + DERECHA · la historia del caso (swap HTMX) ── #}
+  <div class="wb-caso" id="wb-caso">
+    {% if detalle %}
+      {% include "workbench_caso.html" %}
+    {% else %}
+      <div class="wb-empty wb-caso-empty">Selecciona un caso de la cola para verlo aquí.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{# Fase 1 · Drawer raíz para lo secundario (evidencia, comparativa, actividad). FUERA de #wb-cola y #wb-caso →
+   inmune al auto-poll y al swap del caso. Se llena por HTMX y se abre con <dialog> nativo (JS mínimo, ADR-001). #}
+<dialog id="wb-drawer" class="wb-drawer" role="dialog" aria-label="Panel de detalle"></dialog>
+
+{# W20·A1: la Productividad del operador se movió a Reportes (`/panel`) — la Workbench es la estación de decisión,
+   enfocada solo en el caso y su siguiente acción (no en métricas de jornada). #}
+
+<script>
+  // W9 · JS mínimo (ADR-001): copia la firma compartida a las acciones antes del POST. El gate real es el
+  // servidor (usuario requerido, P1); esto es solo comodidad de UI. Delegado → funciona tras swaps HTMX.
+  document.addEventListener('submit', function(e){
+    var f = e.target.closest('.wb-firma-form'); if(!f) return;
+    var firmaEl = document.getElementById('wb-firma');
+    var firma = firmaEl ? firmaEl.value : '';
+    f.querySelectorAll('.wb-firma-in').forEach(function(i){ i.value = firma; });
+  });
+
+  // Fase 1 · Drawer: se abre cuando HTMX le mete contenido; se cierra con ✕, ESC (nativo <dialog>) o click fuera.
+  // ADR-001: JS SOLO de disclosure/navegación — el contenido y toda decisión son server-rendered.
+  (function(){
+    var drawer = document.getElementById('wb-drawer');
+    if(!drawer) return;
+    document.body.addEventListener('htmx:afterSwap', function(e){
+      if(e.target.id === 'wb-drawer' && e.target.children.length && !drawer.open){ drawer.showModal(); }
+      // al cambiar de caso (#wb-caso se re-renderiza), cierra el drawer para no mostrar contenido del caso anterior
+      else if(e.target.id === 'wb-caso' && drawer.open){ drawer.close(); }
+    });
+    drawer.addEventListener('click', function(e){ if(e.target === drawer){ drawer.close(); } });  // click en el backdrop
+  })();
+
+  // Persistencia de la selección: el caso activo se re-resalta tras cada refresco de la cola (cada 3s en vivo),
+  // así el resaltado de la cola SIEMPRE coincide con el caso mostrado en el centro (arregla "no renderiza lo mismo").
+  (function(){
+    var activo = null;
+    function marcar(id){
+      document.querySelectorAll('.wb-cola-item').forEach(function(e){
+        e.classList.toggle('active', e.getAttribute('data-caso-id') === id);
+      });
+    }
+    var pre = document.querySelector('.wb-cola-item.active');
+    if(pre){ activo = pre.getAttribute('data-caso-id'); }
+    document.addEventListener('click', function(e){
+      var item = e.target.closest('.wb-cola-item'); if(!item) return;
+      activo = item.getAttribute('data-caso-id'); marcar(activo);
+    });
+    document.body.addEventListener('htmx:afterSwap', function(){ if(activo) marcar(activo); });
+  })();
+
+  // W10 · Flujo teclado-first (ADR-001: solo navegación/atajos; el gate real es el servidor, P1).
+  (function(){
+    function items(){ return Array.prototype.slice.call(document.querySelectorAll('.wb-cola-item')); }
+    function go(delta){
+      var it = items(); if(!it.length) return false;
+      var cur = document.querySelector('.wb-cola-item.active');
+      var i = it.indexOf(cur);
+      var n = (i < 0) ? 0 : Math.max(0, Math.min(it.length - 1, i + delta));
+      it[n].click(); it[n].scrollIntoView({block:'nearest'}); return true;
+    }
+    function submitForm(sel){
+      var f = document.querySelector(sel); if(!f) return false;
+      var b = f.querySelector('button'); if(b && b.disabled) return false;
+      f.requestSubmit(); return true;
+    }
+    document.addEventListener('keydown', function(e){
+      if(e.target.matches('input, textarea, select')) return;  // no interferir al escribir la firma/nota
+      if(e.key === 'ArrowDown'){ if(go(1)) e.preventDefault(); }
+      else if(e.key === 'ArrowUp'){ if(go(-1)) e.preventDefault(); }
+      else if(e.key === 'Enter'){ if(submitForm('form[action$="/radicar"]')) e.preventDefault(); }  // solo si Radicar habilitado
+      else if(e.key === 'e' || e.key === 'E'){ if(submitForm('form[action$="/escalar"]')) e.preventDefault(); }
+    });
+  })();
+</script>
+{% endblock %}

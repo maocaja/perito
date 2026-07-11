@@ -9,6 +9,12 @@
   </div>
 </div>
 
+{# W20·A1: Productividad del operador (movida desde la Workbench). Reportes/Mi jornada del analista. #}
+{% if productividad %}
+<div class="section-label" style="margin-bottom:10px">Mi jornada (operador)</div>
+{% include "_productividad.html" %}
+{% endif %}
+
 {% set m = metricas %}
 {% set ns = namespace(nodos=0) %}
 {% for r in replays %}{% set ns.nodos = ns.nodos + r.trace_events|length %}{% endfor %}

@@ -33,6 +33,8 @@ from app.demo.seed import sembrar_traza_demo
 
 router = APIRouter(tags=["ingest"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent.parent / "dashboard" / "templates"))
+from app.dashboard import branding  # noqa: E402  (W16: marca/nav consistente con el dashboard)
+branding.registrar(_TEMPLATES)
 
 MAX_AVISO_CHARS = 5000
 
@@ -65,7 +67,8 @@ def crear_desde_texto(request: Request, aviso_texto: str = Form(...), rol: str =
         })
     get_caso_repository().save(resultado)
     get_replay_store().save(tracer, resultado.estado.value, resultado.motivo_escalamiento)
-    return RedirectResponse(f"/casos/{resultado.id}?rol={rol}", status_code=303)
+    # W20/A6: el caso recién creado aterriza en la Workbench (única superficie del operador), no en la bandeja vieja.
+    return RedirectResponse(f"/workbench?rol={rol}&caso_id={resultado.id}", status_code=303)
 
 
 @router.post("/nuevo/preset/{escenario}", response_class=HTMLResponse)
@@ -77,4 +80,5 @@ def crear_desde_preset(escenario: str, rol: str = Form(RolUsuario.ANALISTA.value
         raise HTTPException(status_code=404, detail=f"escenario desconocido: {escenario}")
     get_caso_repository().save(caso)
     sembrar_traza_demo(caso)
-    return RedirectResponse(f"/casos/{caso.id}?rol={rol}", status_code=303)
+    # W20/A6: el preset aterriza en la Workbench (única superficie del operador).
+    return RedirectResponse(f"/workbench?rol={rol}&caso_id={caso.id}", status_code=303)

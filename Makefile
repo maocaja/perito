@@ -32,7 +32,7 @@ help:  ## Muestra esta ayuda
 
 setup:  ## Crea el venv e instala las deps (idempotente)
 	python3 -m venv $(VENV)
-	$(PIP) install -e "./backend[obs,evals]"
+	$(PIP) install -e "./backend[dev,obs,evals]"
 	$(PIP) install "psycopg[binary]"
 	@echo "✓ Listo. Ahora: export tus claves (opcional) y corre 'make demo'."
 

@@ -16,6 +16,8 @@ from app.contracts.enums import EstadoCaso, RolUsuario
 from app.contracts.extraccion import AvisoNormalizado, ExtraccionValidada
 from app.contracts.dictamen import Dictamen, AlertaFraude
 from app.contracts.poliza import ResultadoPoliza
+from app.contracts.adjunto import Adjunto
+from app.contracts.correlacion import Correlacion
 
 
 class Caso(Contract):
@@ -34,9 +36,15 @@ class Caso(Contract):
     poliza_match: Optional[ResultadoPoliza] = None  # C4 rellena
     dictamen: Optional[Dictamen] = None  # C5 rellena
     alerta_fraude: Optional[AlertaFraude] = None  # C6 rellena (informativo)
-    
+    adjuntos: list[Adjunto] = Field(default_factory=list)  # M1: adjuntos leídos/redactados/huellados (P5)
+    correlaciones: list[Correlacion] = Field(default_factory=list)  # M3: overlay cross-fuente (informativo, P6)
+
     aprobado_por: Optional[str] = None  # Usuario que aprobó (solo HITL setea)
     motivo_escalamiento: Optional[str] = None  # Razón si REQUIERE_REVISION
+    # --- W9 acciones del operador (aditivo, NO terminal — P1). Todas opcionales → retro-compat ---
+    derivado_siu_por: Optional[str] = None   # 'Enviar a fraude' = routing SIU (no decide, no cambia estado)
+    nota_operador: Optional[str] = None      # 'Guardar borrador' (trabajo en curso)
+    solicitud_docs: Optional[str] = None     # 'Solicitar documentos' — borrador del pedido (envío mock)
     
     timestamp_creacion: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     timestamp_actualizacion: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

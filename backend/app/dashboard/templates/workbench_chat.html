@@ -1,0 +1,3 @@
+{# W15 · Un intercambio del copiloto (MOCK): pregunta del operador + respuesta guionada. Solo explica (P1/P6). #}
+{% if pregunta %}<div class="wb-chat-msg wb-chat-user">{{ pregunta|redact }}</div>{% endif %}
+<div class="wb-chat-msg wb-chat-ai"><span aria-hidden="true">🤖</span> {{ respuesta }}</div>

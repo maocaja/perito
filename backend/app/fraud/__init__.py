@@ -16,6 +16,7 @@ from .fraude import (
     construir_alerta_fraude,
 )
 from .cross_claim import (
+    combinar_alertas,
     construir_alerta_cross_claim,
     detectar_foto_reutilizada,
     detectar_frecuencia,
@@ -27,6 +28,7 @@ __all__ = [
     "detectar_inconsistencias_fraude",
     "calcular_severidad",
     "construir_alerta_fraude",
+    "combinar_alertas",
     "construir_alerta_cross_claim",
     "detectar_foto_reutilizada",
     "detectar_frecuencia",

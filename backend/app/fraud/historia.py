@@ -6,6 +6,7 @@ Requiere `PERSISTENCE=postgres` para historia real; con `memory` la historia = l
 """
 
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -98,18 +99,22 @@ class HuellaStore:
 
     def __init__(self) -> None:
         self._huellas: list[tuple[str, str]] = []  # (hash_hex, caso_id)
+        self._lock = threading.Lock()  # U10: el poller (hilo daemon) y el web/orquestador comparten el store
         if settings.persistence != "postgres":  # sin C1, la historia = la sesión (degrada, avisa — P7)
             logger.warning("HuellaStore in-memory (PERSISTENCE=%s); sin Postgres la historia no persiste.",
                            settings.persistence)
 
     def registrar(self, hash_hex: str, caso_id: str) -> None:
-        self._huellas.append((hash_hex, caso_id))
+        with self._lock:
+            self._huellas.append((hash_hex, caso_id))
 
     def buscar(self, hash_hex: str, distancia_max: int = 3,
                excluir_id: Optional[str] = None, limite: int = LIMITE_CONSULTA) -> list[tuple[str, int]]:
         """Casos con una huella a distancia ≤ `distancia_max` (foto reutilizada). Devuelve (caso_id, distancia)."""
         out: list[tuple[str, int]] = []
-        for h, cid in self._huellas:
+        with self._lock:  # U10: lectura consistente bajo escritura concurrente del poller
+            snapshot = list(self._huellas)
+        for h, cid in snapshot:
             if len(out) >= limite:  # P4
                 break
             if cid == excluir_id:
@@ -120,4 +125,27 @@ class HuellaStore:
         return sorted(out, key=lambda x: x[1])
 
     def clear(self) -> None:
-        self._huellas.clear()
+        with self._lock:
+            self._huellas.clear()
+
+
+# --- U10: accesor singleton del índice de huellas (patrón `set_poliza_store`) ---
+_huella_store_singleton: Optional["HuellaStore"] = None
+_singleton_lock = threading.Lock()
+
+
+def get_huella_store() -> "HuellaStore":
+    """Índice de huellas compartido (in-memory; degrada sin Postgres — P7). Thread-safe por doble chequeo."""
+    global _huella_store_singleton
+    if _huella_store_singleton is None:
+        with _singleton_lock:
+            if _huella_store_singleton is None:
+                _huella_store_singleton = HuellaStore()
+    return _huella_store_singleton
+
+
+def reset_huella_store() -> None:
+    """Resetea el singleton (tests / arranque limpio)."""
+    global _huella_store_singleton
+    with _singleton_lock:
+        _huella_store_singleton = None

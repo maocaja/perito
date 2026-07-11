@@ -22,6 +22,7 @@ from app.llm.verifier import call_c3_verifier_capa1, call_c3_verifier_capa2
 from app.policy.lookup import call_c4_policy_lookup
 from app.rules.motor_r1_r5 import motor_cobertura
 from app.fraud.fraude import construir_alerta_fraude
+from app.fraud.cross_claim import combinar_alertas
 
 # U9 — Umbral de baja fidelidad para disparar la re-extracción reflexiva C2↔C3 (P4-owned, explícito).
 # El loop re-extrae SOLO si confianza < este umbral Y hay ≥1 inconsistencia de campo. Configurable.
@@ -235,12 +236,17 @@ def orquestar_fnol(
                     break
             
             # --- C6: Fraude (real; informativo, NO escala — P1/P6) ---
+            # Capas 1-2 intra-caso + capa 4 cross-claim (U10). Ambas SOLO sugieren: jamás cambian estado ni
+            # deshabilitan la firma (P6). Fail-open: cualquier fallo aquí se registra y NO rompe el pipeline.
             if caso.alerta_fraude is None and caso.poliza_match and caso.poliza_match.poliza:
                 try:
-                    alerta = construir_alerta_fraude(caso.extraccion, caso.poliza_match.poliza)
+                    intra = construir_alerta_fraude(caso.extraccion, caso.poliza_match.poliza)
+                    cross = _alerta_cross_claim(caso)  # U10: capa 4 (frecuencia hoy; foto/co-ocurrencia latentes)
+                    alerta = combinar_alertas(intra, cross)
                     caso = caso.model_copy(update={"alerta_fraude": alerta})
                     if tracer:
-                        tracer.emit("c6_fraude", "Alerta emitida" if alerta else "Sin inconsistencias")
+                        capas = "+".join(c for c, a in (("intra", intra), ("cross-claim", cross)) if a)
+                        tracer.emit("c6_fraude", f"Alerta emitida ({capas})" if alerta else "Sin inconsistencias")
                 except Exception:
                     # Fraude no escala (informativo); solo se registra
                     if tracer:
@@ -275,6 +281,32 @@ def orquestar_fnol(
         if tracer:
             tracer.emit("orquestador", "Excepción no capturada", error=str(e))
         raise RuntimeError(f"Orquestador failed: {str(e)}") from e
+
+
+def _alerta_cross_claim(caso):
+    """U10: alerta cross-claim (capa 4). Frecuencia por póliza + foto reutilizada (M1: huella de adjunto real).
+    Informativa (P6): nunca cambia estado. Fail-open: None si no hay señal o algo falla.
+
+    Consultas acotadas (P4): `casos_por_poliza` y `HuellaStore.buscar` heredan sus cotas duras.
+    """
+    try:
+        from app.dashboard.store import get_caso_repository
+        from app.fraud.cross_claim import construir_alerta_cross_claim
+        from app.fraud.historia import get_huella_store
+        from app.intake.document_ai import hash_media_de
+
+        numero = None
+        if caso.extraccion:
+            numero = next((c.valor for c in caso.extraccion.campos
+                           if c.nombre == "numero_poliza" and not c.ausente), None)
+        # M1: huella de un adjunto real (foto) → activa la detección de foto reutilizada (antes latente).
+        hash_media = hash_media_de(getattr(caso, "adjuntos", None) or [])
+        return construir_alerta_cross_claim(
+            caso_id=caso.id, numero_poliza=numero, hash_media=hash_media,
+            repo=get_caso_repository(), huella_store=get_huella_store(),
+        )
+    except Exception:
+        return None  # fail-open: el fraude cross-claim nunca rompe el pipeline (P6/P4)
 
 
 def _critica_c3(verif) -> str:
