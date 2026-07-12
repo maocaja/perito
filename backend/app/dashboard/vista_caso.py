@@ -120,6 +120,22 @@ def senal_fraude(caso) -> str | None:
     return _SENAL_FRAUDE.get(tipo, "señal detectada")
 
 
+def razon_cola(caso) -> str:
+    """L4 · Razón OPERATIVA por la que el caso está en la cola — para elegir el siguiente sin abrirlo. El
+    fraude va aparte (su propio flag 🕵️); aquí: qué falta / cobertura / listo. Passive, no decide (P1)."""
+    falt = _faltantes(caso)
+    if falt:
+        extra = f" y {len(falt) - 1} más" if len(falt) > 1 else ""
+        return "Falta " + _LABEL_CAMPO.get(falt[0], falt[0]).lower() + extra
+    d = caso.dictamen
+    if d and d.resultado.value == "NO_CUBIERTO":
+        return "Cobertura no aplica"
+    est = caso.estado  # alias local del estado: comparación passive, nunca mutación
+    if est == EstadoCaso.LISTO_PARA_APROBAR:
+        return "Listo para revisar"
+    return ""
+
+
 # --------------------------------------- N · Visibilidad Tier-1 (todo determinístico, P7)
 
 _COB_TERMINAL = {"CUBIERTO", "CUBIERTO_PARCIAL", "NO_CUBIERTO"}
@@ -227,11 +243,27 @@ def checklist_documentos(caso) -> dict:
 
 # -------------------------------------------- U1 · Clasificación + Prioridad + Routing (passive)
 
+# L2 · Tipo de siniestro: código canónico (enum, el motor lo compara exacto — P2) → etiqueta HUMANA de display.
+# Se cambia solo lo que ve el operador; el valor del dato/campo sigue siendo el enum.
+_TIPO_LABEL = {
+    "AUTO_COLISION": "Colisión vehicular", "AUTO_HURTO": "Hurto de vehículo",
+    "HOGAR_AGUA": "Daño por agua (hogar)", "HOGAR_INCENDIO": "Incendio (hogar)",
+    "SOAT_GASTOS_MEDICOS": "SOAT · gastos médicos", "SOAT_INCAPACIDAD": "SOAT · incapacidad",
+}
+
+
+def _tipo_humano(valor) -> str:
+    """Etiqueta humana del tipo de siniestro (enum → legible); '—' si ausente. El enum no cambia (P2)."""
+    if not valor or valor == "—":
+        return "—"
+    return _TIPO_LABEL.get(valor, valor.replace("_", " ").capitalize())
+
+
 def clasificar(caso) -> dict:
-    """Producto (derivado del ramo) + tipo del siniestro. Passive; sin match → '—' (P7)."""
+    """Producto (derivado del ramo) + tipo del siniestro (código + etiqueta humana). Passive; sin match → '—'."""
     c = _campo(caso, "tipo_siniestro")
     tipo = (c.valor if c and not c.ausente else None) or "—"
-    return {"producto": ramo_de(caso), "tipo": tipo}
+    return {"producto": ramo_de(caso), "tipo": tipo, "tipo_humano": _tipo_humano(tipo)}
 
 
 def prioridad(caso) -> dict:
@@ -437,10 +469,16 @@ def explicacion_cobertura(caso) -> dict:
 
 def resumen_ejecutivo(caso) -> dict:
     """W19 · La historia del caso vía el **Summary Agent** (LLM), con fallback determinístico a W4.
-    {texto, origen}: origen="agente" (lo redactó el LLM) | "base" (plantilla W4). Rotulado en la UI (P7)."""
-    from app.llm.summary import call_summary_agent  # lazy: evita ciclo dashboard↔llm
-    texto, origen = call_summary_agent(caso)
-    return {"texto": texto, "origen": origen}
+    {texto, origen}: origen="agente" (lo redactó el LLM) | "base" (plantilla W4). Rotulado en la UI (P7).
+
+    El Summary Agent (LLM) solo corre en modo `real`; en `deterministic`/`off` usa la historia determinística
+    (W4) DIRECTO — sin llamar a la API (respeta el modo: cero costo/latencia/ruido, no un fallback por error)."""
+    from app.config import settings
+    if settings.demo_live == "real":
+        from app.llm.summary import call_summary_agent  # lazy: evita ciclo dashboard↔llm
+        texto, origen = call_summary_agent(caso)
+        return {"texto": texto, "origen": origen}
+    return {"texto": resumen_narrativo(caso), "origen": "base"}
 
 
 def health_check(caso, traza) -> dict:
@@ -451,18 +489,18 @@ def health_check(caso, traza) -> dict:
     for nombre in CAMPOS:
         c = _campo(caso, nombre)
         ok = c is not None and not c.ausente and c.valor is not None
-        checks.append({"label": nombre.replace("_", " ").capitalize(),
+        checks.append({"label": _LABEL_CAMPO.get(nombre, nombre.replace("_", " ").capitalize()),  # L2: label humano
                        "estado": "ok" if ok else "warn",
                        "detalle": "capturado" if ok else "falta", "demo": False})
     verif = hallazgos_verificador(caso, traza)
-    checks.append({"label": "Verificación de fidelidad",
+    checks.append({"label": "Coincidencia entre fuentes",
                    "estado": "ok" if verif["disponible"] else "na",
                    "detalle": f"confianza {verif['confianza']:.2f}" if verif["disponible"] else "no aplica (modo determinístico)",
                    "demo": False})
     d = caso.dictamen
     # Honesto (P7): solo CUBIERTO es ✔; PARCIAL/NO_CUBIERTO/REQUIERE se muestran ⚠ (no un falso 'todo bien').
     _cob_estado = {"CUBIERTO": "ok"}.get(d.resultado.value, "warn") if d else "warn"
-    checks.append({"label": "Cobertura dictaminada", "estado": _cob_estado,
+    checks.append({"label": "Resultado de cobertura", "estado": _cob_estado,
                    "detalle": _label_cobertura(d) if d else "pendiente de datos", "demo": False})
     for it in checklist_documentos(caso)["docs"]:  # M1: los adjuntos reales del caso alimentan el checklist
         if it["presente"] is True:                 # hay un adjunto que lo satisface → ✔ real (cuenta al %)
@@ -482,20 +520,20 @@ def resumen_narrativo(caso) -> str:
     """
     aseg = asegurado_de(caso)
     cl = clasificar(caso)
-    tipo = cl["tipo"].replace("_", " ").lower() if cl["tipo"] != "—" else "un siniestro"
+    tipo = cl["tipo_humano"].lower() if cl["tipo"] != "—" else "un siniestro"   # L2: tipo humano, no el enum
     # P5 defensa en profundidad: el view-model devuelve prosa YA redactada (no depender solo del |redact
     # del template). `_red` es no-op para el nombre demo, pero blinda el path real (M2) y el monto.
     partes = [f"{_red(aseg['nombre'])} reportó {tipo} ({cl['producto']})."]
     m = _campo(caso, "monto_reclamado")
     if m and not m.ausente and m.valor:
-        partes.append(f"Monto reclamado: {_red(str(m.valor))}.")
-    if caso.dictamen:
+        partes.append(f"Valor de la reclamación: {_red(str(m.valor))}.")
+    if caso.dictamen:  # P2: el resumen CITA el veredicto del motor (resultado + regla)
         partes.append(f"Cobertura: {_label_cobertura(caso.dictamen)} (regla {caso.dictamen.regla_aplicada}).")
     if caso.alerta_fraude:
         partes.append(f"Hay una señal de riesgo ({caso.alerta_fraude.severidad}) para revisar.")
     falt = faltantes(caso)
     if falt:
-        partes.append("Falta: " + ", ".join(falt) + ".")
+        partes.append("Falta: " + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt) + ".")
     texto = " ".join(partes)
     if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):  # P1 fail-closed
         return "Resumen no disponible; revisa el caso y decide (P1)."
@@ -526,11 +564,37 @@ class CampoUI:
 # cédula/lesionados) mapean a las MISMAS etiquetas que los demos de `_CAMPOS_RICOS`, así un real desplaza al mock.
 _LABEL_CAMPO = {
     "numero_poliza": "Póliza", "fecha_siniestro": "Fecha del evento",
-    "tipo_siniestro": "Tipo de siniestro", "monto_reclamado": "Monto reclamado",
+    "tipo_siniestro": "Tipo de siniestro", "monto_reclamado": "Valor de la reclamación",
     "asegurado_nombre": "Asegurado", "placa": "Placa",
     "vehiculo": "Vehículo", "lugar": "Lugar", "telefono": "Teléfono",
     "asegurado_cedula": "Cédula", "lesionados": "Lesionados",
 }
+
+
+def label_campo(nombre: str) -> str:
+    """Etiqueta humana de un campo — FUENTE ÚNICA (la comparten la Workbench y el panel vía filtro Jinja,
+    para que un mismo campo se llame igual en todas las superficies)."""
+    return _LABEL_CAMPO.get(nombre, nombre.replace("_", " ").capitalize())
+
+
+# Estado del caso → etiqueta humana. FUENTE ÚNICA (Workbench y panel dicen lo mismo de cada estado).
+_ESTADO_LABEL = {
+    "LISTO_PARA_APROBAR": "Listo para firmar", "REQUIERE_REVISION": "Necesita revisión",
+    "APROBADO": "Aprobado", "RECHAZADO": "Rechazado", "RECIBIDO": "Recibido",
+    "EN_PROCESO": "En proceso", "EN_REVISION": "En revisión",
+}
+
+
+def label_estado(estado) -> str:
+    """Etiqueta humana de un estado (fuente única compartida vía filtro Jinja)."""
+    v = estado.value if hasattr(estado, "value") else estado
+    return _ESTADO_LABEL.get(v, str(v).replace("_", " ").capitalize())
+
+
+def label_cobertura(valor) -> str:
+    """Etiqueta humana de un resultado de cobertura (fuente única; usa `_COBERTURA_LABEL`, definido abajo)."""
+    v = valor.value if hasattr(valor, "value") else valor
+    return _COBERTURA_LABEL.get(v, v)
 # Tipo de evidencia → fuente legible (P3: cada dato dice de dónde viene).
 _FUENTE_LEGIBLE = {
     TipoOrigen.SPAN: "Correo", TipoOrigen.PAGINA: "PDF", TipoOrigen.REGION: "Imagen",
@@ -587,7 +651,9 @@ def campos_extraidos(caso) -> list[CampoUI]:
             corr = overlay.get(c.nombre)
             confianza = corr.confianza_ajustada if corr else c.confianza
             clase = "validado" if (corr and corr.coincide) else "extraido"
-            reales.append(CampoUI(label=label, valor=_valor_operador(c.valor), confianza=confianza,
+            # L2: el Tipo se muestra humano ("Colisión vehicular"); el valor del dato sigue siendo el enum (P2).
+            valor = _tipo_humano(c.valor) if c.nombre == "tipo_siniestro" else _valor_operador(c.valor)
+            reales.append(CampoUI(label=label, valor=valor, confianza=confianza,
                                   fuente=_fuente_de(c.origen), origen="real", clase=clase))
             labels_reales.add(label)
     demo = [CampoUI(label=lbl, valor=_valor_operador(gen(caso)), confianza=conf, fuente=fte, origen="demo")
@@ -696,7 +762,7 @@ def confianza_riesgo(caso, traza) -> list[dict]:
     return [
         # Extracción = completitud de campos (la confianza por campo va en la tabla, no aquí).
         {"label": "Extracción", "valor": f"{len(presentes)} / {len(CAMPOS)} campos", "nivel": "ok" if not falt else "warn"},
-        {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "n/d", "nivel": verif["nivel"]},
+        {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "No disponible", "nivel": verif["nivel"]},
         {"label": "Fraude", "valor": (fr.severidad if fr else "sin señales"), "nivel": ("bad" if fr and fr.severidad == "ALTA" else ("warn" if fr else "ok"))},
         {"label": "Cobertura", "valor": _label_cobertura(d), "nivel": _nivel_cobertura(d)},
     ]
@@ -711,7 +777,7 @@ _COBERTURA_LABEL = {
 
 
 def _label_cobertura(d) -> str:
-    return _COBERTURA_LABEL.get(d.resultado.value, d.resultado.value) if d else "n/d"
+    return _COBERTURA_LABEL.get(d.resultado.value, d.resultado.value) if d else "No disponible"
 
 
 def _nivel_cobertura(d) -> str:
@@ -729,8 +795,28 @@ def _nivel_cobertura(d) -> str:
 
 # ---------------------------------------------------- D · Recomendación (P1-safe)
 
+def _accion_primaria(caso, faltantes) -> dict | None:
+    """L1 · La ÚNICA acción primaria por estado (recomendación == acción). 🔒P1: solo Radicar alcanza terminal
+    (con firma); en estado bloqueado la primaria NO es terminal (solicitar / enviar a revisión). None = sin
+    primaria (caso resuelto). {label, endpoint, kind, confirm, motivo}."""
+    est = caso.estado
+    if est in _TERMINALES:
+        return None
+    if est == EstadoCaso.REQUIERE_REVISION:
+        if faltantes:
+            return {"label": "Solicitar al asegurado", "endpoint": "solicitar_docs", "kind": "primary",
+                    "confirm": None, "motivo": None}
+        return {"label": "Enviar a revisión especializada", "endpoint": "escalar", "kind": "primary",
+                "confirm": "¿Enviar a revisión especializada?", "motivo": "Enviado a revisión especializada"}
+    if est == EstadoCaso.LISTO_PARA_APROBAR:   # explícito: Radicar SOLO aquí (un estado nuevo → sin primaria)
+        return {"label": "Radicar caso", "endpoint": "radicar", "kind": "go",
+                "confirm": "¿Radicar este caso? Se creará el expediente con tu firma.", "motivo": None}
+    return None
+
+
 def recomendacion(caso) -> dict:
-    """Próximo paso del HUMANO. NUNCA decide (P1): no contiene PALABRAS_PROHIBIDAS ni estado terminal."""
+    """Próximo paso del HUMANO. NUNCA decide (P1): no contiene PALABRAS_PROHIBIDAS ni estado terminal.
+    Incluye `accion`: la ÚNICA acción primaria del estado (L1: recomendación == acción)."""
     faltantes = _faltantes(caso)
     est = caso.estado  # var local: comparación de enum sin el patrón de mutación (passive)
     if est in _TERMINALES:
@@ -739,10 +825,15 @@ def recomendacion(caso) -> dict:
     elif est == EstadoCaso.REQUIERE_REVISION:
         if faltantes:
             n = len(faltantes)
-            titulo = ("Falta 1 dato para poder dictaminar este caso" if n == 1
-                      else f"Faltan {n} datos para poder dictaminar este caso")
-            rec = {"icono": "📝", "titulo": titulo,
-                   "texto": f"El copiloto no pudo completar: falta {', '.join(faltantes)}. Sugerencia: pídelo al asegurado antes de decidir.", "tono": "warn"}
+            humanos = [_LABEL_CAMPO.get(f, f).lower() for f in faltantes]   # L2: nombres humanos, no crudos
+            if n == 1:
+                titulo = f"Falta un dato: {humanos[0]}"   # neutral de género (sirve para monto/fecha/…)
+                texto = ("Este dato no se encontró en el correo ni en los documentos. Solicítalo al "
+                         "asegurado o ingrésalo abajo si ya lo conoces.")
+            else:
+                titulo = f"Faltan {n} datos para evaluar el caso"
+                texto = (f"No se encontraron: {', '.join(humanos)}. Solicítalos al asegurado o ingrésalos abajo.")
+            rec = {"icono": "📝", "titulo": titulo, "texto": texto, "tono": "warn"}
         else:
             rec = {"icono": "🔎", "titulo": "Verifica la póliza",
                    "texto": "No se encontró la póliza referida. Verifícala antes de decidir.", "tono": "warn"}
@@ -753,9 +844,12 @@ def recomendacion(caso) -> dict:
         else:
             rec = {"icono": "✅", "titulo": "Listo para tu firma",
                    "texto": "El copiloto preparó el dictamen citando la cláusula. Revísalo y fírmalo — la decisión es tuya (P1).", "tono": "ok"}
-    # P1 fail-closed: si por algún cambio se colara una palabra de decisión, se degrada a texto neutro.
-    if any(p in rec["texto"].lower() or p in rec["titulo"].lower() for p in PALABRAS_PROHIBIDAS):
+    # P1 fail-closed: si por algún cambio se colara una palabra de decisión, se degrada a texto neutro Y se
+    # anula la acción primaria (que decida el humano a mano, sin un botón que no case con el texto degradado).
+    degradado = any(p in rec["texto"].lower() or p in rec["titulo"].lower() for p in PALABRAS_PROHIBIDAS)
+    if degradado:
         rec = {"icono": "🧑‍⚖️", "titulo": "Decisión humana requerida", "texto": "Revisa el caso y decide (P1).", "tono": "neutral"}
+    rec["accion"] = None if degradado else _accion_primaria(caso, faltantes)  # L1: la única primaria del estado
     return rec
 
 
@@ -776,7 +870,7 @@ def checklist_aprobacion(caso, traza) -> list[dict]:
         {
             # `na` (no aplica): en modo determinístico/preset no hay verificación adversarial; no es un
             # requisito pendiente que vaya a llegar, así que se muestra neutro, no como bloqueo.
-            "label": "Verificación de fidelidad",
+            "label": "Coincidencia entre fuentes",
             "ok": verif["disponible"],
             "na": not verif["disponible"],
             "detalle": f"confianza {verif['confianza']:.2f}" if verif["disponible"] else "no aplica (modo determinístico)",
@@ -788,7 +882,7 @@ def checklist_aprobacion(caso, traza) -> list[dict]:
             "detalle": f"{len(presentes)} / {len(CAMPOS)} campos" if not falt else f"faltan {len(falt)}",
         },
         {
-            "label": "Cobertura dictaminada",
+            "label": "Resultado de cobertura",
             "ok": cobertura_ok,
             "na": False,
             "detalle": _label_cobertura(d) if d else "pendiente de datos",

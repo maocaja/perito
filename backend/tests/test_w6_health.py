@@ -34,11 +34,11 @@ def test_campos_presentes_ok_ausentes_warn():
     caso = _un_caso()
     checks = vista_caso.health_check(caso, traza=None)["checks"]
     labels = {c["label"]: c for c in checks}
-    # numero_poliza suele estar presente en el seed → ok
-    assert labels["Numero poliza"]["estado"] in ("ok", "warn")
+    # numero_poliza suele estar presente en el seed → ok (L2: label humano "Póliza")
+    assert labels["Póliza"]["estado"] in ("ok", "warn")
     # coherencia: un campo presente es ok, uno ausente es warn
     for n in vista_caso._presentes(caso):
-        assert labels[n.replace("_", " ").capitalize()]["estado"] == "ok"
+        assert labels[vista_caso._LABEL_CAMPO.get(n, n.replace("_", " ").capitalize())]["estado"] == "ok"
 
 
 def test_docs_rotulados_demo_y_no_cuentan_al_pct():
@@ -65,13 +65,13 @@ def test_cobertura_parcial_es_warn_no_ok():
             pytest.skip("sin dictamen con cláusula para construir el caso")
         caso = base.model_copy(update={"dictamen": base.dictamen.model_copy(
             update={"resultado": ResultadoCobertura.CUBIERTO_PARCIAL})})
-    cob = next(c for c in vista_caso.health_check(caso, None)["checks"] if c["label"] == "Cobertura dictaminada")
+    cob = next(c for c in vista_caso.health_check(caso, None)["checks"] if c["label"] == "Resultado de cobertura")
     assert cob["estado"] == "warn"
 
 
 def test_verificacion_na_sin_traza():
     checks = vista_caso.health_check(_un_caso(), traza=None)["checks"]
-    verif = next(c for c in checks if c["label"] == "Verificación de fidelidad")
+    verif = next(c for c in checks if c["label"] == "Coincidencia entre fuentes")
     assert verif["estado"] in ("ok", "na")
 
 

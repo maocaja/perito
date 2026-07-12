@@ -43,10 +43,10 @@ def _caso_revision():
 # W20/A6+A7: la decisión vive en el panel de la Workbench. 'Radicar caso' (→APROBADO) está deshabilitado salvo
 # LISTO_PARA_APROBAR; 'Rechazar siniestro' (→RECHAZADO) está disponible mientras el caso no sea terminal (P1).
 
-def test_radicar_deshabilitado_si_no_listo(client):
-    """REQUIERE_REVISION → 'Radicar caso' trae `disabled`."""
+def test_radicar_no_ofrecido_si_no_listo(client):
+    """REQUIERE_REVISION → 'Radicar caso' NO se ofrece (L1: la primaria es otra acción NO terminal)."""
     html = client.get(f"/workbench/caso/{_caso_revision().id}").text
-    assert "disabled>Radicar caso" in html
+    assert "Radicar caso" not in html
 
 
 def test_radicar_habilitado_si_listo(client):
@@ -123,7 +123,7 @@ def test_checklist_completo_en_caso_listo(client):
     caso = _caso_listo()
     items = {i["label"]: i for i in vista_caso.checklist_aprobacion(caso, get_replay_store().load(caso.id))}
     assert items["Datos del siniestro completos"]["ok"] is True
-    assert items["Cobertura dictaminada"]["ok"] is True
+    assert items["Resultado de cobertura"]["ok"] is True
 
 
 # ---------- P7: sin datos del prototipo ----------
@@ -139,8 +139,13 @@ def test_detalle_sin_literales_del_prototipo(client):
 
 def test_banner_titulo_refleja_conteo_faltantes(client):
     """El banner titula 'Falta(n) N dato(s)…' (copy del prototipo, con el conteo real)."""
-    rec = vista_caso.recomendacion(_caso_revision())
-    assert "dato" in rec["titulo"].lower() and "dictaminar" in rec["titulo"].lower()
+    caso = _caso_revision()
+    rec = vista_caso.recomendacion(caso)
+    falt = vista_caso.faltantes(caso)
+    # L2: el banner nombra el dato faltante en HUMANO (sin "dictaminar" ni el nombre técnico crudo)
+    label_humano = vista_caso._LABEL_CAMPO.get(falt[0], falt[0]).lower()
+    assert label_humano in rec["titulo"].lower()
+    assert "dictaminar" not in rec["titulo"].lower() and falt[0] not in rec["titulo"]
     assert rec["tono"] == "warn"
 
 
@@ -148,7 +153,7 @@ def test_caso_usa_etiquetas_humanas(client):
     """La tabla de datos del caso muestra etiquetas humanas ('Póliza', 'Monto reclamado'), no el nombre técnico."""
     html = client.get(f"/workbench/caso/{_caso_revision().id}").text
     assert "Póliza" in html
-    assert "Monto reclamado" in html
+    assert "Valor de la reclamación" in html   # L2: label humano y consistente (antes "Monto reclamado")
 
 
 def test_strip_extraccion_muestra_completitud(client):
@@ -191,7 +196,7 @@ def test_cobertura_humanizada_en_tira(client):
 def test_checklist_verificacion_na_no_bloquea(client):
     """En modo determinístico la verificación es 'no aplica' (na), no un pendiente que nunca llega."""
     items = {i["label"]: i for i in vista_caso.checklist_aprobacion(_caso_listo(), None)}
-    verif = items["Verificación de fidelidad"]
+    verif = items["Coincidencia entre fuentes"]
     assert verif["na"] is True and verif["ok"] is False
     assert "no aplica" in verif["detalle"]
 

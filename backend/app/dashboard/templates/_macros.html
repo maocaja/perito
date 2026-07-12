@@ -1,16 +1,15 @@
 {# Badges semánticos — mapean estado/dictamen/fraude a los kinds del design system
    (equivalente a estadoMeta/dictMeta/fraudeMeta del diseño original). #}
 
+{# L2 · el kind (color) es presentación local; la ETIQUETA sale de la fuente única (filtros label_*). #}
 {% macro estado_badge(estado, lg=false) %}
 {%- set k = {'LISTO_PARA_APROBAR':'info','REQUIERE_REVISION':'warn','APROBADO':'ok','RECHAZADO':'bad','RECIBIDO':'neutral','EN_PROCESO':'neutral'}.get(estado,'neutral') -%}
-{%- set l = {'LISTO_PARA_APROBAR':'Listo para decisión','REQUIERE_REVISION':'Requiere revisión','APROBADO':'Aprobado','RECHAZADO':'Rechazado','RECIBIDO':'Recibido','EN_PROCESO':'En proceso'}.get(estado,estado) -%}
-<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ l }}</span>
+<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ estado|label_estado }}</span>
 {%- endmacro %}
 
 {% macro dict_badge(resultado, lg=false) %}
 {%- set k = {'CUBIERTO':'ok','CUBIERTO_PARCIAL':'warn','NO_CUBIERTO':'bad','REQUIERE_REVISION':'warn'}.get(resultado,'neutral') -%}
-{%- set l = {'CUBIERTO':'Cubierto','CUBIERTO_PARCIAL':'Cubierto parcial','NO_CUBIERTO':'No cubierto','REQUIERE_REVISION':'Requiere revisión'}.get(resultado,resultado) -%}
-<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ l }}</span>
+<span class="badge k-{{ k }}{{ ' badge-lg' if lg }}"><span class="dot"></span>{{ resultado|label_cobertura }}</span>
 {%- endmacro %}
 
 {% macro fraude_badge(severidad) %}
@@ -18,10 +17,9 @@
 <span class="badge k-{{ k }}"><span class="dot"></span>{{ severidad|capitalize }}</span>
 {%- endmacro %}
 
-{# Nombre técnico de campo → etiqueta humana (para la tabla de datos del siniestro). #}
-{% macro campo_label(nombre) %}
-{%- set l = {'numero_poliza':'N.º de póliza','fecha_siniestro':'Fecha del siniestro','tipo_siniestro':'Tipo de siniestro','monto_reclamado':'Monto reclamado'}.get(nombre, nombre) -%}{{ l }}
-{%- endmacro %}
+{# Nombre técnico de campo → etiqueta humana. FUENTE ÚNICA: el filtro `label_campo` (vista_caso._LABEL_CAMPO),
+   para que el panel y la Workbench nombren igual cada campo (L2, sin mapa duplicado). #}
+{% macro campo_label(nombre) %}{{ nombre|label_campo }}{% endmacro %}
 
 {# Evidencia de un campo, legible. El extractor real y los presets usan referencias técnicas
    ('extracted from redacted_texto', 'span:campo') que se ven como debug → se muestran como

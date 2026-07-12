@@ -365,6 +365,19 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-card-pol { font-size:11.5px; color:var(--text-3); margin-top:2px; }
 .wb-card-counts { display:flex; gap:12px; margin-top:8px; font-size:11.5px; color:var(--text-2); font-variant-numeric:tabular-nums; }
 .wb-card-pct { color:var(--ok); font-weight:700; margin-left:auto; }
+.wb-card-razon { margin-top:5px; font-size:11.5px; color:var(--text-3); }  /* L4 · razón operativa */
+
+/* L5 · Confirmación fuerte tras acción terminal (radicado/rechazado). */
+.wb-confirm { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:12px 0;
+  padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); }
+.wb-confirm.nivel-ok { border-color:var(--go-strong); background:color-mix(in srgb, var(--go) 8%, var(--surface)); }
+.wb-confirm-title { font-weight:700; font-size:var(--fs-body); }
+.wb-confirm-sub { font-size:var(--fs-sm); color:var(--text-2); margin-top:2px; }
+/* L5 · Estado de carga del recálculo inline (HTMX): 'Guardando…' visible durante la request. */
+.htmx-indicator { display:none; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display:inline-block; }
+.wb-guardando { margin-left:10px; font-size:var(--fs-sm); color:var(--text-2); }
+.htmx-request .btn-primary { opacity:.55; pointer-events:none; }
 .wb-card-flag { margin-top:7px; font-size:11px; color:var(--warn); }
 
 /* Centro · historia */
@@ -618,6 +631,29 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-ev-doc { background:var(--sunken); border:1px solid var(--border); border-radius:8px; padding:14px; }
 .wb-ev-page { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:4px;
   height:220px; padding:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
+/* L2 · Divulgación de lo técnico (regla/motor): calma, a un click — encode-not-hide (no borrado). */
+.wb-tech { margin-top:4px; }
+.wb-tech > summary { font-size:var(--fs-xs); color:var(--text-3); cursor:pointer; list-style:none; }
+.wb-tech > summary::-webkit-details-marker { display:none; }
+.wb-tech > summary::before { content:"› "; }
+.wb-tech[open] > summary::before { content:"⌄ "; }
+
+/* L3 · "Más acciones": las secundarias no compiten con la primaria; disclosure calmo (todo sigue disponible). */
+.wb-mas { margin-top:6px; }
+.wb-mas > summary { font-size:var(--fs-sm); color:var(--text-2); cursor:pointer; padding:7px 2px; list-style:none; user-select:none; border-radius:6px; }
+.wb-mas > summary:hover { color:var(--text); background:var(--sunken); }
+.wb-mas > summary::-webkit-details-marker { display:none; }
+.wb-mas > summary::after { content:" ▾"; color:var(--text-3); }
+.wb-mas[open] > summary::after { content:" ▴"; }
+.wb-mas[open] { border-top:1px solid var(--border); margin-top:8px; padding-top:6px; }
+
+/* L3 · "Ver todas las verificaciones": completadas/na plegadas; pendientes quedan a la vista. */
+.wb-hc-more { margin-top:6px; }
+.wb-hc-more > summary { font-size:var(--fs-xs); color:var(--text-3); cursor:pointer; list-style:none; padding:3px 0; }
+.wb-hc-more > summary::-webkit-details-marker { display:none; }
+.wb-hc-more > summary::after { content:" ▾"; }
+.wb-hc-more[open] > summary::after { content:" ▴"; }
+
 .wb-ev-media { max-width:100%; max-height:62vh; border-radius:4px; display:block; box-shadow:var(--shadow-sm); }  /* imagen real */
 embed.wb-ev-media { width:100%; height:62vh; }  /* PDF real embebido */
 .wb-ev-line { height:7px; background:var(--sunken); border-radius:3px; margin-bottom:11px; }

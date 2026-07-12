@@ -43,6 +43,10 @@ branding.registrar(_TEMPLATES)
 _TEMPLATES.env.filters["icono_tipo"] = _documentos.icono_de
 # Demo: URL del asset real (foto/PDF) de un documento si existe en `demo_assets/`; None → mock (P5).
 _TEMPLATES.env.filters["asset_url"] = _demo_assets.url_de
+# L2: etiquetas humanas — FUENTE ÚNICA compartida (Workbench y panel), sin mapas duplicados.
+_TEMPLATES.env.filters["label_campo"] = vista_caso.label_campo
+_TEMPLATES.env.filters["label_estado"] = vista_caso.label_estado
+_TEMPLATES.env.filters["label_cobertura"] = vista_caso.label_cobertura
 
 # Tasa blended ESTIMADA (Haiku ~$1/$5, Sonnet ~$3/$15 in/out por 1M) — NO facturable, solo orientativa.
 COSTO_USD_POR_1M_TOKENS = 8.0
@@ -189,6 +193,7 @@ def _cola_filas(rol: str):
         "hace": _tiempo_relativo(c.timestamp_actualizacion, ahora),
         "ramo": vista_caso.ramo_de(c),
         "senal_fraude": vista_caso.senal_fraude(c),
+        "razon": vista_caso.razon_cola(c),            # L4: razón operativa (para elegir sin abrir)
         "prioridad": vista_caso.prioridad(c),
         "clasificacion": vista_caso.clasificar(c),
         "carril": vista_caso.clasificador_cola(c),   # W8: carril por razón

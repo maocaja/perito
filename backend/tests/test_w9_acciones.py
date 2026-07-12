@@ -116,7 +116,7 @@ def test_guardar_borrador_no_cambia_estado(client):
 
 def test_workbench_muestra_acciones(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    for accion in ("Radicar caso", "Escalar a fraude", "Escalar a revisión", "Solicitar documentos", "Guardar"):
+    for accion in ("Radicar caso", "Enviar a análisis de irregularidades", "Enviar a revisión especializada", "Solicitar documentos", "Guardar"):
         assert accion in r.text
 
 

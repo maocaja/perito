@@ -35,7 +35,9 @@ def test_recomendacion_terminal_nunca_decide():
 def test_recomendacion_faltantes_pide_el_dato():
     caso = construir_caso_preset("campos-faltantes")
     rec = vista_caso.recomendacion(caso)
-    assert "monto_reclamado" in rec["texto"]
+    # L2: nombra el dato faltante en HUMANO ("valor de la reclamación"), no el nombre técnico crudo
+    assert "valor de la reclamación" in (rec["titulo"] + " " + rec["texto"]).lower()
+    assert "monto_reclamado" not in (rec["titulo"] + rec["texto"])
     assert rec["tono"] == "warn"
 
 

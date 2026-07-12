@@ -51,7 +51,7 @@ def test_a2_bloqueado_muestra_hero_con_campo_editable(client):
     if caso is None:
         pytest.skip("no hay caso REQUIERE_REVISION sembrado")
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "Necesitas revisar" in html
+    assert "Necesita revisión" in html   # L1: el banner lo dice una vez (sin repetir "Necesitas revisar —")
     assert f'hx-post="/workbench/corregir/{caso.id}"' in html   # el campo editable posta a la corrección
     assert 'name="usuario"' in html and "required" in html      # firma obligatoria embebida (P1)
     # mutuamente excluyente: el colapsable "Corregir datos" (vía de un caso LISTO) NO aparece aquí
@@ -135,7 +135,7 @@ def test_a5_un_solo_bloque_estado_operativo(client):
     assert 'data-slot="estado"' in html
     # las tarjetas separadas ya no existen (se fusionaron)
     assert 'data-slot="health"' not in html and 'data-slot="dictamen"' not in html
-    assert "Cobertura · por qué" in html and "no el LLM (P2)" in html   # P2 intacto (presenta el motor)
+    assert "Cobertura · por qué" in html and "no el LLM" in html   # P2 intacto: el motor sigue presente (en "Ver regla aplicada")
     assert re.search(r"\d+ de \d+ verificaciones", html)               # barra "N de M" (health sin %)
 
 
@@ -173,8 +173,8 @@ def test_encode_not_hide_muestra_pct_incluso_al_100(client):
     caso = caso.model_copy(update={"extraccion": caso.extraccion.model_copy(update={"campos": campos_100})})
     get_caso_repository().save(caso)
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "100%" in html                       # confianza alta VISIBLE, no oculta
-    assert "wb-conf-pct" in html
+    assert "100%" in html                       # encode-not-hide: el % sigue en el DOM aunque sea 100%
+    assert "confianza 100%" in html             # (en el title del campo — presente + accesible + hover)
 
 
 def test_encode_not_hide_timeline_no_colapsa(client):
