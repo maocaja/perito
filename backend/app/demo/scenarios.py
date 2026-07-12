@@ -132,7 +132,8 @@ def construir_caso_preset(escenario: str) -> Caso:
         return armar_caso(
             "Reporto un choque AUTO_COLISION. Póliza POL-DEMO-1001. Daños por $5.000.000.",
             extraccion_demo(numero="POL-DEMO-1001", monto="5000000"),
-            poliza_demo(numero="POL-DEMO-1001", suma="100000000"),
+            # deducible 0 → CUBIERTO pleno (paridad con demo_run: mismo dictamen en real y deterministic).
+            poliza_demo(numero="POL-DEMO-1001", suma="100000000", deducible="0"),
         )
     if escenario == "fraude":
         return armar_caso(

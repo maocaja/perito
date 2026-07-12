@@ -253,6 +253,11 @@ PII has been redacted for privacy; extract only the operational fields that are 
 
 {additional_context}
 
+For `tipo_siniestro`, you MUST map the incident to EXACTLY ONE of these canonical codes
+(the deterministic coverage engine matches this value verbatim — free text will not match):
+AUTO_COLISION, AUTO_HURTO, HOGAR_AGUA, HOGAR_INCENDIO, SOAT_GASTOS_MEDICOS, SOAT_INCAPACIDAD.
+If the incident fits none, set `tipo_siniestro` ausente=true (do NOT invent a code).
+
 For each field, provide: nombre, valor, confianza (0-1), ausente (true if not found/unclear).
 Return JSON array of extracted fields.
 """

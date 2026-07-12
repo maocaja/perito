@@ -173,13 +173,12 @@ def test_adjuntos_del_correo_roundtrip():
 
 
 def test_adjuntos_demo_fraude_diverge():
-    """El generador de demo produce placas divergentes en 'fraude' (para el 'aha' de M3) y foto compartida."""
-    from demo_mail import _adjuntos_demo, _FOTO_COMPARTIDA
+    """El generador de demo produce placas divergentes en 'fraude' (el 'aha' de M3): la denuncia dice GHT456
+    y el SOAT GHT457. (Las fotos ahora son REALES por escenario — `demo_assets/` — así que la señal de fraude
+    vive en la divergencia de placa + monto, no en una foto compartida; el fallback sintético compartido solo
+    aplica si faltan los archivos de foto.)"""
+    from demo_mail import _adjuntos_demo
     adj_fraude = dict(_adjuntos_demo("fraude"))
-    adj_feliz = dict(_adjuntos_demo("feliz"))
-    # foto compartida (mismos bytes) → foto reutilizada al segundo correo
-    assert adj_fraude["foto_siniestro.jpg"] == adj_feliz["foto_siniestro.jpg"] == _FOTO_COMPARTIDA
-    # en 'fraude' la denuncia y el SOAT llevan placas distintas
     assert b"GHT456" in adj_fraude["denuncia.txt"] and b"GHT457" in adj_fraude["soat.txt"]
 
 

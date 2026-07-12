@@ -1,67 +1,72 @@
-"""app/dashboard/comparativa.py — provider de la vista comparativa multi-correo (W13).
+"""app/dashboard/comparativa.py — provider de la vista de cruce de fuentes del expediente (W13 · M3).
 
-Cuando llegan varios correos del mismo cliente, la IA los relaciona y resume **qué cambió** entre versiones.
-DIP: la UI depende de `comparativa_de(caso)`; HOY es un mock rotulado, y **U8 (entity resolution) + U7 (triage
-PERTENECE_A_CASO) + M1** lo vuelven real (agrupar correos del mismo expediente) SIN tocar la vista.
-P5: las fuentes se citan por etiqueta/fecha (redactadas); el diff referencia campos, nunca PII cruda. P7: mock.
+Cuando un caso tiene varias FUENTES de un mismo dato (el correo + la denuncia + el SOAT), el Evidence
+Correlator (M3) las cruza y dice qué **coincide** (varias fuentes concuerdan) y qué **diverge** (una
+inconsistencia "míralo", P6). Este provider adapta ese overlay real (`caso.correlaciones`) a la forma que
+la vista consume (DIP: la vista depende de `comparativa_de(caso)`, no de M3).
+
+P6: una divergencia solo SUGIERE (nunca decide). P5: los valores citados ya vienen redactados de M3; aquí
+se citan campos/fuentes por etiqueta, nunca PII cruda. P7: LATENTE — sin ≥2 fuentes reales `disponible=False`
+(no se fabrica una comparativa de una sola fuente).
 """
 
 from dataclasses import dataclass
 from typing import TypedDict
 
-# Cotas duras de presentación (P4): el clustering real (M1/U8) puede traer muchos correos; se acotan.
+# Cotas duras de presentación (P4): un expediente muy cruzado puede traer muchas fuentes/campos; se acotan.
 MAX_FUENTES = 10
 MAX_CAMBIOS = 20
 
 
 @dataclass(frozen=True)
 class FuenteCorreo:
-    """Un correo/fuente del expediente. Contrato estable que el clustering real (U7/U8) llenará."""
-    etiqueta: str    # "Correo 1"
-    fecha: str       # "11/07/2026 08:45 p.m."
-    resumen: str     # resumen corto (redactado)
+    """Una fuente del expediente (correo o adjunto legible) y qué aportó. Etiqueta legible, sin PII."""
+    etiqueta: str       # "Correo", "Denuncia", "SOAT"
+    resumen: str        # qué campos aportó esta fuente (redactado/por etiqueta)
+    fecha: str = ""     # subtítulo opcional; vacío en el cruce de fuentes M3 (no hay fecha por fuente)
 
 
 @dataclass(frozen=True)
 class CambioDetectado:
-    """Un cambio detectado por la IA entre versiones. Referencia campos, no PII."""
+    """Un hallazgo del cruce: una coincidencia (✅) o una divergencia (⚠️). Referencia campos, no PII cruda."""
     icono: str
     texto: str
 
 
 class Comparativa(TypedDict):
-    """Contrato de retorno estable (DIP): la vista depende de esta forma, no de la implementación."""
+    """Contrato de retorno estable (DIP): la vista depende de esta forma, no de la implementación (mock↔M3)."""
     disponible: bool
     fuentes: list[FuenteCorreo]
     cambios: list[CambioDetectado]
-    origen: str  # "demo" hoy; "real" con U7/U8/M1
-
-
-# Mock rotulado (P7): el expediente con 3 correos del mockup + los cambios detectados.
-_FUENTES_DEMO = [
-    FuenteCorreo("Correo 1", "11/07/2026 08:45 p.m.", "Aviso inicial del siniestro con 6 fotografías."),
-    FuenteCorreo("Correo 2", "12/07/2026 09:15 a.m.", "Amplía la descripción del accidente."),
-    FuenteCorreo("Correo 3", "12/07/2026 10:02 a.m.", "Adjunta la factura de reparación del taller."),
-]
-_CAMBIOS_DEMO = [
-    CambioDetectado("🖼️", "Se agregó una nueva foto del costado izquierdo."),
-    CambioDetectado("✏️", "Cambió la descripción del accidente."),
-    CambioDetectado("📎", "Se adjuntó la factura de reparación."),
-]
+    origen: str  # "real" (M3); el DTO admite otros orígenes si un clustering multi-correo llega después
 
 
 def comparativa_de(caso) -> Comparativa:
-    """Vista comparativa del expediente. Contrato `Comparativa` estable (DIP).
-
-    HOY: mock rotulado `origen="demo"` que **sí** muestra la comparativa (es el objetivo de la demo). El
-    clustering multi-correo real llega con U7/U8/M1: entonces `caso` se usará para agrupar los correos del
-    expediente y `disponible` reflejará el conteo real (`False` con < 2 correos, sin fabricar una comparativa
-    de un solo correo — P7). Cotas duras `MAX_FUENTES`/`MAX_CAMBIOS` (P4).
+    """Cruce de fuentes del expediente desde el overlay REAL de M3 (`caso.correlaciones`). Contrato
+    `Comparativa` estable (DIP). LATENTE (P7): sin ≥2 fuentes reales `disponible=False` — no se fabrica un
+    cruce de una sola fuente. Cotas duras `MAX_FUENTES`/`MAX_CAMBIOS` (P4).
     """
-    _ = caso  # reservado: el clustering real (U7/U8/M1) agrupará los correos del expediente
-    return {
-        "disponible": True,
-        "fuentes": _FUENTES_DEMO[:MAX_FUENTES],
-        "cambios": _CAMBIOS_DEMO[:MAX_CAMBIOS],
-        "origen": "demo",
-    }
+    correlaciones = getattr(caso, "correlaciones", None) or []
+    if not correlaciones:
+        return {"disponible": False, "fuentes": [], "cambios": [], "origen": "real"}
+
+    # Fuentes: cada fuente distinta y los campos que aportó al cruce (etiquetas legibles, sin PII).
+    aportes: dict[str, list[str]] = {}
+    for c in correlaciones:
+        for fuente in c.fuentes:
+            campos = aportes.setdefault(fuente, [])
+            if c.campo_label not in campos:
+                campos.append(c.campo_label)
+    fuentes = [FuenteCorreo(etiqueta=fuente, resumen="Aportó: " + ", ".join(campos))
+               for fuente, campos in sorted(aportes.items())][:MAX_FUENTES]
+
+    # Cambios: por campo correlacionado, una coincidencia o la divergencia (que M3 ya trae con evidencia, P6).
+    cambios: list[CambioDetectado] = []
+    for c in correlaciones:
+        if c.coincide:
+            cambios.append(CambioDetectado("✅", f"{c.campo_label}: {len(c.fuentes)} fuentes concuerdan"))
+        else:
+            cambios.append(CambioDetectado("⚠️", c.inconsistencia))
+    cambios = cambios[:MAX_CAMBIOS]
+
+    return {"disponible": True, "fuentes": fuentes, "cambios": cambios, "origen": "real"}

@@ -154,7 +154,8 @@
       <button class="wb-doc" type="button" data-tipo="{{ d.tipo }}" data-doc="{{ loop.index0 }}"
               aria-label="Ver documento {{ d.etiqueta }} · {{ d.estado }}"
               hx-get="/workbench/documento/{{ caso.id }}?doc={{ loop.index0 }}" hx-target="#wb-drawer" hx-swap="innerHTML">
-        <span class="wb-doc-preview"><span class="wb-doc-ic" aria-hidden="true">{{ d.tipo|icono_tipo }}</span></span>
+        {% set d_asset = d|asset_url %}
+        <span class="wb-doc-preview">{% if d_asset and not d_asset.endswith('.pdf') %}<img class="wb-doc-thumb" src="{{ d_asset }}" alt="{{ d.etiqueta }}" loading="lazy">{% else %}<span class="wb-doc-ic" aria-hidden="true">{{ d.tipo|icono_tipo }}</span>{% endif %}</span>
         <span class="wb-doc-meta">
           <span class="wb-doc-label">{{ d.etiqueta }}</span>
           <span class="wb-doc-estado estado-{{ d.estado }}">{{ d.estado }}</span>
@@ -187,15 +188,15 @@
   <section class="card">
     <details>
       <summary class="card-head email-summary"><h2>Correo recibido · texto original</h2></summary>
-      <div class="card-body mono email-body">{{ detalle.aviso_redactado }}</div>
+      <div class="card-body mono email-body">{{ detalle.aviso_texto }}</div>
     </details>
   </section>
 
   {% if detalle.comparativa.disponible %}
   <section class="card wb-comp-aviso" data-slot="comparativa">
     <div class="card-body wb-comp-aviso-body">
-      <div><span aria-hidden="true">🗂️</span> <strong>{{ detalle.comparativa.fuentes|length }} correos</strong> asociados · {{ detalle.comparativa.cambios|length }} cambio(s) detectado(s) <span class="badge-demo" title="Agrupación multi-correo de demostración; el clustering real llega con U7/U8/M1">demo</span></div>
-      <button class="btn btn-ghost wb-drawer-trigger" type="button" hx-get="/workbench/comparativa/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Comparar correos</button>
+      <div><span aria-hidden="true">🗂️</span> <strong>{{ detalle.comparativa.fuentes|length }} fuentes</strong> cruzadas · {{ detalle.comparativa.cambios|length }} hallazgo(s) del Evidence Correlator{% if detalle.comparativa.origen == 'demo' %} <span class="badge-demo" title="Cruce de demostración">demo</span>{% endif %}</div>
+      <button class="btn btn-ghost wb-drawer-trigger" type="button" hx-get="/workbench/comparativa/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Comparar fuentes</button>
     </div>
   </section>
   {% endif %}

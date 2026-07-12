@@ -57,6 +57,15 @@ def _red(v) -> str:
     return redact_pii_spans_es_co(str(v)) if v is not None else "—"
 
 
+def _valor_operador(v) -> str:
+    """Valor de un campo para la VISTA DEL OPERADOR. P5 (dos niveles): al LLM la PII se redacta SIEMPRE
+    (nunca ve cédula/teléfono, ver `build_extraction_prompt_u2`); al operador —encargado del tratamiento con
+    finalidad legítima (Ley 1581, 'acceso restringido a terceros autorizados')— se le muestra el dato REAL
+    para que pueda trabajar (verificar identidad, contactar, cruzar fraude). El enmascarado + reveal por rol
+    + log de acceso se justifica solo con múltiples roles/datos reales — no con un único analista autorizado."""
+    return "—" if v is None else str(v)
+
+
 def _campo(caso, nombre):
     if not caso.extraccion:
         return None
@@ -175,8 +184,34 @@ def documentos_requeridos(producto: str) -> list[str]:
     return _DOCS_POR_PRODUCTO.get(producto, [])
 
 
+# Liga un documento requerido con un adjunto real por palabra clave (etiqueta/nombre/tipo del adjunto). M1
+# cuelga adjuntos del caso → el checklist deja de ser ciego. Un doc sin criterio → no se puede afirmar (None).
+_DOC_KEYWORD = {
+    "Denuncia de tránsito": ("denuncia",), "Denuncia (si aplica)": ("denuncia",),
+    "SOAT vigente": ("soat",),
+    "Fotos del vehículo": ("foto",), "Fotos de los daños": ("foto",),
+    "Licencia de conducción": ("licencia",),
+    "Tarjeta de propiedad": ("tarjeta", "propiedad"),
+    "Cotización del taller": ("cotiz", "factura"), "Cotización de reparación": ("cotiz", "factura"),
+    "Soporte de propiedad/tenencia": ("propiedad", "tenencia"),
+}
+
+
+def _documento_presente(caso, doc: str) -> bool | None:
+    """¿Hay un adjunto real que satisface `doc`? True/False si hay criterio; None si no se puede afirmar."""
+    claves = _DOC_KEYWORD.get(doc)
+    if not claves:
+        return None
+    for a in getattr(caso, "adjuntos", None) or []:
+        heno = f"{a.etiqueta} {a.nombre} {a.tipo}".lower()
+        if any(clave in heno for clave in claves):
+            return True
+    return False
+
+
 def checklist_documentos(caso) -> dict:
-    """Checklist de documentos por producto. `presente=None` hasta que U4 (multimodal) detecte adjuntos.
+    """Checklist de documentos por producto. `presente` se deriva de los adjuntos REALES del caso (M1): True
+    si hay un adjunto que lo satisface, False si no, None si el caso aún no trae adjuntos (no se puede afirmar).
 
     P7: si el producto no está modelado → `disponible=False` (no inventa una lista).
     """
@@ -184,8 +219,10 @@ def checklist_documentos(caso) -> dict:
     docs = documentos_requeridos(prod)
     if not docs:
         return {"producto": prod, "disponible": False, "docs": []}
+    tiene_adjuntos = bool(getattr(caso, "adjuntos", None))
     return {"producto": prod, "disponible": True,
-            "docs": [{"doc": d, "presente": None} for d in docs]}  # 'docs' (no 'items': colisiona con dict.items en Jinja)
+            # 'docs' (no 'items': colisiona con dict.items en Jinja)
+            "docs": [{"doc": d, "presente": _documento_presente(caso, d) if tiene_adjuntos else None} for d in docs]}
 
 
 # -------------------------------------------- U1 · Clasificación + Prioridad + Routing (passive)
@@ -427,8 +464,13 @@ def health_check(caso, traza) -> dict:
     _cob_estado = {"CUBIERTO": "ok"}.get(d.resultado.value, "warn") if d else "warn"
     checks.append({"label": "Cobertura dictaminada", "estado": _cob_estado,
                    "detalle": _label_cobertura(d) if d else "pendiente de datos", "demo": False})
-    for it in checklist_documentos(caso)["docs"]:  # adjuntos no fluyen aún (M1) → 'na' rotulado demo
-        checks.append({"label": it["doc"], "estado": "na", "detalle": "pendiente de validar", "demo": True})
+    for it in checklist_documentos(caso)["docs"]:  # M1: los adjuntos reales del caso alimentan el checklist
+        if it["presente"] is True:                 # hay un adjunto que lo satisface → ✔ real (cuenta al %)
+            checks.append({"label": it["doc"], "estado": "ok", "detalle": "adjuntado", "demo": False})
+        elif it["presente"] is False:              # el caso trae adjuntos, pero este no → honesto, sin badge demo
+            checks.append({"label": it["doc"], "estado": "na", "detalle": "no adjuntado", "demo": False})
+        else:                                       # el caso aún no trae adjuntos → no se puede validar (demo)
+            checks.append({"label": it["doc"], "estado": "na", "detalle": "pendiente de validar", "demo": True})
     evaluables = [c for c in checks if c["estado"] != "na"]
     oks = sum(1 for c in evaluables if c["estado"] == "ok")
     return {"pct": round(100 * oks / len(evaluables)) if evaluables else 0, "checks": checks}
@@ -545,10 +587,10 @@ def campos_extraidos(caso) -> list[CampoUI]:
             corr = overlay.get(c.nombre)
             confianza = corr.confianza_ajustada if corr else c.confianza
             clase = "validado" if (corr and corr.coincide) else "extraido"
-            reales.append(CampoUI(label=label, valor=_red(str(c.valor)), confianza=confianza,
+            reales.append(CampoUI(label=label, valor=_valor_operador(c.valor), confianza=confianza,
                                   fuente=_fuente_de(c.origen), origen="real", clase=clase))
             labels_reales.add(label)
-    demo = [CampoUI(label=lbl, valor=_red(str(gen(caso))), confianza=conf, fuente=fte, origen="demo")
+    demo = [CampoUI(label=lbl, valor=_valor_operador(gen(caso)), confianza=conf, fuente=fte, origen="demo")
             for (lbl, fte, conf, gen) in _CAMPOS_RICOS if lbl not in labels_reales]
     return reales + demo
 

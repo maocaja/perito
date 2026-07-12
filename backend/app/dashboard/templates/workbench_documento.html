@@ -9,10 +9,16 @@
   <div class="wb-drawer-body">
     {% if documento %}
     <div class="wb-ev">
-      <div class="wb-ev-doc" data-tipo="{{ documento.tipo }}" aria-label="Vista de {{ documento.etiqueta }} (demostración)">
+      <div class="wb-ev-doc" data-tipo="{{ documento.tipo }}" aria-label="Vista de {{ documento.etiqueta }}">
+        {% if asset_url and asset_url.endswith('.pdf') %}
+        <embed class="wb-ev-media" src="{{ asset_url }}" type="application/pdf">
+        {% elif asset_url %}
+        <img class="wb-ev-media" src="{{ asset_url }}" alt="{{ documento.etiqueta }}">
+        {% else %}
         <div class="wb-ev-page">
           {% for _ in range(9) %}<div class="wb-ev-line"></div>{% endfor %}
         </div>
+        {% endif %}
       </div>
       <div class="wb-ev-meta">
         <div class="hint">Adjunto del caso</div>
@@ -23,7 +29,7 @@
         </div>
         {% if documento.huella %}
         <div class="wb-ev-src mono" title="Huella perceptual (P5: la huella, no la imagen)">🔗 {{ documento.huella[:16] }}…</div>
-        {% else %}
+        {% elif not asset_url %}
         <div class="hint">Sin huella (mock) — se poblará con Document AI (M1)</div>
         {% endif %}
         {# 'Usar este valor' extrae un dato del documento a un campo: requiere OCR real → disponible con M1 (P7:

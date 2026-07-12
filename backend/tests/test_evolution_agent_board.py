@@ -100,20 +100,12 @@ def test_confianza_riesgo_cuatro_celdas():
 
 # ---------------- P5: el detalle redacta los campos de display (defensa en profundidad) ----------------
 
-def test_caso_redacta_pii_en_display():
-    """Un campo solo-display (explicación de fraude) con PII se muestra REDACTADO en el caso (P5).
-
-    W20/A6: se verifica sobre el panel del caso en la Workbench (`/workbench/caso/{id}`); la página `detalle`
-    se retiró.
-    """
-    from fastapi.testclient import TestClient
-    from app.main import app
-    from app.dashboard.store import get_caso_repository, reset_caso_repository
-
-    reset_caso_repository()
+def test_explicacion_fraude_redacta_pii_en_texto_derivado():
+    """P5/P6 defensa en profundidad: la EXPLICACIÓN de fraude (texto DERIVADO/generado) no filtra PII cruda —
+    se redacta en el view-model. (Los CAMPOS del operador sí muestran el dato real; la explicación derivada se
+    mantiene conservadora — P6: la evidencia de fraude referencia el caso, no PII.)"""
     caso = construir_caso_preset("fraude")
     object.__setattr__(caso.alerta_fraude, "explicacion", "Verificar con el asegurado C.C. 1.098.765.432")
-    get_caso_repository().save(caso)
-    html = TestClient(app).get(f"/workbench/caso/{caso.id}").text
-    assert "1.098.765.432" not in html   # la cédula NO aparece cruda
-    assert "[REDACTED]" in html            # se redactó
+    riesgos = vista_caso.riesgos(caso)
+    assert "1.098.765.432" not in riesgos["explicacion"]   # la cédula NO se filtra al texto derivado
+    assert "[REDACTED]" in riesgos["explicacion"]

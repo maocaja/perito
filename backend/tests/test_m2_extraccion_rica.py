@@ -113,11 +113,13 @@ def test_campos_extraidos_reales_desplazan_al_mock():
         assert reales.get(label) == "real", f"{label} debería ser real, no demo"
 
 
-def test_telefono_y_cedula_se_redactan_en_display():
-    """🔒 P5: aunque se extraen, teléfono/cédula se muestran REDACTADOS en el panel (no crudos)."""
+def test_telefono_y_cedula_visibles_para_el_operador():
+    """P5 (gobernanza): teléfono/cédula se EXTRAEN y se MUESTRAN al operador (dato real, no `[REDACTED]`) —
+    los necesita para verificar identidad/contactar/cruzar fraude. La minimización es hacia el LLM, no al
+    operador autorizado."""
     por_label = {cu.label: cu.valor for cu in campos_extraidos(_caso())}
-    assert "310 555 8899" not in (por_label.get("Teléfono") or "")
-    assert "1032456789" not in (por_label.get("Cédula") or "")
+    assert "310 555 8899" in (por_label.get("Teléfono") or "")
+    assert "1032456789" in (por_label.get("Cédula") or "")
 
 
 def test_resumen_cola_placa_real():
