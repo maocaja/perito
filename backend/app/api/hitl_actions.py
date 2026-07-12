@@ -214,8 +214,9 @@ def enviar_fraude(caso_id: str, usuario: Optional[str] = Form(None), rol: str = 
 
 @router.post("/casos/{caso_id}/solicitar_docs", response_class=RedirectResponse)
 def solicitar_docs(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
-    """Prepara el borrador de solicitud de documentos faltantes. Envío MOCK (rotulado): NO envía correo real;
-    NO cambia estado. El borrador se compone de los campos faltantes."""
+    """Acción SECUNDARIA (vía rápida): solicita los documentos faltantes en un paso. Envío MOCK (rotulado): NO
+    envía correo real; NO cambia estado. La primaria del caso bloqueado es 'Preparar solicitud' (W23·M5), que
+    abre un borrador editable en el drawer; esta es el atajo sin revisar el texto. Se compone de los faltantes."""
     from app.dashboard import vista_caso
     firma = _firma(usuario)
     caso = _get_activo(caso_id)

@@ -399,14 +399,21 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-status.nivel-neutral .wb-status-ic { color:var(--text-3); }
 
 /* W20·A2 · Bloque héroe "Necesitas revisar": banner + campo editable embebido (corrige aquí, sin bajar al panel) */
-.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:12px; padding:14px 16px;
-  display:flex; flex-direction:column; gap:12px; }
+/* M6 · el bloque de excepción pesa menos (padding/gap más ajustados): es una acción a resolver, no un cartel. */
+.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:10px; padding:12px 14px;
+  display:flex; flex-direction:column; gap:9px; }
 .wb-revisar.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
-.wb-revisar-head { display:flex; gap:12px; align-items:flex-start; }
-.wb-revisar-ic { font-size:22px; line-height:1; }
+.wb-revisar-head { display:flex; gap:10px; align-items:flex-start; }
+.wb-revisar-ic { font-size:19px; line-height:1; }
 .wb-revisar-title { font-weight:700; }
 .wb-revisar-text { color:var(--text-2); font-size:13px; margin-top:2px; }
-.wb-revisar-form { border-top:1px dashed var(--border); padding-top:12px; margin-top:2px; }
+.wb-revisar-form { border-top:1px dashed var(--border); padding-top:10px; margin-top:2px; }
+/* M6 · datos verificados colapsados en caso bloqueado ("primero la excepción"). El summary es el eyebrow;
+   list-style:none cross-browser (igual que wb-mas/wb-hc-more/wb-tech). encode-not-hide: a un click. */
+.wb-datos-fold > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:6px; }
+.wb-datos-fold > summary::-webkit-details-marker { display:none; }
+.wb-datos-fold > summary::before { content:"▸"; color:var(--text-3); font-size:11px; transition:transform .12s; }
+.wb-datos-fold[open] > summary::before { transform:rotate(90deg); }
 .copilot-headline { font-weight:600; margin-bottom:8px; }
 .copilot-lines { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13.5px; color:var(--text-2); }
 .wb-strip { display:flex; gap:10px; flex-wrap:wrap; }
@@ -756,7 +763,7 @@ embed.wb-ev-media { width:100%; height:62vh; }  /* PDF real embebido */
 /* ═══════════ Fase 2 · Corrección inline (server-authoritative) ═══════════ */
 .wb-corregir-form { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; align-items:end; }
 .wb-corregir-campo { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--text-2); font-weight:600; }
-.wb-corregir-campo input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
+.wb-corregir-campo input, .wb-corregir-campo select { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }  /* M3 · select combina con los inputs */
 .wb-corregir-firma { grid-column:1 / -1; }
 .wb-corregir-form .btn { grid-column:1 / -1; }
 

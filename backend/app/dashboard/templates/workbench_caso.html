@@ -2,6 +2,7 @@
    Fase 0 (declutter): tabla de datos ÚNICA (fusiona 'Datos del siniestro' + 'Información extraída'), panel
    derecho enfocado en la DECISIÓN, secundarios plegados. Encode-not-hide: el rastro agéntico y la confianza
    se CODIFICAN (peso/color), no se ocultan (W18/P2/P7). Se renderiza en el include inicial y en el swap #wb-caso. #}
+{% import "_macros.html" as ui %}
 {% set caso = detalle.caso %}
 {% set rec = detalle.recomendacion %}
 
@@ -61,12 +62,8 @@
     </div>
     <form class="wb-corregir-form wb-revisar-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
       <input type="hidden" name="rol" value="{{ rol }}">
-      {% for c in detalle.campos_corregibles %}
-      <label class="wb-corregir-campo">{{ c.label }}
-        <input type="text" name="{{ c.nombre }}" value="{{ c.valor|redact }}" autocomplete="off" placeholder="—">
-      </label>
-      {% endfor %}
-      <label class="wb-corregir-campo wb-corregir-firma">Firma (P1)
+      {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
+      <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
         <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
       </label>
       <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
@@ -94,8 +91,14 @@
      Confianza en calma (§4 encode-not-hide): alta → "✓ Verificado" con el % TENUE (presente en el DOM); solo se
      RESALTA lo que importa (media/baja/conflicto/ausente). "Lo que necesita atención" salta; el resto se ve
      tranquilo/completo. Click (o Enter) en un campo → su evidencia (salto a la fuente exacta, V1·4). #}
+  {# M6 · "primero la excepción": cuando el caso está BLOQUEADO, los datos YA verificados se colapsan bajo
+     "Ver información extraída" (a un click) para que la excepción + el form manden. encode-not-hide: los campos
+     siguen en el DOM. En un caso LISTO, se muestran expandidos (son el objeto de la firma). Sin duplicar el
+     loop: solo se abre/cierra el `<details>` condicionalmente. #}
   <section class="wb-datos" data-slot="datos">
-    <h2 class="wb-eyebrow">Datos del siniestro</h2>
+    {% set bloqueado = caso.estado.value == 'REQUIERE_REVISION' %}
+    {% if bloqueado %}<details class="wb-datos-fold"><summary class="wb-eyebrow">Ver información extraída</summary>
+    {% else %}<h2 class="wb-eyebrow">Datos del siniestro</h2>{% endif %}
     <div class="wb-fields">
       {% for c in detalle.datos_principales %}
       {% if c.ausente %}
@@ -131,6 +134,7 @@
       {% endfor %}
     </div>
     <div class="wb-datos-foot">Haz clic en un campo para ver su evidencia. La cobertura la decide una regla de la póliza, no la IA.</div>
+    {% if bloqueado %}</details>{% endif %}
   </section>
 
   {# Fase 2 · Corrección inline (caso ya preparado): editar un campo mal extraído → el SERVIDOR re-corre C4 +
@@ -144,12 +148,8 @@
       <div class="card-body">
         <form class="wb-corregir-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
           <input type="hidden" name="rol" value="{{ rol }}">
-          {% for c in detalle.campos_corregibles %}
-          <label class="wb-corregir-campo">{{ c.label }}
-            <input type="text" name="{{ c.nombre }}" value="{{ c.valor|redact }}" autocomplete="off" placeholder="—">
-          </label>
-          {% endfor %}
-          <label class="wb-corregir-campo wb-corregir-firma">Firma (P1)
+          {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
+          <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
             <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
           </label>
           <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
@@ -234,30 +234,26 @@
       {% set verificadas = evaluables|selectattr('estado','equalto','ok')|list %}
       {% set nivel_prep = 'ok' if detalle.health.pct >= 90 else ('warn' if detalle.health.pct >= 60 else 'bad') %}
       <div class="wb-eo-block wb-eo-prep">
+        {% set hc_pend = detalle.health.checks|rejectattr('estado','equalto','ok')|rejectattr('estado','equalto','na')|list %}
+        {% set n_pend = hc_pend|length %}
         <div class="wb-eo-h"><span>Preparación</span>
-          <span class="wb-eo-nm nivel-{{ nivel_prep }}">{{ verificadas|length }} de {{ evaluables|length }} verificaciones</span></div>
-        <div class="wb-eo-bar" role="img" aria-label="{{ verificadas|length }} de {{ evaluables|length }} verificaciones completas">
+          <span class="wb-eo-nm nivel-{{ nivel_prep }}">{{ verificadas|length }} de {{ evaluables|length }}{% if n_pend %} · {{ n_pend }} pendiente{{ 's' if n_pend != 1 }}{% endif %}</span></div>
+        <div class="wb-eo-bar" role="img" aria-label="{{ verificadas|length }} de {{ evaluables|length }} verificaciones completas, {{ n_pend }} pendiente(s)">
           <div class="wb-eo-bar-fill nivel-{{ nivel_prep }}" style="width:{{ (100 * verificadas|length / evaluables|length)|round|int if evaluables|length else 0 }}%"></div>
         </div>
-        {# L3 · Densidad: 'Pendiente' (lo que requiere atención) VISIBLE; el detalle completo bajo "Ver todas"
-           — se distingue de un vistazo qué falta. encode-not-hide: la lista completa sigue a un click. #}
-        {% set hc_pend = detalle.health.checks|rejectattr('estado','equalto','ok')|rejectattr('estado','equalto','na')|list %}
-        {% if hc_pend %}
-        <div class="hint">Pendiente</div>
-        <ul class="wb-health wb-health-compact">
-          {% for c in hc_pend %}
-          <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
-            <span class="wb-hc-ic" aria-hidden="true">⚠</span><span class="wb-hc-label">{{ c.label }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% endif %}
+        {# M1 · Densidad: solo el conteo por defecto; el detalle (pendientes primero, luego el resto) se despliega
+           a un click. encode-not-hide: la lista completa sigue en el DOM. #}
         <details class="wb-hc-more">
-          <summary>Ver todas las verificaciones · {{ detalle.health.checks|length }}</summary>
+          <summary>{% if n_pend %}Ver {{ n_pend }} pendiente{{ 's' if n_pend != 1 }} y el resto{% else %}Ver las {{ detalle.health.checks|length }} verificaciones{% endif %}</summary>
           <ul class="wb-health wb-health-compact">
-            {% for c in detalle.health.checks %}
+            {% for c in hc_pend %}
             <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
-              <span class="wb-hc-ic" aria-hidden="true">{{ '✔' if c.estado == 'ok' else ('—' if c.estado == 'na' else '⚠') }}</span>
+              <span class="wb-hc-ic" aria-hidden="true">⚠</span><span class="wb-hc-label">{{ c.label }}</span>
+            </li>
+            {% endfor %}
+            {% for c in detalle.health.checks if c.estado != 'warn' %}
+            <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
+              <span class="wb-hc-ic" aria-hidden="true">{{ '✔' if c.estado == 'ok' else '—' }}</span>
               <span class="wb-hc-label">{{ c.label }}{% if c.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
             </li>
             {% endfor %}
@@ -314,7 +310,8 @@
         <span class="wb-reco-ic" aria-hidden="true">{{ rec.icono }}</span>
         <div class="wb-reco-body">
           <div class="wb-reco-eyebrow">Siguiente paso</div>
-          <div class="wb-reco-title">{{ rec.titulo|redact }}</div>
+          {# M1 · el panel enfoca la ACCIÓN (no re-enuncia el problema, que ya está en el banner + bloque central) #}
+          <div class="wb-reco-title">{{ (rec.accion.titulo if rec.accion else rec.titulo)|redact }}</div>
           {# Dedup (L1): el detalle completo vive en el bloque de resolución central; aquí NO se repite cuando
              el caso está bloqueado (REQUIERE_REVISION). En los demás estados sí, porque no hay bloque central. #}
           {% if caso.estado.value != 'REQUIERE_REVISION' %}<div class="wb-reco-text">{{ rec.texto|redact }}</div>{% endif %}
@@ -323,16 +320,26 @@
       </div>
 
       <div class="wb-acciones">
-        <input type="text" id="wb-firma" placeholder="Tu nombre (firma, P1)" autocomplete="off">
+        <input type="text" id="wb-firma" placeholder="Firma del analista" autocomplete="off">
+        <div class="hint wb-firma-hint">Obligatoria antes de radicar o rechazar.</div>
         {# L1 · Acción PRIMARIA ÚNICA por estado (recomendación == acción, `rec.accion`). Verde/go solo cuando
            es Radicar (terminal con firma). None ⇒ caso resuelto, sin primaria. 🔒P1: el gate real es el servidor. #}
         {% if rec.accion %}
+        {% if rec.accion.drawer %}
+        {# M5 · la primaria PREPARA un borrador (draft≠send, P1): abre el drawer con la solicitud ya redactada
+           (nombra el dato faltante); el analista la revisa y la envía DESDE el drawer con su firma. Abrir el
+           borrador no exige firma (la firma va al enviar), por eso es un hx-post directo, no el form de firma. #}
+        <button class="btn btn-primary btn-lg" type="button"
+                hx-post="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" hx-target="#wb-drawer" hx-swap="innerHTML"
+                title="Redacta un borrador de solicitud al asegurado; tú lo revisas y envías (P1: draft ≠ send)">{{ rec.accion.label }}</button>
+        {% else %}
         <form method="post" action="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" class="wb-firma-form"
               {% if rec.accion.confirm %}data-confirm="{{ rec.accion.confirm }}"{% endif %}>
           <input type="hidden" name="usuario" class="wb-firma-in">
           {% if rec.accion.motivo %}<input type="hidden" name="motivo" value="{{ rec.accion.motivo }}">{% endif %}
-          <button class="btn {{ 'btn-radicar' if rec.accion.kind == 'go' else 'btn-primary' }} btn-lg" type="submit"{% if rec.accion.kind == 'go' %} title="Crear el expediente formal del siniestro"{% endif %}>{{ rec.accion.label }}</button>
+          <button class="btn {{ 'btn-radicar' if rec.accion.kind == 'go' else 'btn-primary' }} btn-lg" type="submit"{% if rec.accion.kind == 'go' %} title="Crear formalmente el expediente y enviarlo al siguiente equipo"{% endif %}>{{ rec.accion.label }}</button>
         </form>
+        {% endif %}
         {% endif %}
 
         {# L3 · Densidad: las secundarias (rechazar/fraude/escalar/carta/guardar) NO compiten con la primaria;
@@ -349,12 +356,12 @@
         </form>
         {% endif %}
         <div class="wb-acc-grid">
-          {% if not (rec.accion and rec.accion.endpoint == 'solicitar_docs') %}
+          {# 'Solicitar documentos' (envío mock directo) queda como secundaria: la primaria 'Preparar
+             solicitud' (M5) abre un borrador editable; esta es la vía rápida sin revisar el texto. #}
           <form method="post" action="/casos/{{ caso.id }}/solicitar_docs" class="wb-firma-form">
             <input type="hidden" name="usuario" class="wb-firma-in">
             <button class="btn btn-ghost" type="submit">Solicitar documentos</button>
           </form>
-          {% endif %}
           <form method="post" action="/casos/{{ caso.id }}/enviar_fraude" class="wb-firma-form"
                 data-confirm="¿Derivar al carril de fraude (SIU)? Es una sugerencia de revisión, no decide fraude (P6).">
             <input type="hidden" name="usuario" class="wb-firma-in">
@@ -364,11 +371,12 @@
           <form method="post" action="/casos/{{ caso.id }}/escalar" class="wb-firma-form"
                 data-confirm="¿Escalar este caso a revisión humana?">
             <input type="hidden" name="usuario" class="wb-firma-in"><input type="hidden" name="motivo" value="Escalado desde la workbench">
-            <button class="btn btn-ghost" type="submit">Enviar a revisión especializada</button>
+            <button class="btn btn-ghost" type="submit" title="Enviar el caso a un especialista para evaluación manual">Enviar a revisión especializada</button>
           </form>
           {% endif %}
-          {# W20/A7: Carta al asegurado (drawer). Solo cuando aplica (pedir datos / resolución). P1: draft ≠ send. #}
-          {% if detalle.carta_tipo %}
+          {# W20/A7: Carta al asegurado (drawer). Solo cuando aplica (pedir datos / resolución). P1: draft ≠ send.
+             M5 · dedup: si la PRIMARIA ya es el borrador de solicitud (drawer), no repetir aquí la misma carta. #}
+          {% if detalle.carta_tipo and not (rec.accion and rec.accion.drawer) %}
           <button class="btn btn-ghost" type="button" hx-post="/casos/{{ caso.id }}/carta" hx-target="#wb-drawer" hx-swap="innerHTML"
                   title="Genera un borrador de carta al asegurado; tú lo firmas y envías (P1)">✍ Preparar carta</button>
           {% endif %}

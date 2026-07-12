@@ -22,9 +22,12 @@ from app.intake.mailbox import Mailbox
 
 router = APIRouter(tags=["cartas"])
 
+# Labels de la carta (orientados al asegurado). Alineado con el workbench en 'monto_reclamado' →
+# "valor de la reclamación" (W23·M5: la carta es ahora el flujo primario); las demás frases se mantienen
+# claras para un cliente ("fecha del siniestro" > "fecha del evento").
 _CAMPO_ES = {
     "numero_poliza": "número de póliza", "fecha_siniestro": "fecha del siniestro",
-    "tipo_siniestro": "tipo de siniestro", "monto_reclamado": "monto reclamado",
+    "tipo_siniestro": "tipo de siniestro", "monto_reclamado": "valor de la reclamación",
 }
 
 

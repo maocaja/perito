@@ -21,6 +21,21 @@
    para que el panel y la Workbench nombren igual cada campo (L2, sin mapa duplicado). #}
 {% macro campo_label(nombre) %}{{ nombre|label_campo }}{% endmacro %}
 
+{# M3 · Campo editable de la corrección inline (FUENTE ÚNICA — la usan los dos formularios: bloque de
+   resolución y colapsable). `tipo == 'select'` → dropdown humano→enum (label ≠ valor, P2); si no, input. #}
+{% macro corregir_campo(c) %}
+<label class="wb-corregir-campo">{{ c.label }}
+  {% if c.tipo == 'select' %}
+  <select name="{{ c.nombre }}">
+    <option value="">—</option>
+    {% for o in c.opciones %}<option value="{{ o.valor }}"{{ ' selected' if o.valor == c.valor }}>{{ o.label }}</option>{% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="{{ c.nombre }}" value="{{ c.valor|redact }}" autocomplete="off" placeholder="—">
+  {% endif %}
+</label>
+{% endmacro %}
+
 {# Evidencia de un campo, legible. El extractor real y los presets usan referencias técnicas
    ('extracted from redacted_texto', 'span:campo') que se ven como debug → se muestran como
    "extraído del aviso". Si es corrección humana o una cita real, se muestra tal cual (redactada, P5). #}

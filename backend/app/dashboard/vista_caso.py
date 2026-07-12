@@ -178,7 +178,7 @@ def razon_escalamiento(caso) -> str | None:
         return None
     falt = _faltantes(caso)
     if falt:
-        return f"faltan datos: {', '.join(falt)}"
+        return "faltan datos: " + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt)
     if getattr(caso, "motivo_escalamiento", None):
         return caso.motivo_escalamiento
     return "escalado a revisión humana (dato ambiguo o póliza sin match)"
@@ -421,7 +421,7 @@ def clasificador_cola(caso) -> dict:
           or (est == EstadoCaso.REQUIERE_REVISION and not falt)):
         carril, motivo = "ambar", "cobertura/riesgo a revisar antes de decidir"
     elif falt:
-        carril, motivo = "amarillo", f"faltan datos ({', '.join(falt)})"
+        carril, motivo = "amarillo", "faltan datos (" + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt) + ")"
     elif est in (EstadoCaso.APROBADO, EstadoCaso.RECHAZADO):
         carril, motivo = "verde", "caso cerrado (resuelto por humano)"
     elif est == EstadoCaso.LISTO_PARA_APROBAR:
@@ -527,13 +527,19 @@ def resumen_narrativo(caso) -> str:
     m = _campo(caso, "monto_reclamado")
     if m and not m.ausente and m.valor:
         partes.append(f"Valor de la reclamación: {_red(str(m.valor))}.")
-    if caso.dictamen:  # P2: el resumen CITA el veredicto del motor (resultado + regla)
-        partes.append(f"Cobertura: {_label_cobertura(caso.dictamen)} (regla {caso.dictamen.regla_aplicada}).")
+    # M2 · cobertura en HUMANO: si el motor dictaminó (terminal) → el resultado; si escaló → POR QUÉ (falta X).
+    # La cita técnica de la regla vive en "Cobertura · por qué → Ver regla aplicada" (P2), no en la prosa.
+    d = caso.dictamen
+    falt = faltantes(caso)
+    if d and d.resultado.value in _COB_TERMINAL:   # CUBIERTO / CUBIERTO_PARCIAL / NO_CUBIERTO
+        partes.append(f"Cobertura: {_label_cobertura(d)}.")
+    elif falt:
+        partes.append("La cobertura no puede evaluarse todavía porque falta "
+                      + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt) + ".")
+    else:
+        partes.append("La cobertura no puede evaluarse todavía; el caso requiere revisión.")
     if caso.alerta_fraude:
         partes.append(f"Hay una señal de riesgo ({caso.alerta_fraude.severidad}) para revisar.")
-    falt = faltantes(caso)
-    if falt:
-        partes.append("Falta: " + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt) + ".")
     texto = " ".join(partes)
     if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):  # P1 fail-closed
         return "Resumen no disponible; revisa el caso y decide (P1)."
@@ -681,9 +687,18 @@ def campos_corregibles(caso) -> list[dict]:
     corregibles = []
     for n in CAMPOS:
         c = base.get(n)
-        # P5 defensa en profundidad: se redacta en el boundary (además del |redact del template).
-        corregibles.append({"nombre": n, "label": _LABEL_CAMPO.get(n, n),
-                            "valor": _red(c.valor) if (c and not c.ausente and c.valor) else ""})
+        valor = c.valor if (c and not c.ausente and c.valor) else ""
+        campo = {"nombre": n, "label": _LABEL_CAMPO.get(n, n)}
+        if n == "tipo_siniestro":
+            # M3 · dropdown: el operador ve la etiqueta HUMANA; el form envía el enum canónico (label ≠ valor;
+            # el motor lo compara exacto, P2). El valor crudo (enum, no PII) pre-selecciona la opción.
+            campo["tipo"] = "select"
+            campo["valor"] = valor
+            campo["opciones"] = [{"valor": v, "label": _tipo_humano(v)} for v in _TIPO_LABEL]
+        else:
+            campo["tipo"] = "text"
+            campo["valor"] = _red(valor)   # P5 defensa en profundidad (además del |redact del template)
+        corregibles.append(campo)
     return corregibles
 
 
@@ -762,7 +777,7 @@ def confianza_riesgo(caso, traza) -> list[dict]:
     return [
         # Extracción = completitud de campos (la confianza por campo va en la tabla, no aquí).
         {"label": "Extracción", "valor": f"{len(presentes)} / {len(CAMPOS)} campos", "nivel": "ok" if not falt else "warn"},
-        {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "No disponible", "nivel": verif["nivel"]},
+        {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "No realizada", "nivel": verif["nivel"]},
         {"label": "Fraude", "valor": (fr.severidad if fr else "sin señales"), "nivel": ("bad" if fr and fr.severidad == "ALTA" else ("warn" if fr else "ok"))},
         {"label": "Cobertura", "valor": _label_cobertura(d), "nivel": _nivel_cobertura(d)},
     ]
@@ -797,20 +812,28 @@ def _nivel_cobertura(d) -> str:
 
 def _accion_primaria(caso, faltantes) -> dict | None:
     """L1 · La ÚNICA acción primaria por estado (recomendación == acción). 🔒P1: solo Radicar alcanza terminal
-    (con firma); en estado bloqueado la primaria NO es terminal (solicitar / enviar a revisión). None = sin
-    primaria (caso resuelto). {label, endpoint, kind, confirm, motivo}."""
+    (con firma); en estado bloqueado la primaria NO es terminal (preparar solicitud / enviar a revisión).
+    None = sin primaria (caso resuelto). {label, titulo, endpoint, kind, drawer, confirm, motivo}.
+    `drawer=True` ⇒ la acción ABRE un borrador en el drawer (draft≠send, P1); no es un POST directo."""
     est = caso.estado
     if est in _TERMINALES:
         return None
     if est == EstadoCaso.REQUIERE_REVISION:
         if faltantes:
-            return {"label": "Solicitar al asegurado", "endpoint": "solicitar_docs", "kind": "primary",
-                    "confirm": None, "motivo": None}
+            dato = _LABEL_CAMPO.get(faltantes[0], faltantes[0]).lower()
+            titulo = (f"Solicitar {dato} al asegurado" if len(faltantes) == 1
+                      else "Solicitar los datos faltantes al asegurado")
+            # M5 · la primaria PREPARA un borrador de solicitud (drawer): la carta de datos ya nombra el dato
+            # faltante; el humano la revisa y ENVÍA desde el drawer (P1: draft ≠ send, no es un POST a ciegas).
+            return {"label": "Preparar solicitud", "endpoint": "carta", "kind": "primary", "drawer": True,
+                    "titulo": titulo, "confirm": None, "motivo": None}
         return {"label": "Enviar a revisión especializada", "endpoint": "escalar", "kind": "primary",
+                "drawer": False, "titulo": "Enviar a un especialista para revisión",
                 "confirm": "¿Enviar a revisión especializada?", "motivo": "Enviado a revisión especializada"}
     if est == EstadoCaso.LISTO_PARA_APROBAR:   # explícito: Radicar SOLO aquí (un estado nuevo → sin primaria)
-        return {"label": "Radicar caso", "endpoint": "radicar", "kind": "go",
-                "confirm": "¿Radicar este caso? Se creará el expediente con tu firma.", "motivo": None}
+        return {"label": "Radicar caso", "endpoint": "radicar", "kind": "go", "drawer": False,
+                "titulo": "Revisa y firma el caso", "confirm": "¿Radicar este caso? Se creará el expediente con tu firma.",
+                "motivo": None}
     return None
 
 

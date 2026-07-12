@@ -87,7 +87,8 @@ def test_resumen_narrativo_menciona_faltantes():
     caso = next((c for c in get_caso_repository().list() if vista_caso.faltantes(c)), None)
     if caso is None:
         pytest.skip("no hay caso con faltantes sembrado")
-    assert "Falta:" in vista_caso.resumen_narrativo(caso)
+    # M2: el resumen nombra lo faltante en humano ("…no puede evaluarse todavía porque falta {campo}")
+    assert "falta" in vista_caso.resumen_narrativo(caso).lower()
 
 
 def test_resumen_narrativo_sin_palabras_prohibidas():

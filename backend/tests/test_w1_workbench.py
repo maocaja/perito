@@ -77,8 +77,8 @@ def test_workbench_caso_sin_extraccion_renderiza(client):
     r = client.get(f"/workbench/caso/{caso.id}")
     assert r.status_code == 200
     assert "Datos del siniestro" in r.text
-    # V1·3: sin extracción los campos-objeto no revientan; los ausentes se marcan "Falta" (no crash).
-    assert "Falta" in r.text
+    # sin extracción los campos-objeto no revientan; los ausentes se marcan "No encontrado" (L3a, no crash).
+    assert "No encontrado" in r.text
 
 
 def test_cola_item_apunta_al_parcial_via_htmx(client):

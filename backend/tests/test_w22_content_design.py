@@ -33,11 +33,12 @@ def _guardar(key, **update):
 # ───────────────────────── L1 · acción primaria única por estado ─────────────────────────
 
 def test_accion_primaria_bloqueado_es_no_terminal():
-    """REQUIERE_REVISION + faltantes → primaria 'Solicitar al asegurado' (NO terminal, P1)."""
+    """REQUIERE_REVISION + faltantes → primaria 'Preparar solicitud' (borrador en drawer, NO terminal, P1).
+    W23·M5: la primaria PREPARA el borrador (draft≠send), no un POST a ciegas."""
     caso = construir_caso_preset("campos-faltantes")
     accion = vista_caso.recomendacion(caso)["accion"]
-    assert accion["endpoint"] == "solicitar_docs" and accion["kind"] == "primary"
-    assert accion["label"] == "Solicitar al asegurado"
+    assert accion["endpoint"] == "carta" and accion["kind"] == "primary"
+    assert accion["label"] == "Preparar solicitud" and accion["drawer"] is True
 
 
 def test_accion_primaria_listo_es_radicar():
@@ -57,7 +58,7 @@ def test_render_primaria_por_estado(client):
     """El panel renderiza UNA primaria = la recomendación del estado."""
     bloq = _guardar("campos-faltantes")
     html = client.get(f"/workbench/caso/{bloq.id}").text
-    assert "Solicitar al asegurado" in html and "Siguiente paso" in html
+    assert "Preparar solicitud" in html and "Siguiente paso" in html   # W23·M5: primaria = preparar borrador
     assert "/radicar" not in html                       # Radicar no se ofrece en estado bloqueado (P1)
 
     listo = _guardar("feliz")
@@ -164,13 +165,14 @@ def test_mas_acciones_agrupa_secundarias_sin_ocultarlas(client):
     assert html.index('/casos/%s/radicar' % caso.id) < html.index('Más acciones')
 
 
-def test_checklist_pendiente_visible_resto_a_un_click(client):
-    """El checklist muestra 'Pendiente' a la vista y el resto bajo 'Ver todas' — encode-not-hide: la lista
-    completa sigue en el DOM."""
+def test_checklist_conteo_pendientes_y_detalle_a_un_click(client):
+    """M1: Estado operativo muestra el CONTEO de pendientes; el detalle (pendientes + el resto) se despliega a
+    un click. encode-not-hide: la lista completa sigue en el DOM."""
+    import re
     caso = _guardar("campos-faltantes")   # tiene al menos un check pendiente (warn)
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "Pendiente" in html
-    assert 'class="wb-hc-more"' in html and "Ver todas las verificaciones" in html
+    assert re.search(r"\d+ pendiente", html)                       # conteo en el header
+    assert 'class="wb-hc-more"' in html and "y el resto" in html    # detalle colapsado (a un click)
 
 
 def test_campo_faltante_dice_no_encontrado(client):
