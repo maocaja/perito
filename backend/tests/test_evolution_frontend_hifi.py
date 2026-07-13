@@ -186,11 +186,12 @@ def test_deducible_oculto_sin_cobertura(client):
     assert "Deducible calculado" not in client.get(f"/workbench/caso/{revision.id}").text
 
 
-def test_cobertura_humanizada_en_tira(client):
-    """La tira de estado muestra la cobertura humanizada ('Requiere revisión'), no el enum crudo."""
-    strip = vista_caso.confianza_riesgo(_caso_revision(), None)
-    cob = next(c for c in strip if c["label"] == "Cobertura")
-    assert cob["valor"] == "Requiere revisión"
+def test_cobertura_humanizada_en_health(client):
+    """La cobertura se muestra humanizada ('Requiere revisión'), no el enum crudo. W24·N1: ya no vive en el
+    strip (salió por dedup); su hogar autoritativo es el Estado operativo / panel derecho."""
+    checks = vista_caso.health_check(_caso_revision(), None)["checks"]
+    cob = next(c for c in checks if c["label"] == "Resultado de cobertura")
+    assert cob["detalle"] == "Requiere revisión"
 
 
 def test_checklist_verificacion_na_no_bloquea(client):

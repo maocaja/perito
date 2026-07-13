@@ -151,7 +151,7 @@ def test_render_muestra_la_historia(client):
     (la IA es invisible — el origen LLM/base se comunica, si acaso, con una nota sutil, no un badge)."""
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
     assert "wb-historia" in html
-    assert "Resumen del caso" in html
+    assert "Resumen automático" in html   # W24·N2 (rev): eyebrow del resumen (sin repetir 'IA' en el flujo)
     assert "wb-agente-tag" not in html and "Summary Agent" not in html
 
 

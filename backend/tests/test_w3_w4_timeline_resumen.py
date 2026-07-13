@@ -75,10 +75,11 @@ def test_render_timeline(client):
 
 # ---------- W4 resumen narrativo ----------
 
-def test_resumen_narrativo_es_prosa():
+def test_resumen_narrativo_es_ejecutivo():
+    """W24·N2: el resumen es una línea EJECUTIVA de conteo+señal (no prosa que repita el hero/campos)."""
     caso = _un_caso()
     texto = vista_caso.resumen_narrativo(caso)
-    assert vista_caso.asegurado_de(caso)["nombre"] in texto
+    assert "datos extraídos" in texto and " · " in texto   # conteo + señales separadas por '·'
     assert texto.endswith(".")
 
 
@@ -112,7 +113,7 @@ def test_resumen_narrativo_redacta_pii():
 
 def test_render_resumen_narrativo(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    assert "Resumen del caso" in r.text   # V1·2: eyebrow de la historia (antes "Resumen ejecutivo")
+    assert "Resumen automático" in r.text   # W24·N2 (rev): eyebrow del resumen (sin repetir 'IA' en el flujo)
     assert "wb-narrativa" in r.text
 
 

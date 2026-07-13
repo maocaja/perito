@@ -92,11 +92,14 @@ def test_hallazgos_verificador_ausente_no_disponible():
 
 # ---------------- C: strip de confianza ----------------
 
-def test_confianza_riesgo_cuatro_celdas():
+def test_confianza_riesgo_sin_cobertura():
+    """W24·N1: el strip de un vistazo es Extracción · Verificación · Fraude. La COBERTURA salió del strip —
+    vive UNA sola vez en el panel derecho (dedup: no repetir el estado de cobertura en strip+banner+panel)."""
     caso = construir_caso_preset("fraude")
     strip = vista_caso.confianza_riesgo(caso, None)
     labels = [c["label"] for c in strip]
-    assert labels == ["Extracción", "Verificación", "Fraude", "Cobertura"]
+    assert labels == ["Extracción", "Verificación", "Fraude"]
+    assert "Cobertura" not in labels
     assert strip[2]["valor"] == "ALTA"  # fraude preset → severidad ALTA
 
 

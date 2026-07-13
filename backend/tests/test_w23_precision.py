@@ -73,24 +73,30 @@ def test_estado_operativo_conteo_pendientes_colapsado(client):
 # ───────────────────────── M2 · resumen sin jerga interna ─────────────────────────
 
 def test_resumen_operativo_sin_jerga_de_regla():
-    """El resumen (prosa del operador) NO expone la regla técnica ni el enum interno."""
+    """El resumen NO expone el IDENTIFICADOR técnico de la regla ni el enum interno. (W24: 'cobertura pendiente
+    de regla' en humano SÍ se permite —es lo que el usuario pidió—; lo prohibido es el id de la regla del motor
+    y el enum crudo.)"""
     for key in ("feliz", "campos-faltantes", "cobertura-negativa", "no-encontrada"):
-        prosa = vista_caso.resumen_narrativo(construir_caso_preset(key))
-        assert "PRE_MOTOR" not in prosa and "regla" not in prosa.lower()
+        caso = construir_caso_preset(key)
+        prosa = vista_caso.resumen_narrativo(caso)
+        assert "PRE_MOTOR" not in prosa
+        if caso.dictamen and caso.dictamen.regla_aplicada:
+            assert caso.dictamen.regla_aplicada not in prosa   # el id técnico de la regla no se filtra
         assert "AUTO_COLISION" not in prosa and "HOGAR_AGUA" not in prosa
 
 
 def test_resumen_escalado_explica_por_que():
-    """Cuando el motor no puede dictaminar (falta un dato), el resumen dice POR QUÉ en humano."""
-    prosa = vista_caso.resumen_narrativo(construir_caso_preset("campos-faltantes"))
-    assert "no puede evaluarse todavía porque falta" in prosa.lower()
-    assert "valor de la reclamación" in prosa.lower()
+    """Cuando el motor no puede dictaminar (falta un dato), el resumen ejecutivo nombra el faltante en humano."""
+    prosa = vista_caso.resumen_narrativo(construir_caso_preset("campos-faltantes")).lower()
+    assert "falta" in prosa and "obligatorio" in prosa
+    assert "valor de la reclamación" in prosa
+    assert "cobertura pendiente de regla" in prosa
 
 
 def test_resumen_terminal_dice_el_resultado_humano():
-    """Con dictamen terminal, el resumen dice el resultado humano ('Cubierto'/'No cubierto'), sin la regla."""
-    assert "Cobertura: Cubierto." in vista_caso.resumen_narrativo(construir_caso_preset("feliz"))
-    assert "Cobertura: No cubierto." in vista_caso.resumen_narrativo(construir_caso_preset("cobertura-negativa"))
+    """Con dictamen terminal, el resumen dice el resultado humano ('cubierto'/'no cubierto'), sin enum ni id de regla."""
+    assert "cobertura: cubierto" in vista_caso.resumen_narrativo(construir_caso_preset("feliz")).lower()
+    assert "cobertura: no cubierto" in vista_caso.resumen_narrativo(construir_caso_preset("cobertura-negativa")).lower()
 
 
 def test_p2_regla_no_desaparece_solo_se_mueve():
@@ -142,7 +148,7 @@ def test_firma_sin_p1_en_la_superficie(client):
     html = client.get(f"/workbench/caso/{caso.id}").text
     assert "Firma del analista" in html
     assert "Firma (P1)" not in html and "firma, P1" not in html
-    assert "Obligatoria antes de radicar o rechazar" in html   # la ayuda explica el porqué en humano
+    assert "Obligatoria para" in html   # W24·N6: la ayuda de firma explica el porqué (contextual a la acción)
 
 
 def test_verificacion_no_realizada_en_humano(client):

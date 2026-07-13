@@ -515,32 +515,28 @@ def health_check(caso, traza) -> dict:
 
 
 def resumen_narrativo(caso) -> str:
-    """W4 · Resumen ejecutivo en PROSA, compuesto DETERMINÍSTICAMENTE desde los datos (no LLM libre).
-    P1: sin `PALABRAS_PROHIBIDAS` (fail-closed a neutro). P7: nombra lo ausente, no lo inventa.
+    """N2 · Resumen EJECUTIVO (conteo + señal), no prosa que duplique los campos ni el hero. Una línea de
+    señales separadas por '·', compuesta DETERMINÍSTICAMENTE desde las salidas reales (P7: nombra lo ausente,
+    no lo inventa). P1: sin `PALABRAS_PROHIBIDAS` (fail-closed a neutro). La cita de la regla (P2) vive en
+    'Cobertura · por qué → Ver regla aplicada', NO aquí. El tipo/asegurado ya están en el hero (dedup W24).
     """
-    aseg = asegurado_de(caso)
-    cl = clasificar(caso)
-    tipo = cl["tipo_humano"].lower() if cl["tipo"] != "—" else "un siniestro"   # L2: tipo humano, no el enum
-    # P5 defensa en profundidad: el view-model devuelve prosa YA redactada (no depender solo del |redact
-    # del template). `_red` es no-op para el nombre demo, pero blinda el path real (M2) y el monto.
-    partes = [f"{_red(aseg['nombre'])} reportó {tipo} ({cl['producto']})."]
-    m = _campo(caso, "monto_reclamado")
-    if m and not m.ausente and m.valor:
-        partes.append(f"Valor de la reclamación: {_red(str(m.valor))}.")
-    # M2 · cobertura en HUMANO: si el motor dictaminó (terminal) → el resultado; si escaló → POR QUÉ (falta X).
-    # La cita técnica de la regla vive en "Cobertura · por qué → Ver regla aplicada" (P2), no en la prosa.
+    presentes, falt = _presentes(caso), _faltantes(caso)
+    señales = [f"{len(presentes)} de {len(CAMPOS)} datos extraídos"]
+    if falt:   # P7: nombra el/los faltante(s) obligatorio(s) en humano
+        etiquetas = ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt)
+        señales.append(f"falta {len(falt)} obligatorio{'s' if len(falt) > 1 else ''} ({etiquetas})")
+    señales.append(f"señal de fraude ({caso.alerta_fraude.severidad})" if caso.alerta_fraude
+                   else "sin señales de fraude")
+    # Cobertura (glance, NO la cita de regla): terminal → resultado humano; escaló por falta → pendiente de
+    # regla; si no → requiere revisión. El estado terminal de cobertura vive autoritativo en el panel derecho.
     d = caso.dictamen
-    falt = faltantes(caso)
     if d and d.resultado.value in _COB_TERMINAL:   # CUBIERTO / CUBIERTO_PARCIAL / NO_CUBIERTO
-        partes.append(f"Cobertura: {_label_cobertura(d)}.")
+        señales.append(f"cobertura: {_label_cobertura(d).lower()}")
     elif falt:
-        partes.append("La cobertura no puede evaluarse todavía porque falta "
-                      + ", ".join(_LABEL_CAMPO.get(f, f).lower() for f in falt) + ".")
+        señales.append("cobertura pendiente de regla")
     else:
-        partes.append("La cobertura no puede evaluarse todavía; el caso requiere revisión.")
-    if caso.alerta_fraude:
-        partes.append(f"Hay una señal de riesgo ({caso.alerta_fraude.severidad}) para revisar.")
-    texto = " ".join(partes)
+        señales.append("cobertura requiere revisión")
+    texto = " · ".join(señales) + "."
     if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):  # P1 fail-closed
         return "Resumen no disponible; revisa el caso y decide (P1)."
     return texto
@@ -564,6 +560,7 @@ class CampoUI:
     origen: Literal["real", "demo"]
     clase: str = "extraido"  # extraido | validado | relacionado (conexión W11)
     ausente: bool = False    # True ⇒ campo requerido aún no presente (fila REQUERIDO en la tabla fusionada)
+    manual: bool = False     # N5 · True ⇒ lo ingresó el analista (corrección humana); False ⇒ lo extrajo la IA
 
 
 # Nombre técnico del campo → etiqueta humana del panel. Los campos ricos de M2 (vehiculo/lugar/telefono/
@@ -617,6 +614,23 @@ def _fuente_de(origen) -> str:
     return f"{base} · {ref}" if (origen.tipo == TipoOrigen.PAGINA and ref) else base
 
 
+def _es_manual(origen) -> bool:
+    """N5 · ¿El campo lo ingresó el analista (corrección humana) en vez de extraerlo la IA?"""
+    return origen is not None and getattr(origen, "tipo", None) == TipoOrigen.HUMANO
+
+
+# N5/N9 · Glifo compacto de la FUENTE de un campo — sustituye el texto "Correo" repetido por un icono
+# escaneable (el nombre completo de la fuente queda en el `title`, encode-not-hide).
+_ICONO_FUENTE = {"correo": "📧", "pdf": "📄", "imagen": "📷", "fotos": "📷", "foto": "📷",
+                 "corrección humana": "✍", "soat": "📄", "denuncia": "📄"}
+
+
+def icono_fuente(fuente: str) -> str:
+    """Icono de la fuente (base antes de ' · '). Default 📎 (adjunto genérico). Fuente única para la plantilla."""
+    base = (fuente or "").split("·")[0].strip().lower()
+    return _ICONO_FUENTE.get(base, "📎")
+
+
 # Campos ricos que AÚN NO producimos → mock rotulado hasta M2. (label, fuente_demo, confianza_demo, generador).
 _DEMO_LUGAR = ["Autopista Norte con Calle 153, Bogotá", "Carrera 7 con Calle 80, Bogotá", "Calle 26 con Cra 68, Bogotá"]
 _DEMO_VEHICULO = ["Mazda CX-5 2021", "Chevrolet Onix 2022", "Renault Duster 2020", "Kia Sportage 2023"]
@@ -660,7 +674,8 @@ def campos_extraidos(caso) -> list[CampoUI]:
             # L2: el Tipo se muestra humano ("Colisión vehicular"); el valor del dato sigue siendo el enum (P2).
             valor = _tipo_humano(c.valor) if c.nombre == "tipo_siniestro" else _valor_operador(c.valor)
             reales.append(CampoUI(label=label, valor=valor, confianza=confianza,
-                                  fuente=_fuente_de(c.origen), origen="real", clase=clase))
+                                  fuente=_fuente_de(c.origen), origen="real", clase=clase,
+                                  manual=_es_manual(c.origen)))
             labels_reales.add(label)
     demo = [CampoUI(label=lbl, valor=_valor_operador(gen(caso)), confianza=conf, fuente=fte, origen="demo")
             for (lbl, fte, conf, gen) in _CAMPOS_RICOS if lbl not in labels_reales]
@@ -769,17 +784,17 @@ def hallazgos_verificador(caso, traza) -> dict:
 # ---------------------------------------------------------- C · Confianza y riesgo
 
 def confianza_riesgo(caso, traza) -> list[dict]:
-    """Strip de un vistazo: extracción · verificación · fraude · cobertura."""
+    """Strip de un vistazo: extracción · verificación · fraude. N1: la COBERTURA no va aquí — es su propia
+    pregunta y vive UNA sola vez en el panel derecho ('Cobertura · por qué → Ver regla aplicada', P2). Repetir
+    el estado de cobertura en el strip, el banner y el panel era decirlo tres veces (dedup W24)."""
     presentes, falt = _presentes(caso), _faltantes(caso)
     verif = hallazgos_verificador(caso, traza)
     fr = caso.alerta_fraude
-    d = caso.dictamen
     return [
         # Extracción = completitud de campos (la confianza por campo va en la tabla, no aquí).
         {"label": "Extracción", "valor": f"{len(presentes)} / {len(CAMPOS)} campos", "nivel": "ok" if not falt else "warn"},
         {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "No realizada", "nivel": verif["nivel"]},
         {"label": "Fraude", "valor": (fr.severidad if fr else "sin señales"), "nivel": ("bad" if fr and fr.severidad == "ALTA" else ("warn" if fr else "ok"))},
-        {"label": "Cobertura", "valor": _label_cobertura(d), "nivel": _nivel_cobertura(d)},
     ]
 
 

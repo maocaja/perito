@@ -44,6 +44,7 @@ _TEMPLATES.env.filters["icono_tipo"] = _documentos.icono_de
 # Demo: URL del asset real (foto/PDF) de un documento si existe en `demo_assets/`; None → mock (P5).
 _TEMPLATES.env.filters["asset_url"] = _demo_assets.url_de
 # L2: etiquetas humanas — FUENTE ÚNICA compartida (Workbench y panel), sin mapas duplicados.
+_TEMPLATES.env.filters["icono_fuente"] = vista_caso.icono_fuente  # N5/N9: glifo de la fuente de un campo
 _TEMPLATES.env.filters["label_campo"] = vista_caso.label_campo
 _TEMPLATES.env.filters["label_estado"] = vista_caso.label_estado
 _TEMPLATES.env.filters["label_cobertura"] = vista_caso.label_cobertura

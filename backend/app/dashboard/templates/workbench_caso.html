@@ -26,21 +26,23 @@
               'REQUIERE_REVISION': ('warn','⚠','Necesita revisión'),
               'APROBADO': ('ok','🔒','Aprobado'),
               'RECHAZADO': ('neutral','🔒','Rechazado')}.get(est, ('neutral','•', est|replace('_',' ')|title)) %}
+  {# N9 · en un caso TERMINAL, el banner de estado y la tarjeta de confirmación decían lo mismo (estado +
+     transición). Se fusionan: para APROBADO/RECHAZADO se muestra SOLO la tarjeta `wb-confirm` (estado +
+     transición + referencia en una). El banner de estado queda para los estados NO terminales. #}
+  {% if est not in ('APROBADO', 'RECHAZADO') %}
   {# L6 · a11y: región viva → el cambio de estado (tras recalcular/corregir) se anuncia a lector de pantalla. #}
   <div class="wb-status nivel-{{ S[0] }}" data-slot="status" role="status" aria-live="polite">
     <span class="wb-status-ic" aria-hidden="true">{{ S[1] }}</span>
     <div class="wb-status-body">
-      <div class="wb-status-label">{{ S[2] }}{% if est == 'APROBADO' and caso.aprobado_por %} · {{ caso.aprobado_por|redact }}{% endif %}</div>
+      <div class="wb-status-label">{{ S[2] }}</div>
       {% if est != 'REQUIERE_REVISION' %}<div class="wb-status-sub">{{ rec.texto|redact }}</div>{% endif %}
     </div>
   </div>
-
-  {# L5 · Confirmación FUERTE tras una acción terminal: resultado inequívoco + referencia del expediente +
-     siguiente paso. `role=status`/`aria-live` → se anuncia a lector de pantalla. #}
-  {% if est in ('APROBADO', 'RECHAZADO') %}
+  {% else %}
+  {# L5 · Confirmación FUERTE tras una acción terminal: estado + transición + referencia, una sola tarjeta. #}
   <div class="wb-confirm nivel-{{ S[0] }}" data-slot="confirmacion" role="status" aria-live="polite">
     <div class="wb-confirm-body">
-      <div class="wb-confirm-title">{{ '✅ Caso radicado' if est == 'APROBADO' else '⛔ Siniestro rechazado' }}</div>
+      <div class="wb-confirm-title">{{ '✅ Caso aprobado y radicado' if est == 'APROBADO' else '⛔ Siniestro rechazado' }}</div>
       <div class="wb-confirm-sub">Referencia del caso <strong class="mono">#{{ caso.id[:8]|upper }}</strong> · decisión registrada{% if caso.aprobado_por %} por {{ caso.aprobado_por|redact }}{% endif %}.</div>
     </div>
     <a class="btn btn-ghost" href="/workbench?rol={{ rol }}">Continuar →</a>
@@ -75,7 +77,7 @@
      ruidosa. La IA es INVISIBLE: se ve la historia, no el "agente". P7: ambos orígenes (LLM/base) son REALES —
      no hay mock que rotular; si la redactó el copiloto, una nota MUY sutil y honesta lo dice (no marketing). #}
   <section class="wb-historia" data-slot="resumen">
-    <h2 class="wb-eyebrow">Resumen del caso</h2>
+    <h2 class="wb-eyebrow">Resumen automático</h2>
     <p class="wb-narrativa">{{ detalle.resumen_ejecutivo.texto|redact }}</p>
     {% if detalle.resumen_ejecutivo.origen == 'agente' %}<div class="wb-historia-por">Redactado por el copiloto</div>{% endif %}
   </section>
@@ -104,7 +106,8 @@
       {% if c.ausente %}
         <div class="wb-field is-falta">
           <span class="wb-field-ic" aria-hidden="true">⚠</span>
-          <span class="wb-field-main"><span class="wb-field-label">{{ c.label }}</span><span class="wb-field-value dim">No encontrado — ingrésalo arriba</span></span>
+          {# N9 · el chip "No encontrado" (derecha) ya lo dice; el valor no lo repite, solo indica la acción. #}
+          <span class="wb-field-main"><span class="wb-field-label">{{ c.label }}</span><span class="wb-field-value dim">Ingrésalo arriba</span></span>
           <span class="wb-field-state"><span class="req-tag">No encontrado</span></span>
         </div>
       {% else %}
@@ -127,7 +130,11 @@
             {% else %}
               <span class="wb-conf-pct">{{ (conf*100)|round|int }}%</span><span class="wb-field-flag">revisar</span>
             {% endif %}
-            <span class="wb-field-src">{{ c.fuente }}</span>
+            {# N5 (rev W24.1) · La IA es INVISIBLE en el flujo: no se rotula "IA" en cada fila (todo el sistema
+               es IA; repetirlo es ruido). Se muestra el ORIGEN (de dónde salió el dato: Correo/SOAT/Fotos) —eso
+               sí aporta contexto/trazabilidad—; la ÚNICA excepción marcada es "✍ Manual" (lo escribió el
+               operador), que sí cambia cómo el analista lee el dato. #}
+            <span class="wb-field-src wb-field-origen">{% if c.manual %}✍ Manual{% else %}{{ c.fuente|icono_fuente }} {{ c.fuente }}{% endif %}</span>
           </span>
         </button>
       {% endif %}
@@ -188,15 +195,23 @@
       <h2 class="wb-eyebrow">Actividad del caso</h2>
       <button class="wb-link wb-drawer-trigger" type="button" hx-get="/workbench/actividad/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Ver actividad técnica →</button>
     </div>
-    <ol class="wb-crono-list">
-      {% for p in detalle.timeline %}
-      <li class="wb-crono-step estado-{{ p.estado }}">
-        <span class="wb-crono-dot" aria-hidden="true">{{ p.icono }}</span>
-        <span class="wb-crono-label">{{ p.texto }}{% if p.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
-        {% if p.hora %}<span class="wb-crono-time mono">{{ p.hora }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ol>
+    {# N7 · densidad: se muestran los ÚLTIMOS 4 eventos; los anteriores se colapsan (evita una lista interminable
+       cuando hay 20+). encode-not-hide: el timeline completo sigue en el DOM, a un click. #}
+    {% macro crono_step(p) %}
+    <li class="wb-crono-step estado-{{ p.estado }}">
+      <span class="wb-crono-dot" aria-hidden="true">{{ p.icono }}</span>
+      <span class="wb-crono-label">{{ p.texto }}{% if p.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
+      {% if p.hora %}<span class="wb-crono-time mono">{{ p.hora }}</span>{% endif %}
+    </li>
+    {% endmacro %}
+    {% set tl = detalle.timeline %}
+    {% if tl|length > 4 %}
+    <details class="wb-crono-fold">
+      <summary>Ver los {{ tl|length - 4 }} eventos anteriores</summary>
+      <ol class="wb-crono-list">{% for p in tl[:-4] %}{{ crono_step(p) }}{% endfor %}</ol>
+    </details>
+    {% endif %}
+    <ol class="wb-crono-list">{% for p in tl[-4:] %}{{ crono_step(p) }}{% endfor %}</ol>
   </section>
 
   {# Secundarios plegados (progressive disclosure sin esconder): correo original + comparativa multi-correo #}
@@ -236,7 +251,8 @@
       <div class="wb-eo-block wb-eo-prep">
         {% set hc_pend = detalle.health.checks|rejectattr('estado','equalto','ok')|rejectattr('estado','equalto','na')|list %}
         {% set n_pend = hc_pend|length %}
-        <div class="wb-eo-h"><span>Preparación</span>
+        {# N8 · el aviso "es informativa; decides tú (P1)" pasa a tooltip — se lee una vez, no ocupa una línea fija. #}
+        <div class="wb-eo-h"><span title="La preparación es informativa; la aprobación la decides tú (P1).">Preparación <span class="wb-eo-info" aria-hidden="true">ⓘ</span></span>
           <span class="wb-eo-nm nivel-{{ nivel_prep }}">{{ verificadas|length }} de {{ evaluables|length }}{% if n_pend %} · {{ n_pend }} pendiente{{ 's' if n_pend != 1 }}{% endif %}</span></div>
         <div class="wb-eo-bar" role="img" aria-label="{{ verificadas|length }} de {{ evaluables|length }} verificaciones completas, {{ n_pend }} pendiente(s)">
           <div class="wb-eo-bar-fill nivel-{{ nivel_prep }}" style="width:{{ (100 * verificadas|length / evaluables|length)|round|int if evaluables|length else 0 }}%"></div>
@@ -259,7 +275,6 @@
             {% endfor %}
           </ul>
         </details>
-        <div class="card-foot">La preparación es informativa; la aprobación la decides tú (P1).</div>
       </div>
 
       {# Cobertura · por qué — 🔒P2: PRESENTA la decisión del motor R1-R5, no re-decide. #}
@@ -320,8 +335,17 @@
       </div>
 
       <div class="wb-acciones">
-        <input type="text" id="wb-firma" placeholder="Firma del analista" autocomplete="off">
-        <div class="hint wb-firma-hint">Obligatoria antes de radicar o rechazar.</div>
+        {# N6 · La firma aparece EN EL PUNTO DE ACCIÓN, no flotando arriba del panel. Va con la primaria salvo
+           que la primaria abra un borrador (Preparar solicitud → la firma va al ENVIAR, dentro del drawer). Si
+           la primaria no exige firma (drawer) o no hay primaria, la firma acompaña las acciones terminales de
+           "Más acciones". 🔒P1: hay exactamente UN #wb-firma; el gate REAL es el servidor (usuario requerido). #}
+        {% set firma_con_primaria = rec.accion and not rec.accion.drawer %}
+        {% macro firma_input(ayuda) %}
+        <label class="wb-firma-label">Firma del analista
+          <input type="text" id="wb-firma" placeholder="Tu nombre" autocomplete="off">
+        </label>
+        <div class="hint wb-firma-hint">{{ ayuda }}</div>
+        {% endmacro %}
         {# L1 · Acción PRIMARIA ÚNICA por estado (recomendación == acción, `rec.accion`). Verde/go solo cuando
            es Radicar (terminal con firma). None ⇒ caso resuelto, sin primaria. 🔒P1: el gate real es el servidor. #}
         {% if rec.accion %}
@@ -333,6 +357,8 @@
                 hx-post="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" hx-target="#wb-drawer" hx-swap="innerHTML"
                 title="Redacta un borrador de solicitud al asegurado; tú lo revisas y envías (P1: draft ≠ send)">{{ rec.accion.label }}</button>
         {% else %}
+        {# N6 · firma inmediatamente ANTES de la acción terminal (Radicar/Escalar): se firma donde se decide. #}
+        {{ firma_input('Obligatoria para ' ~ ('radicar' if rec.accion.kind == 'go' else 'esta acción') ~ '.') }}
         <form method="post" action="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" class="wb-firma-form"
               {% if rec.accion.confirm %}data-confirm="{{ rec.accion.confirm }}"{% endif %}>
           <input type="hidden" name="usuario" class="wb-firma-in">
@@ -347,6 +373,9 @@
            superficie. 🔒P1: el humano SÍ puede negar — Rechazar está aquí, a un click. #}
         <details class="wb-mas" data-slot="mas-acciones">
           <summary>Más acciones</summary>
+        {# N6 · si la primaria no trajo la firma (abre drawer o no hay primaria), va aquí — donde viven las
+           acciones terminales secundarias (rechazar/escalar). Garantiza UN solo #wb-firma en la página. #}
+        {% if not firma_con_primaria %}{{ firma_input('Obligatoria para rechazar o escalar.') }}{% endif %}
         {% if caso.estado.value not in ('APROBADO', 'RECHAZADO') %}
         <form method="post" action="/casos/{{ caso.id }}/rechazar" class="wb-firma-form wb-rechazar-form"
               data-confirm="¿Rechazar este siniestro? Quedará RECHAZADO con tu firma.">
@@ -394,10 +423,11 @@
     </div>
   </section>
 
-  {# Preguntar a la IA — copiloto conversacional contextual (MOCK, solo explica; P1/P6/P7) #}
+  {# N9 · "Consultar el caso" (antes "Preguntar a la IA"): toda la pantalla ya la generó la IA; no hace falta
+     repetir "IA" en cada bloque. Copiloto conversacional contextual (MOCK, solo explica; P1/P6/P7). #}
   <section class="card" data-slot="chat">
     <details>
-      <summary class="card-head email-summary"><h2>Preguntar a la IA</h2><span class="badge-demo" title="Copiloto de demostración: respuestas de ejemplo sobre este caso, no una IA funcional (P7)">demo</span></summary>
+      <summary class="card-head email-summary"><h2>Consultar el caso</h2><span class="badge-demo" title="Copiloto de demostración: respuestas de ejemplo sobre este caso, no una IA funcional (P7)">demo</span></summary>
       <div class="card-body">
         <div class="wb-chat-log" id="wb-chat-log">
           <div class="wb-chat-msg wb-chat-ai"><span aria-hidden="true">🤖</span> Pregúntame por qué falta un documento, la cobertura o los riesgos de este caso.</div>

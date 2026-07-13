@@ -145,11 +145,11 @@ def test_panel_metricas_render(client):
     """El panel muestra las métricas de operación + las garantías (separadas, P7)."""
     r = client.get("/panel")
     assert r.status_code == 200
-    assert "Métricas de operación" in r.text
-    assert "Garantías" in r.text and "RULE-CTR-03" in r.text
-    assert "estimado" in r.text  # costo rotulado como estimado (no facturable)
+    assert "Qué está pasando" in r.text                       # W24·N3: sección de métricas de operación
+    assert "Ver controles" in r.text and "RULE-CTR-03" in r.text  # garantías colapsadas, controles siguen en el DOM
+    assert "estimado" in r.text  # costo rotulado como estimado (no facturable), ahora en Detalle técnico
     total = len(get_caso_repository().list())
-    assert str(total) in r.text  # el KPI de casos totales
+    assert str(total) in r.text  # el KPI de backlog total
 
 
 def test_panel_metricas_cero_casos_no_rompe(client):
