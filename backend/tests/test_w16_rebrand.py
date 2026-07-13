@@ -88,11 +88,30 @@ def test_busqueda_sin_resultados_no_crashea(client):
 # ---------- navegación: todo se queda en el workbench ----------
 
 def test_nav_operacional_apunta_al_workbench(client):
-    """La nav operacional (En Proceso/Radicados/Escalados) filtra DENTRO del workbench, no salta a la bandeja."""
+    """La nav operacional (Listos/Radicados/Escalados) filtra DENTRO del workbench, no salta a la bandeja."""
     from app.dashboard import branding
     operacionales = [i for i in branding.SIDEBAR if i["label"] in
-                     ("Inbox", "En Proceso", "Pendientes", "Radicados", "Escalados")]
+                     ("Inbox", "Listos", "Pendientes", "Radicados", "Escalados")]
     assert operacionales and all(i["ruta"].startswith("/workbench") for i in operacionales)
+
+
+def test_nav_no_apunta_a_estado_transitorio():
+    """Fail-closed: ningún link de la nav filtra por un estado TRANSITORIO de la orquestación (EN_PROCESO):
+    ahí no reposa ningún caso → la cola saldría siempre vacía (link que aparenta filtrar y no muestra nada).
+    La nav solo apunta a estados de REPOSO o agregados de UI."""
+    from urllib.parse import parse_qs, urlparse
+    from app.dashboard import branding
+    TRANSITORIOS = {"EN_PROCESO", "RECIBIDO"}
+    for item in branding.SIDEBAR:
+        estados = parse_qs(urlparse(item["ruta"]).query).get("estado", [])
+        assert not (set(estados) & TRANSITORIOS), f"{item['label']} apunta a un estado transitorio: {estados}"
+
+
+def test_nav_listos_apunta_a_casos_accionables():
+    """El atajo 'Listos' lleva al bucket accionable del analista (LISTO_PARA_APROBAR), no a un filtro vacío."""
+    from app.dashboard import branding
+    listos = next((i for i in branding.SIDEBAR if i["label"] == "Listos"), None)
+    assert listos is not None and listos["ruta"] == "/workbench?estado=LISTO_PARA_APROBAR"
 
 
 def test_cola_tarjetas_simples(client):
