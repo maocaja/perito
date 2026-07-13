@@ -11,7 +11,7 @@
 
 {# W20·A1: Productividad del operador (movida desde la Workbench). Reportes/Mi jornada del analista. #}
 {% if productividad %}
-<div class="section-label" style="margin-bottom:10px">Mi jornada (operador)</div>
+<div class="section-label" style="margin-bottom:10px">Cómo voy hoy</div>
 {% include "_productividad.html" %}
 {% endif %}
 
@@ -19,13 +19,11 @@
 {% set ns = namespace(nodos=0) %}
 {% for r in replays %}{% set ns.nodos = ns.nodos + r.trace_events|length %}{% endfor %}
 
-<!-- MÉTRICAS MEDIDAS (operación) -->
-<div class="section-label" style="margin-bottom:10px">Métricas de operación (medidas)</div>
+<!-- MÉTRICAS MEDIDAS (operación) — "¿qué está pasando?" (N3: Tokens/Costo bajan a Detalle técnico) -->
+<div class="section-label" style="margin-bottom:10px">Qué está pasando</div>
 <div class="kpi-grid">
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Casos totales</div><div class="kpi-value">{{ m.total }}</div></div>
+  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Backlog total</div><div class="kpi-value">{{ m.total }}</div><div class="kpi-sub">casos acumulados (todos los estados)</div></div>
   <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">% escalado a humano</div><div class="kpi-value">{{ m.pct_escalado }}%</div><div class="kpi-sub">{{ m.escalado }} en REQUIERE_REVISION</div></div>
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Tokens consumidos</div><div class="kpi-value">{{ "{:,}".format(m.tokens) }}</div><div class="kpi-sub">{{ ns.nodos }} nodos ejecutados</div></div>
-  <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Costo estimado</div><div class="kpi-value">${{ m.costo_estimado }}</div><div class="kpi-sub">estimado · no facturable</div></div>
 </div>
 
 <!-- DISTRIBUCIÓN -->
@@ -53,10 +51,10 @@
   </div>
 </div>
 
-<!-- GARANTÍAS (invariantes, NO métricas medidas) -->
-<div class="card" style="padding:15px 18px;margin-bottom:18px">
-  <div class="section-label">Garantías &amp; trazabilidad — supervisión humana EU AI Act Art. 14 / NAIC Model Bulletin</div>
-  <div class="guardrails">
+<!-- GARANTÍAS (invariantes, NO métricas medidas) — N3: colapsadas; el titular afirma cumplimiento, el detalle a un click -->
+<details class="card reportes-fold" style="padding:15px 18px;margin-bottom:18px">
+  <summary class="section-label" style="cursor:pointer;list-style:none">✔ Cumple — supervisión humana EU AI Act Art. 14 / NAIC · <span style="color:var(--brand)">Ver controles</span></summary>
+  <div class="guardrails" style="margin-top:12px">
     {% set sellos = [
       'Human-in-the-Loop, decide y firma el humano (P1 · EU AI Act Art. 14)',
       'Cobertura por reglas determinísticas, no LLM (P2)',
@@ -70,7 +68,17 @@
     <span class="badge k-ok" style="padding:5px 12px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>{{ s }}</span>
     {% endfor %}
   </div>
-</div>
+</details>
+
+{# N3 · Detalle técnico (ingeniería): tokens y costo NO son datos de decisión del operador; el dato sigue
+   (encode-not-hide), pero colapsado y fuera de las métricas de operación. #}
+<details class="card reportes-fold" style="padding:15px 18px;margin-bottom:18px">
+  <summary class="section-label" style="cursor:pointer;list-style:none">Detalle técnico (tokens, costo) · <span style="color:var(--brand)">Ver</span></summary>
+  <div class="kpi-grid" style="margin-top:12px">
+    <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Tokens consumidos</div><div class="kpi-value">{{ "{:,}".format(m.tokens) }}</div><div class="kpi-sub">{{ ns.nodos }} nodos ejecutados</div></div>
+    <div class="kpi"><div class="kpi-label" style="margin-bottom:7px">Costo estimado</div><div class="kpi-value">${{ m.costo_estimado }}</div><div class="kpi-sub">estimado · no facturable</div></div>
+  </div>
+</details>
 
 <div class="section-label" style="margin-bottom:10px">Trazas por caso</div>
 

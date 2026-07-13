@@ -124,6 +124,23 @@ def _correlacionar_evidencia(caso, tracer):
     return caso.model_copy(update={"correlaciones": correlaciones})
 
 
+def _fusionar_entidades_del_correo(caso):
+    """Modo deterministic: fusiona en la extracción del preset los campos ricos que M2 (`extraer_entidades`,
+    determinístico — NO mock) saca del cuerpo del correo. Da PARIDAD con `real` (donde el extractor ya los
+    fusiona, extractor.py). Sin colisión: los nombres ricos son disjuntos de los 4 base; se omite un nombre
+    ya presente (no-duplicación). Passive/P5: `extraer_entidades` es determinístico y no manda PII a un LLM."""
+    from app.contracts.extraccion import ExtraccionValidada
+    from app.intake.entidades import extraer_entidades
+
+    if not caso.extraccion or not caso.aviso:
+        return caso
+    presentes = {c.nombre for c in caso.extraccion.campos}
+    ricos = [c for c in extraer_entidades(caso.aviso.texto_crudo) if c.nombre not in presentes]
+    if not ricos:
+        return caso
+    return caso.model_copy(update={"extraccion": ExtraccionValidada(campos=list(caso.extraccion.campos) + ricos)})
+
+
 def _procesar(correo) -> None:
     """Un correo → un caso, guardado + trazado. NUNCA alcanza terminal (P1)."""
     from app.dashboard.store import get_caso_repository
@@ -142,6 +159,7 @@ def _procesar(correo) -> None:
         # Conserva el CORREO tal cual llegó como aviso (el operador debe ver lo que entró); la
         # extracción/dictamen son del preset (sin LLM). Números de póliza alineados → sin desajuste.
         caso = caso.model_copy(update={"aviso": AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO)})
+        caso = _fusionar_entidades_del_correo(caso)  # M2: campos ricos del cuerpo (paridad con real)
         caso = _ingerir_adjuntos(caso, correo)  # M1: adjuntos reales sobre el caso preset (si el correo trae)
         caso = _correlacionar_evidencia(caso, None)  # M3: overlay cross-fuente (sin traza en modo preset)
         with _save_lock:

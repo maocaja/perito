@@ -26,19 +26,23 @@
       {# Tarjeta de cola simple (escaneo rápido): prioridad · tiempo · asegurado · tipo · alerta. Fase 0: se
          quitaron placa/conteos/pct (eran mock) — menos ruido y más honestidad P7. Read-only (vive en la región
          poleada): SOLO navegación; conserva data-caso-id para la persistencia de selección. #}
-      <a class="wb-cola-item row-link {{ 'active' if f.caso.id == caso_activo_id }}"
+      {# N4 · la urgencia se ESCANEA, no se lee: acento lateral por carril (rojo/ámbar/amarillo/verde) + fraude
+         resaltado. La prioridad (MEDIA/BAJA) deja de ser lo único que pesa; el porqué operativo manda. #}
+      <a class="wb-cola-item row-link wb-cr-{{ f.carril.carril }} {{ 'active' if f.caso.id == caso_activo_id }}"
          href="/workbench?rol={{ rol }}&caso_id={{ f.caso.id }}"
          hx-get="/workbench/caso/{{ f.caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML"
-         data-caso-id="{{ f.caso.id }}" data-titulo="{{ f.clasificacion.tipo|replace('_',' ')|title }}"
+         data-caso-id="{{ f.caso.id }}" data-titulo="{{ f.clasificacion.tipo_humano }}"
          data-hora="{{ f.hora }}" data-fraude="{{ f.senal_fraude or '' }}"
          title="{{ f.carril.etiqueta }} — {{ f.carril.motivo }}">
+        {% if f.senal_fraude %}<div class="wb-card-flag">🕵️ {{ f.senal_fraude }}</div>{% endif %}
+        <div class="wb-card-aseg">{{ f.resumen.asegurado }}</div>
+        <div class="wb-card-tipo">{{ f.clasificacion.tipo_humano }} <span class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</span></div>
+        {# L4 · razón operativa (por qué está aquí) — para elegir el siguiente sin abrir. #}
+        {% if f.razon %}<div class="wb-card-razon">{{ f.razon }}</div>{% endif %}
         <div class="wb-card-top">
           <span class="chip chip-{{ f.prioridad.nivel|lower }}">{{ f.prioridad.nivel }}</span>
-          <span class="wb-card-hace mono">🕒 {{ f.hace }}</span>
+          <span class="wb-card-hace mono" title="Tiempo desde la última actividad del caso">🕒 esperando {{ f.hace }}</span>
         </div>
-        <div class="wb-card-aseg">{{ f.resumen.asegurado }}</div>
-        <div class="wb-card-tipo">{{ f.clasificacion.tipo|replace('_',' ')|title }} <span class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</span></div>
-        {% if f.senal_fraude %}<div class="wb-card-flag">🕵️ {{ f.senal_fraude }}</div>{% endif %}
       </a>
       {% else %}
       <div class="wb-empty">{% if filtrado %}No hay casos que coincidan con este filtro. <a href="/workbench?rol={{ rol }}">Ver todos</a>.{% else %}Sin casos en la cola. Entran automáticamente desde el correo.{% endif %}</div>

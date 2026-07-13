@@ -75,10 +75,11 @@ def test_render_timeline(client):
 
 # ---------- W4 resumen narrativo ----------
 
-def test_resumen_narrativo_es_prosa():
+def test_resumen_narrativo_es_ejecutivo():
+    """W24·N2: el resumen es una línea EJECUTIVA de conteo+señal (no prosa que repita el hero/campos)."""
     caso = _un_caso()
     texto = vista_caso.resumen_narrativo(caso)
-    assert vista_caso.asegurado_de(caso)["nombre"] in texto
+    assert "datos extraídos" in texto and " · " in texto   # conteo + señales separadas por '·'
     assert texto.endswith(".")
 
 
@@ -87,7 +88,8 @@ def test_resumen_narrativo_menciona_faltantes():
     caso = next((c for c in get_caso_repository().list() if vista_caso.faltantes(c)), None)
     if caso is None:
         pytest.skip("no hay caso con faltantes sembrado")
-    assert "Falta:" in vista_caso.resumen_narrativo(caso)
+    # M2: el resumen nombra lo faltante en humano ("…no puede evaluarse todavía porque falta {campo}")
+    assert "falta" in vista_caso.resumen_narrativo(caso).lower()
 
 
 def test_resumen_narrativo_sin_palabras_prohibidas():
@@ -111,7 +113,7 @@ def test_resumen_narrativo_redacta_pii():
 
 def test_render_resumen_narrativo(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
-    assert "Resumen del caso" in r.text   # V1·2: eyebrow de la historia (antes "Resumen ejecutivo")
+    assert "Resumen automático" in r.text   # W24·N2 (rev): eyebrow del resumen (sin repetir 'IA' en el flujo)
     assert "wb-narrativa" in r.text
 
 

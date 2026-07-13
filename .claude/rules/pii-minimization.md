@@ -1,22 +1,35 @@
 # Regla: Minimización de PII (P5) — NO NEGOCIABLE
 
-Habeas Data por diseño. Dos niveles, ambos P5:
+Habeas Data por diseño. La minimización se aplica en la **frontera de máquina** (LLM, logs, persistencia de
+media cruda), **NO hacia el operador humano autorizado**. Ley 1581: principio de "acceso y circulación
+restringida" = conocimiento **restringido a terceros AUTORIZADOS**, no oculto a quien tiene finalidad legítima.
 
-1. **Minimización** — no incluir PII en el prompt de entrada al LLM (deny-by-default: solo lo operacional).
-2. **Redacción** — si algo debe ir, remover los spans antes (`redact_pii_spans_es_co` / `redact_pii_extendida`).
+**Dos destinos, dos reglas:**
+1. **Al LLM / logs / persistencia (máquina):** minimizar y redactar SIEMPRE (deny-by-default). El modelo no
+   necesita PII → nunca la ve (`redact_pii_spans_es_co` / `redact_pii_extendida`).
+2. **Al operador (encargado del tratamiento con finalidad legítima):** ve el **dato real** en su vista —
+   campos estructurados (cédula/teléfono/placa) y el **correo original** — porque lo necesita para trabajar
+   (verificar identidad, contactar, cruzar fraude). Ocultárselo lo empuja a canales no auditados (peor).
 
 Invariantes:
 - **Ningún texto con PII llega a un LLM sin redacción previa.** Todo prompt (extractor C2, verificador C3,
   triage C0, razonamiento de fraude) parte de texto **ya redactado**.
-- **Ningún adjunto con PII cruda se muestra ni se persiste:** se redacta, o se guarda **solo la huella**
-  (nunca la imagen/media cruda con PII).
-- **La evidencia de fraude/historia referencia solo `caso_id` opaco**, nunca PII (cédula/placa/nombre/media).
-- **El remitente del correo se omite** (no se captura en `CorreoEntrante`).
+- **Ningún adjunto con PII cruda se persiste** (solo la **huella**, nunca la imagen/media cruda). La media
+  real que se muestra en el visor proviene **solo** de assets de demo sintéticos (`demo_assets/`), jamás de
+  la media de un correo real.
+- **La evidencia de fraude/historia (texto DERIVADO) referencia solo `caso_id` / se redacta**, nunca PII —
+  es texto generado, se mantiene conservador aunque los campos del operador muestren el dato.
+- **El remitente del correo se omite** (no se captura en `CorreoEntrante`). **PII nunca a logs.**
+
+**⚖️ Enmascarar + revelar-por-rol + log de acceso** (dynamic data masking, RBAC) es la evolución correcta
+**cuando** aparezca: (a) más de un rol con necesidades distintas, (b) auditoría de cumplimiento, o (c)
+producción con datos reales. Con un único operador autorizado sobre datos sintéticos **no se justifica** —
+mantener simple (mostrar en claro al operador). Decisión de gobernanza: no relajar la frontera de máquina.
 
 **🚫 Prohibido:**
 - Enviar `texto_crudo`/cuerpo de correo/adjunto **sin redactar** a un LLM.
-- Persistir o mostrar media cruda con PII (solo huella).
-- Filtrar PII a logs o a la evidencia de una alerta.
+- Persistir media cruda con PII (solo huella) o servir la media de un correo real en el visor.
+- Filtrar PII a logs o a la evidencia (texto derivado) de una alerta.
 
 **⚠️ Gaps declarados (P7, no ocultos):** el NER de nombres/direcciones es **heurístico** (fase 1); la
 redacción **visual** de imágenes (caras/cédulas/placas) es **fase 2** — hasta entonces las imágenes van

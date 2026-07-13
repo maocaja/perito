@@ -60,86 +60,94 @@ ESCENARIOS = [
     {
         "key": "feliz",
         "titulo": "FELIZ — cobertura OK",
-        "aviso": f"Buenos días, espero que se encuentren muy bien. Les escribo bastante preocupado porque "
-                 f"tuve un accidente con mi carro y la verdad es la primera vez que me pasa algo así, no sé "
-                 f"bien cómo es el proceso. Resulta que venía saliendo del trabajo por la carrera 30, ya era "
-                 f"tarde y estaba lloviznando, había mucho tráfico. Un motociclista se me atravesó de repente "
-                 f"y por no atropellarlo frené y giré el timón, pero terminé estrellándome contra un poste de "
-                 f"la luz del separador. El golpe fue en toda la parte delantera derecha: la puerta del "
-                 f"copiloto quedó abollada, el farol derecho destruido y el espejo partido. Gracias a Dios yo "
-                 f"salí bien, solo un susto y un golpecito en el brazo, pero el carro sí quedó bastante "
+        "aviso": f"Buenos días, espero que se encuentren muy bien. Mi nombre es Andrés Ramírez, con cédula "
+                 f"79.482.135, y les escribo bastante preocupado porque tuve un accidente con mi carro, un "
+                 f"Mazda 3, placas FBC123, y la verdad es la primera vez que me pasa algo así, no sé bien "
+                 f"cómo es el proceso. Resulta que venía saliendo del trabajo por la Carrera 30 con Calle 45, "
+                 f"ya era tarde y estaba lloviznando, había mucho tráfico. Un motociclista se me atravesó de "
+                 f"repente y por no atropellarlo frené y giré el timón, pero terminé estrellándome contra un "
+                 f"poste de la luz del separador. El golpe fue en toda la parte delantera derecha: la puerta "
+                 f"del copiloto quedó abollada, el farol derecho destruido y el espejo partido. Gracias a Dios "
+                 f"yo salí bien, solo un susto y un golpecito en el brazo, pero el carro sí quedó bastante "
                  f"maltratado. El siniestro fue el {FECHA}. Tengo con ustedes la póliza número POL-DEMO-1001, "
                  f"que saqué hace como un año para el vehículo. Ya lo llevé a un taller de confianza y me "
                  f"dijeron que la reparación, entre latonería, pintura, el farol y el espejo, sale en unos "
-                 f"5.000.000 de pesos, aunque todavía me deben pasar la cotización formal. Quisiera saber qué "
-                 f"debo hacer, qué documentos necesitan y si esto lo cubre mi póliza. Quedo muy atento a su "
-                 f"respuesta. Mil gracias por la ayuda.",
-        "poliza": poliza_demo(numero="POL-DEMO-1001", suma="100000000"),
+                 f"5.000.000 de pesos, aunque todavía me deben pasar la cotización formal. Mi celular es el "
+                 f"310 555 8899 por si necesitan contactarme. Quisiera saber qué debo hacer, qué documentos "
+                 f"necesitan y si esto lo cubre mi póliza. Quedo muy atento a su respuesta. Mil gracias por la "
+                 f"ayuda.",
+        "poliza": poliza_demo(numero="POL-DEMO-1001", suma="100000000", deducible="0"),  # deducible 0 → CUBIERTO pleno
         "objetivo": "P2/P3: el motor dictamina y cita regla + cláusula · P1: el caso NO se cierra solo",
     },
     {
         "key": "fraude",
         "titulo": "FRAUDE — monto excede la suma asegurada",
-        "aviso": f"Cordial saludo. Escribo para reportar un siniestro que tuve con mi vehículo, fue un "
-                 f"choque bastante fuerte y estoy muy afectado. Ocurrió el {FECHA} en la vía que va hacia las "
-                 f"afueras de la ciudad; venía a velocidad normal cuando otro carro se pasó el semáforo en "
-                 f"rojo y me impactó de lado, mandándome contra el andén. El vehículo quedó prácticamente "
-                 f"destruido: el chasis se torció, se activaron todos los airbags, el motor quedó sonando "
-                 f"raro, las dos puertas del lado derecho no abren, el eje delantero se dañó y la carrocería "
-                 f"quedó doblada. Es un carro que yo cuidaba muchísimo, le había puesto rines nuevos y sonido. "
-                 f"Mi póliza con ustedes es la POL-DEMO-1002. Después de hablar con un perito conocido y con "
-                 f"el taller, estoy reclamando 15.000.000 de pesos por la totalidad de los daños, porque "
-                 f"francamente creo que el carro quedó para pérdida total. Necesito que me ayuden con esto lo "
-                 f"más pronto posible porque ese carro es mi herramienta de trabajo y sin él no puedo generar "
-                 f"ingresos. Agradezco su pronta gestión y quedo pendiente de sus indicaciones.",
+        "aviso": f"Cordial saludo. Mi nombre es Carlos Gutiérrez, con cédula 1.020.457.881. Escribo para "
+                 f"reportar un siniestro que tuve con mi vehículo, un Chevrolet Onix, placas GHT456; fue un "
+                 f"choque bastante fuerte y estoy muy afectado. Ocurrió el {FECHA} sobre la Autopista Norte "
+                 f"con Calle 170; venía a velocidad normal cuando otro carro se pasó el semáforo en rojo y me "
+                 f"impactó de lado, mandándome contra el andén. El vehículo quedó prácticamente destruido: el "
+                 f"chasis se torció, se activaron todos los airbags, el motor quedó sonando raro, las dos "
+                 f"puertas del lado derecho no abren, el eje delantero se dañó y la carrocería quedó doblada. "
+                 f"Es un carro que yo cuidaba muchísimo, le había puesto rines nuevos y sonido. Mi póliza con "
+                 f"ustedes es la POL-DEMO-1002. Después de hablar con un perito conocido y con el taller, "
+                 f"estoy reclamando 15.000.000 de pesos por la totalidad de los daños, porque francamente creo "
+                 f"que el carro quedó para pérdida total. Mi celular es 320 444 5566. Necesito que me ayuden "
+                 f"con esto lo más pronto posible porque ese carro es mi herramienta de trabajo y sin él no "
+                 f"puedo generar ingresos. Agradezco su pronta gestión y quedo pendiente de sus indicaciones.",
         "poliza": poliza_demo(numero="POL-DEMO-1002", suma="10000000"),  # suma 10M < monto 15M → fraude
         "objetivo": "P6: fraude detectado y explicable (monto excede suma) · solo sugiere, decide el humano",
     },
     {
         "key": "cobertura-negativa",
         "titulo": "COBERTURA NEGATIVA — tipo no contratado",
-        "aviso": f"Buenas tardes, escribo para reportar un daño en mi vivienda y ver si me lo pueden cubrir. "
-                 f"El {FECHA} en la madrugada se reventó una tubería del baño del segundo piso, al parecer por "
-                 f"la presión del agua, y cuando me desperté ya había un reguero por toda la casa. El agua "
-                 f"bajó por las escaleras y me dañó los muebles de la sala: el sofá quedó empapado, la mesa de "
+        "aviso": f"Buenas tardes. Mi nombre es Diana Torres, con cédula 52.876.109, y escribo para reportar "
+                 f"un daño en mi vivienda ubicada en la Calle 128 # 19-45 y ver si me lo pueden cubrir. El "
+                 f"{FECHA} en la madrugada se reventó una tubería del baño del segundo piso, al parecer por la "
+                 f"presión del agua, y cuando me desperté ya había un reguero por toda la casa. El agua bajó "
+                 f"por las escaleras y me dañó los muebles de la sala: el sofá quedó empapado, la mesa de "
                  f"madera se hinchó y la alfombra quedó inservible. También se levantó una parte del piso "
                  f"laminado del comedor. Fue un desastre, pasamos toda la mañana secando y sacando agua con "
                  f"la familia, imagínese el estrés. Mi póliza es la POL-DEMO-1003. Un conocido que sabe de "
                  f"construcción me ayudó a calcular y dice que reponer los muebles y arreglar el piso sale en "
                  f"unos 3.000.000 de pesos más o menos. Es un daño por agua en la vivienda, tipo HOGAR_AGUA. "
-                 f"Quisiera saber si mi póliza responde por esto y cómo es el trámite para la reclamación. "
-                 f"Muchas gracias de antemano por su atención.",
+                 f"Mi celular es 315 777 8899. Quisiera saber si mi póliza responde por esto y cómo es el "
+                 f"trámite para la reclamación. Muchas gracias de antemano por su atención.",
         "poliza": poliza_demo(numero="POL-DEMO-1003", coberturas=("AUTO_COLISION",), suma="100000000"),  # suma alta → sin fraude incidental
         "objetivo": "P2: NO_CUBIERTO citando la regla de cobertura · lo decide el motor, NO el LLM",
     },
     {
         "key": "no-encontrada",
         "titulo": "PÓLIZA NO ENCONTRADA — escala",
-        "aviso": f"Hola, buenas. Necesito reportar un choque que tuve con mi carro el {FECHA}. Iba por una "
-                 f"calle destapada camino a la finca cuando otro vehículo que venía en sentido contrario me "
-                 f"cerró y, para esquivarlo, me subí a una cuneta; el carro se raspó todo el costado "
-                 f"izquierdo, se dañó el rin delantero y el bómper quedó guindando de un lado. No fue un "
-                 f"choque de muerte pero sí quedó feo y me tocó sacarlo con grúa. Mi número de póliza es "
+        "aviso": f"Hola, buenas. Mi nombre es Jorge Medina, con cédula 80.145.223. Necesito reportar un "
+                 f"choque que tuve con mi carro, un Renault Logan, placas JKL789, el {FECHA}. Iba por la "
+                 f"Calle 80 con Carrera 68, camino a la finca, cuando otro vehículo que venía en sentido "
+                 f"contrario me cerró y, para esquivarlo, me subí a una cuneta; el carro se raspó todo el "
+                 f"costado izquierdo, se dañó el rin delantero y el bómper quedó guindando de un lado. No fue "
+                 f"un choque de muerte pero sí quedó feo y me tocó sacarlo con grúa. Mi número de póliza es "
                  f"POL-DEMO-9999, o al menos ese es el que tengo anotado en un papel que me dio el corredor "
                  f"cuando la compré. Los daños, según un mecánico que conozco, salen por ahí en 4.000.000 de "
-                 f"pesos entre el rin, el bómper y la latonería de todo el costado. Quisiera empezar el "
-                 f"proceso de reclamación cuanto antes. Quedo atento a lo que necesiten. Muchas gracias.",
+                 f"pesos entre el rin, el bómper y la latonería de todo el costado. Mi celular es 300 111 "
+                 f"2233. Quisiera empezar el proceso de reclamación cuanto antes. Quedo atento a lo que "
+                 f"necesiten. Muchas gracias.",
         "poliza": None,  # a propósito NO se siembra → C4 no la encuentra → escala P4
         "objetivo": "P4: escala a REQUIERE_REVISION — NO inventa una póliza ni cierra el caso",
     },
     {
         "key": "campos-faltantes",
         "titulo": "DATOS FALTANTES — escala pidiendo info",
-        "aviso": "Buenos días. Les cuento que ayer tuve un accidente con el carro y estoy bastante "
-                 "estresado, no había tenido tiempo de reportarlo antes. Fue saliendo de un parqueadero de "
-                 "un centro comercial: otro carro me pegó por detrás cuando yo estaba saliendo en reversa, "
-                 "un golpe en el bómper trasero y la compuerta del baúl que ya no cierra bien. La otra "
-                 "persona se bajó, discutimos un rato, tomamos fotos y nos intercambiamos los datos del "
-                 "seguro, pero yo estaba muy nervioso y la verdad no revisé bien todo. Mi póliza con ustedes "
-                 "es la POL-DEMO-1001. Todavía no tengo ni idea de cuánto pueda costar el arreglo, apenas "
-                 "mañana voy a llevar el carro a un taller para que me den la cotización, así que aún no les "
-                 "puedo decir el monto de los daños. Quería ir adelantando el reporte mientras tanto. ¿Me "
-                 "pueden ir diciendo qué documentos necesito? Gracias, quedo muy pendiente.",
+        "aviso": "Buenos días. Mi nombre es Laura Castaño, con cédula 43.998.210. Les cuento que ayer tuve "
+                 "un accidente con el carro, un Kia Picanto, placas MNO321, y estoy bastante estresada, no "
+                 "había tenido tiempo de reportarlo antes. Fue saliendo de un parqueadero de un centro "
+                 "comercial sobre la Calle 80 con Carrera 15: otro carro me pegó por detrás cuando yo estaba "
+                 "saliendo en reversa, un golpe en el bómper trasero y la compuerta del baúl que ya no cierra "
+                 "bien. La otra persona se bajó, discutimos un rato, tomamos fotos y nos intercambiamos los "
+                 "datos del seguro, pero yo estaba muy nerviosa y la verdad no revisé bien todo. Mi póliza "
+                 "con ustedes es la POL-DEMO-1001. Todavía no tengo ni idea de cuánto pueda costar el "
+                 "arreglo, apenas mañana voy a llevar el carro a un taller para que me den la cotización, así "
+                 "que aún no les puedo decir el monto de los daños. Mi celular es 311 222 3344. Quería ir "
+                 "adelantando el reporte mientras tanto. ¿Me pueden ir diciendo qué documentos necesito? "
+                 "Gracias, quedo muy pendiente.",
         "poliza": None,  # reusa POL-DEMO-1001 (sembrada por 'feliz'); falta el monto → escala (P4)
         "objetivo": "P4: aviso incompleto (sin monto) → escala, no inventa · el humano pide el dato",
     },

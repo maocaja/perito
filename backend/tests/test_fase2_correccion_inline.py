@@ -90,7 +90,7 @@ def test_form_corregir_presente_y_prellenado(client):
     caso = _con_extraccion()
     html = client.get(f"/workbench/caso/{caso.id}").text
     assert 'hx-post="/workbench/corregir/' in html and 'hx-target="#wb-caso"' in html
-    assert "Corregir y recalcular" in html
+    assert "Guardar y verificar" in html   # L1: acción con resultado humano (antes "Corregir y recalcular")
     # campos_corregibles pre-llena con los valores actuales
     corregibles = vista_caso.campos_corregibles(caso)
     assert len(corregibles) == len(vista_caso.CAMPOS)

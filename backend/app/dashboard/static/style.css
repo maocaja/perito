@@ -352,12 +352,18 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
   padding:12px 14px; font-weight:600; border-bottom:1px solid var(--border); background:var(--surface-2); }
 /* Tarjeta rica de la cola (mockup): chip prioridad · #id · asegurado · tipo · póliza|placa · conteos */
 .wb-cola-list { max-height:calc(100vh - 200px); overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:9px; }
-.wb-cola-item { display:block; padding:11px 13px; border:1px solid var(--border); border-radius:10px;
-  text-decoration:none; color:var(--text); cursor:pointer; background:var(--surface); transition:border-color .12s, box-shadow .12s; }
+.wb-cola-item { display:block; padding:11px 13px; border:1px solid var(--border); border-left:3px solid var(--border);
+  border-radius:10px; text-decoration:none; color:var(--text); cursor:pointer; background:var(--surface); transition:border-color .12s, box-shadow .12s; }
 .wb-cola-item:hover { border-color:var(--border-strong); }
+/* N4 · acento lateral por CARRIL: la urgencia se escanea sin leer (rojo lesionados · ámbar cobertura dudosa ·
+   amarillo docs faltantes · verde listo). El porqué operativo pesa más que la etiqueta MEDIA/BAJA. */
+.wb-cola-item.wb-cr-rojo     { border-left-color:var(--bad); }
+.wb-cola-item.wb-cr-ambar    { border-left-color:var(--warn); }
+.wb-cola-item.wb-cr-amarillo { border-left-color:var(--warn-bd); }
+.wb-cola-item.wb-cr-verde    { border-left-color:var(--ok); }
 /* Selección de la cola: calma ink, no rojo (el rojo se reserva a lo crítico — manifiesto V1) */
 .wb-cola-item.active { border-color:var(--primary-bd); box-shadow:inset 3px 0 0 var(--primary), var(--shadow-sm); background:var(--primary-weak); }
-.wb-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.wb-card-top { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
 .wb-card-hace { font-size:11px; color:var(--text-3); }
 .wb-card-id { font-size:11px; color:var(--text-3); font-weight:600; }
 .wb-card-aseg { font-weight:700; font-size:14px; margin-top:2px; display:flex; align-items:center; gap:6px; }
@@ -365,7 +371,24 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-card-pol { font-size:11.5px; color:var(--text-3); margin-top:2px; }
 .wb-card-counts { display:flex; gap:12px; margin-top:8px; font-size:11.5px; color:var(--text-2); font-variant-numeric:tabular-nums; }
 .wb-card-pct { color:var(--ok); font-weight:700; margin-left:auto; }
-.wb-card-flag { margin-top:7px; font-size:11px; color:var(--warn); }
+.wb-card-razon { margin-top:5px; font-size:11.5px; color:var(--text-3); }  /* L4 · razón operativa */
+
+/* L5 · Confirmación fuerte tras acción terminal (radicado/rechazado). */
+.wb-confirm { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:12px 0;
+  padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); }
+.wb-confirm.nivel-ok { border-color:var(--go-strong); background:color-mix(in srgb, var(--go) 8%, var(--surface)); }
+.wb-confirm-title { font-weight:700; font-size:var(--fs-body); }
+.wb-confirm-sub { font-size:var(--fs-sm); color:var(--text-2); margin-top:2px; }
+/* L5 · Estado de carga del recálculo inline (HTMX): 'Guardando…' visible durante la request. */
+.htmx-indicator { display:none; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display:inline-block; }
+.wb-guardando { margin-left:10px; font-size:var(--fs-sm); color:var(--text-2); }
+.htmx-request .btn-primary { opacity:.55; pointer-events:none; }
+/* N4 · fraude RESALTADO (va arriba de la tarjeta): es la señal más accionable, no una nota al pie. */
+.wb-card-flag { margin-bottom:6px; font-size:11.5px; font-weight:600; color:var(--bad);
+  display:inline-flex; align-items:center; gap:4px; }
+/* N5 · chip de origen del dato (📧 IA · ✍ Manual): quién puso el valor, de un vistazo. */
+.wb-field-origen { font-size:10.5px; color:var(--text-3); white-space:nowrap; }
 
 /* Centro · historia */
 .wb-centro { display:flex; flex-direction:column; gap:12px; min-width:0; }
@@ -386,20 +409,36 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-status.nivel-neutral .wb-status-ic { color:var(--text-3); }
 
 /* W20·A2 · Bloque héroe "Necesitas revisar": banner + campo editable embebido (corrige aquí, sin bajar al panel) */
-.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:12px; padding:14px 16px;
-  display:flex; flex-direction:column; gap:12px; }
+/* M6 · el bloque de excepción pesa menos (padding/gap más ajustados): es una acción a resolver, no un cartel. */
+.wb-revisar { border:1px solid var(--warn-bd); background:var(--warn-bg); border-radius:10px; padding:12px 14px;
+  display:flex; flex-direction:column; gap:9px; }
 .wb-revisar.tone-ok { border-color:var(--ok-bd); background:var(--ok-bg); }
-.wb-revisar-head { display:flex; gap:12px; align-items:flex-start; }
-.wb-revisar-ic { font-size:22px; line-height:1; }
+.wb-revisar-head { display:flex; gap:10px; align-items:flex-start; }
+.wb-revisar-ic { font-size:19px; line-height:1; }
 .wb-revisar-title { font-weight:700; }
 .wb-revisar-text { color:var(--text-2); font-size:13px; margin-top:2px; }
-.wb-revisar-form { border-top:1px dashed var(--border); padding-top:12px; margin-top:2px; }
+.wb-revisar-form { border-top:1px dashed var(--border); padding-top:10px; margin-top:2px; }
+/* M6 · datos verificados colapsados en caso bloqueado ("primero la excepción"). El summary es el eyebrow;
+   list-style:none cross-browser (igual que wb-mas/wb-hc-more/wb-tech). encode-not-hide: a un click. */
+.wb-datos-fold > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:6px; }
+.wb-datos-fold > summary::-webkit-details-marker { display:none; }
+.wb-datos-fold > summary::before { content:"▸"; color:var(--text-3); font-size:11px; transition:transform .12s; }
+.wb-datos-fold[open] > summary::before { transform:rotate(90deg); }
+/* N7 · timeline: eventos anteriores colapsados (últimos 4 visibles). Mismo disclosure calmo. */
+.wb-crono-fold > summary { cursor:pointer; list-style:none; font-size:12px; color:var(--text-3); margin-bottom:6px; }
+.wb-crono-fold > summary::-webkit-details-marker { display:none; }
+.wb-crono-fold > summary::before { content:"▸ "; color:var(--text-3); }
+.wb-crono-fold[open] > summary::before { content:"▾ "; }
+/* N8 · ⓘ del aviso de preparación (el texto va en el title). */
+.wb-eo-info { font-size:11px; color:var(--text-3); cursor:help; }
 .copilot-headline { font-weight:600; margin-bottom:8px; }
 .copilot-lines { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13.5px; color:var(--text-2); }
-.wb-strip { display:flex; gap:10px; flex-wrap:wrap; }
-.wb-strip-item { flex:1; min-width:120px; background:var(--surface); border:1px solid var(--border);
-  border-radius:10px; padding:9px 12px; }
-.wb-strip-val { font-weight:700; margin-top:2px; }
+/* N8 · strip ~25% más compacto: gap/padding/min-width reducidos y label más chico (libera espacio vertical). */
+.wb-strip { display:flex; gap:8px; flex-wrap:wrap; }
+.wb-strip-item { flex:1; min-width:92px; background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:6px 10px; }
+.wb-strip-item .hint { font-size:10.5px; }
+.wb-strip-val { font-weight:700; margin-top:1px; font-size:13px; }
 .wb-strip-item.nivel-ok .wb-strip-val{color:var(--ok)} .wb-strip-item.nivel-bad .wb-strip-val{color:var(--bad)}
 .wb-strip-item.nivel-warn .wb-strip-val{color:var(--warn)}
 .req-tag { font-size:10.5px; font-weight:700; color:var(--warn); background:var(--warn-bg);
@@ -419,6 +458,9 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
   background:var(--surface); color:var(--text); font:inherit; }
 /* Señal "falta la firma": el operador debe escribir su nombre en #wb-firma antes de una acción firmada (P1) */
 #wb-firma.wb-firma-missing { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
+/* N6 · la firma vive en el punto de acción (con Radicar/Rechazar), no flotando arriba del panel. */
+.wb-firma-label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:var(--text-2); }
+.wb-firma-hint { margin-top:-2px; }
 .wb-o { text-align:center; color:var(--text-3); font-size:12px; }
 
 /* Chips por prioridad / fraude */
@@ -603,8 +645,9 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
   background:var(--surface); cursor:pointer; text-align:left; padding:0; font:inherit; color:var(--text); }
 .wb-doc:hover { border-color:var(--primary-bd); box-shadow:var(--shadow); transform:translateY(-1px); }  /* lift calmo (Linear) */
 .wb-doc:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
-.wb-doc-preview { height:96px; display:flex; align-items:center; justify-content:center; background:var(--sunken); border-bottom:1px solid var(--border); }
+.wb-doc-preview { height:96px; display:flex; align-items:center; justify-content:center; background:var(--sunken); border-bottom:1px solid var(--border); overflow:hidden; }
 .wb-doc-ic { font-size:32px; opacity:.85; }
+.wb-doc-thumb { width:100%; height:100%; object-fit:cover; display:block; }  /* thumbnail real (demo_assets) */
 .wb-doc-meta { display:flex; flex-direction:column; gap:3px; padding:9px 11px; }
 .wb-doc-label { font-size:12px; color:var(--text); line-height:1.25; font-weight:500; }
 .wb-doc-estado { font-size:9px; text-transform:uppercase; letter-spacing:.4px; font-weight:700; }
@@ -617,6 +660,31 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 .wb-ev-doc { background:var(--sunken); border:1px solid var(--border); border-radius:8px; padding:14px; }
 .wb-ev-page { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:4px;
   height:220px; padding:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
+/* L2 · Divulgación de lo técnico (regla/motor): calma, a un click — encode-not-hide (no borrado). */
+.wb-tech { margin-top:4px; }
+.wb-tech > summary { font-size:var(--fs-xs); color:var(--text-3); cursor:pointer; list-style:none; }
+.wb-tech > summary::-webkit-details-marker { display:none; }
+.wb-tech > summary::before { content:"› "; }
+.wb-tech[open] > summary::before { content:"⌄ "; }
+
+/* L3 · "Más acciones": las secundarias no compiten con la primaria; disclosure calmo (todo sigue disponible). */
+.wb-mas { margin-top:6px; }
+.wb-mas > summary { font-size:var(--fs-sm); color:var(--text-2); cursor:pointer; padding:7px 2px; list-style:none; user-select:none; border-radius:6px; }
+.wb-mas > summary:hover { color:var(--text); background:var(--sunken); }
+.wb-mas > summary::-webkit-details-marker { display:none; }
+.wb-mas > summary::after { content:" ▾"; color:var(--text-3); }
+.wb-mas[open] > summary::after { content:" ▴"; }
+.wb-mas[open] { border-top:1px solid var(--border); margin-top:8px; padding-top:6px; }
+
+/* L3 · "Ver todas las verificaciones": completadas/na plegadas; pendientes quedan a la vista. */
+.wb-hc-more { margin-top:6px; }
+.wb-hc-more > summary { font-size:var(--fs-xs); color:var(--text-3); cursor:pointer; list-style:none; padding:3px 0; }
+.wb-hc-more > summary::-webkit-details-marker { display:none; }
+.wb-hc-more > summary::after { content:" ▾"; }
+.wb-hc-more[open] > summary::after { content:" ▴"; }
+
+.wb-ev-media { max-width:100%; max-height:62vh; border-radius:4px; display:block; box-shadow:var(--shadow-sm); }  /* imagen real */
+embed.wb-ev-media { width:100%; height:62vh; }  /* PDF real embebido */
 .wb-ev-line { height:7px; background:var(--sunken); border-radius:3px; margin-bottom:11px; }
 .wb-ev-line:nth-child(3n){ width:82%; } .wb-ev-line:nth-child(4n){ width:64%; }
 .wb-ev-hl { position:absolute; left:8px; right:8px; background:color-mix(in srgb, var(--warn) 26%, transparent);
@@ -717,7 +785,7 @@ a.kpi.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak)
 /* ═══════════ Fase 2 · Corrección inline (server-authoritative) ═══════════ */
 .wb-corregir-form { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; align-items:end; }
 .wb-corregir-campo { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--text-2); font-weight:600; }
-.wb-corregir-campo input { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
+.wb-corregir-campo input, .wb-corregir-campo select { padding:8px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }  /* M3 · select combina con los inputs */
 .wb-corregir-firma { grid-column:1 / -1; }
 .wb-corregir-form .btn { grid-column:1 / -1; }
 

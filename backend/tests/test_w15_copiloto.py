@@ -83,7 +83,7 @@ def test_pregunta_redactada_en_html(client):
 
 def test_panel_chat_rotulado_demo(client):
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
-    assert "Preguntar a la IA" in html
+    assert "Consultar el caso" in html   # W24·N9: antes "Preguntar a la IA" (menos repetición de 'IA')
     assert 'data-slot="chat"' in html and "badge-demo" in html
     assert 'hx-post="/workbench/preguntar/' in html
 

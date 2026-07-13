@@ -32,23 +32,68 @@ _PLACAS_DEMO = {
     "campos-faltantes": ("MNO321", "MNO321"),
 }
 
+# Vehículo por escenario, ALINEADO con el cuerpo del correo → M3 cruza también 'Vehículo' (además de 'Placa').
+# En 'fraude', el vehículo COINCIDE (mismo carro descrito) pero la placa del SOAT difiere → la divergencia
+# aísla la placa: "el mismo carro, con una placa que no concuerda" (señal de fraude realista).
+_VEHICULOS_DEMO = {
+    "feliz": "Mazda 3", "fraude": "Chevrolet Onix", "no-encontrada": "Renault Logan",
+    "campos-faltantes": "Kia Picanto",
+}
+
+# Foto REAL por escenario (archivos en `demo_assets/`), alineada con el daño que narra cada correo. Si el
+# archivo no existe, se cae a la foto sintética compartida (bytes estables → cross-claim foto reutilizada).
+_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo_assets")
+_FOTO_POR_ESCENARIO = {
+    "feliz": "Colisión_Delantera.png",             # "golpe en la parte delantera derecha"
+    "fraude": "Colision_lateral_derecha.png",      # "me impactó de lado, pérdida total"
+    "no-encontrada": "Colision_lateral_izquierda.png",  # "raspó todo el costado izquierdo"
+    "campos-faltantes": "Colisión_Trasera.png",    # "golpe en el bómper trasero"
+}
+
+
+def _leer_asset(nombre: str) -> bytes | None:
+    """Bytes de un asset real de `demo_assets/` si existe; None si no (→ fallback sintético)."""
+    ruta = os.path.join(_ASSETS_DIR, nombre)
+    if os.path.isfile(ruta):
+        with open(ruta, "rb") as f:
+            return f.read()
+    return None
+
+
+def _foto_de(key: str) -> tuple[str, bytes] | None:
+    """Foto del escenario: la REAL de `demo_assets/` si existe; si no, la sintética compartida para los
+    escenarios de auto; None para vivienda (P7: no se le inventa una foto de carro)."""
+    nombre = _FOTO_POR_ESCENARIO.get(key)
+    if nombre:
+        datos = _leer_asset(nombre)
+        if datos is not None:
+            return (nombre, datos)
+    return ("foto_siniestro.jpg", _FOTO_COMPARTIDA) if key in _PLACAS_DEMO else None
+
 
 def _adjuntos_demo(key: str) -> list[tuple[str, bytes]]:
-    """Adjuntos sintéticos por escenario para ejercitar M1 (huella/galería) y M3 (cruce de fuentes).
+    """Adjuntos por escenario para ejercitar M1 (huella/galería/render) y M3 (cruce de fuentes).
 
-    - Foto compartida en todos → foto reutilizada (M1) al segundo correo.
-    - denuncia.txt + soat.txt con placa → M3 correlaciona las dos fuentes ('fraude' diverge, resto coincide).
-    - El escenario de vivienda (sin placa) solo lleva la foto (honesto: no se le inventan papeles de auto).
+    - Foto REAL del escenario (o sintética compartida de fallback) → galería + visor + huella.
+    - denuncia + soat SINTÉTICOS con placa Y vehículo → M3 cruza dos campos entre Correo/Denuncia/SOAT
+      ('fraude' diverge en la placa; el vehículo coincide → aísla la señal). El visor pinta `SOAT.png`
+      (demo_assets) por etiqueta, pero el texto sintético es el que M3 lee (sin OCR, la imagen no da texto).
+    - El escenario de vivienda (sin placa) no lleva foto de auto (honesto).
     """
-    adjuntos: list[tuple[str, bytes]] = [("foto_siniestro.jpg", _FOTO_COMPARTIDA)]
+    adjuntos: list[tuple[str, bytes]] = []
+    foto = _foto_de(key)
+    if foto:
+        adjuntos.append(foto)
     placas = _PLACAS_DEMO.get(key)
     if placas:
         p_denuncia, p_soat = placas
+        vehiculo = _VEHICULOS_DEMO[key]
         adjuntos.append(("denuncia.txt",
-                         f"DENUNCIA POLICIAL (sintética)\nVehículo involucrado placa {p_denuncia}.\n"
-                         f"Fecha del siniestro 2026-06-10.\n".encode("utf-8")))
+                         f"DENUNCIA POLICIAL (sintética)\nVehículo involucrado: {vehiculo}, placa {p_denuncia}.\n"
+                         f"Descripción: colisión reportada por el conductor.\n".encode("utf-8")))
         adjuntos.append(("soat.txt",
-                         f"SOAT (sintético)\nPlaca {p_soat}\nVigencia 2026-01-01 a 2026-12-31.\n".encode("utf-8")))
+                         f"SOAT (sintético)\nVehículo: {vehiculo}.\nPlaca: {p_soat}.\n"
+                         f"Vigencia: 2026-01-01 a 2026-12-31.\n".encode("utf-8")))
     return adjuntos
 
 

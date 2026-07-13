@@ -1,25 +1,26 @@
-{# Vista comparativa multi-correo (Fase 1): se abre en el drawer desde "Comparar correos". Mock rotulado; el
-   clustering real llega con U7/U8/M1. P5: resúmenes redactados. #}
+{# Cruce de fuentes del expediente (Fase 1): se abre en el drawer desde "Comparar fuentes". Alimentado por el
+   Evidence Correlator (M3, real) vía `comparativa_de(caso)`. P5: resúmenes/valores redactados. P6: una
+   divergencia solo sugiere. P7: `demo` solo si el origen no es real. #}
 <div class="wb-drawer-inner">
   <header class="wb-drawer-head">
-    <h2>Vista comparativa <span class="hint">· {{ comparativa.fuentes|length }} correos</span> <span class="badge-demo" title="Agrupación multi-correo de demostración; el clustering real llega con U7/U8/M1">demo</span></h2>
-    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar vista comparativa">✕</button>
+    <h2>Cruce de fuentes <span class="hint">· {{ comparativa.fuentes|length }} fuentes</span>{% if comparativa.origen == 'demo' %} <span class="badge-demo" title="Cruce de demostración">demo</span>{% endif %}</h2>
+    <button class="wb-drawer-x" type="button" onclick="this.closest('dialog').close()" aria-label="Cerrar cruce de fuentes">✕</button>
   </header>
   <div class="wb-drawer-body">
     {% if comparativa.disponible %}
     <div class="wb-comp">
       <div class="wb-comp-fuentes">
         {% for f in comparativa.fuentes %}
-        <div class="wb-comp-fuente"><div class="wb-comp-f-top"><strong>{{ f.etiqueta }}</strong><span class="hint">{{ f.fecha }}</span></div><div class="wb-comp-f-res">{{ f.resumen|redact }}</div></div>
+        <div class="wb-comp-fuente"><div class="wb-comp-f-top"><strong>{{ f.etiqueta }}</strong>{% if f.fecha %}<span class="hint">{{ f.fecha }}</span>{% endif %}</div><div class="wb-comp-f-res">{{ f.resumen|redact }}</div></div>
         {% endfor %}
       </div>
       <div class="wb-comp-cambios">
-        <div class="hint">Cambios detectados por la IA</div>
+        <div class="hint">Coincidencias y divergencias entre fuentes</div>
         <ul>{% for c in comparativa.cambios %}<li><span aria-hidden="true">{{ c.icono }}</span> {{ c.texto|redact }}</li>{% endfor %}</ul>
       </div>
     </div>
     {% else %}
-    <div class="wb-ev-empty">Un solo correo — no hay nada que comparar.</div>
+    <div class="wb-ev-empty">Una sola fuente — no hay nada que cruzar.</div>
     {% endif %}
   </div>
 </div>

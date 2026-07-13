@@ -25,12 +25,15 @@ BRANDING = {
 # Navegación lateral: cada ítem apunta a una ruta REAL existente; los que no tienen destino → habilitado=False
 # (placeholder honesto, no un link falso). Ver W16 §7.
 # Acoplamiento declarado: los valores de `carril=` deben existir en `vista_caso.CARRILES` (amarillo/ambar) y
-# los de `estado=` en `EstadoCaso`/pseudo-filtros de `_filtrar_bandeja` (EN_PROCESO/RESUELTOS). Si cambian allá,
-# actualizar aquí (un carril inválido filtra a vacío, no rompe).
+# los de `estado=` en `EstadoCaso`/pseudo-filtros de `_filtrar_bandeja` (LISTO_PARA_APROBAR/RESUELTOS). Si cambian
+# allá, actualizar aquí (un carril inválido filtra a vacío, no rompe). Cada `estado=` debe ser un estado de
+# REPOSO (donde el caso descansa esperando al operador), no uno transitorio: EN_PROCESO es un paso de la
+# orquestación (c7), ningún caso reposa ahí → filtraría siempre a 0. Por eso el atajo accionable es "Listos"
+# (LISTO_PARA_APROBAR), no "En Proceso".
 # Todo lo operacional se queda DENTRO del workbench (no salta a la bandeja vieja): filtra por estado/carril.
 SIDEBAR: list[dict] = [
     {"label": "Inbox",      "icono": "inbox",    "ruta": "/workbench",                          "habilitado": True},
-    {"label": "En Proceso", "icono": "proceso",  "ruta": "/workbench?estado=EN_PROCESO",         "habilitado": True},
+    {"label": "Listos",     "icono": "listo",    "ruta": "/workbench?estado=LISTO_PARA_APROBAR", "habilitado": True},
     {"label": "Pendientes", "icono": "pendiente","ruta": "/workbench?carril=amarillo",           "habilitado": True},
     {"label": "Radicados",  "icono": "radicado", "ruta": "/workbench?estado=RESUELTOS",          "habilitado": True},
     {"label": "Escalados",  "icono": "escalado", "ruta": "/workbench?estado=REQUIERE_REVISION",  "habilitado": True},
@@ -44,7 +47,7 @@ SIDEBAR: list[dict] = [
 # Íconos de línea (path SVG único por ícono). Estilo minimal, coherente con el mockup.
 ICONOS = {
     "inbox":    "M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
-    "proceso":  "M22 12h-4l-3 9L9 3l-3 9H2",
+    "listo":    "M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",  # check-square: listo para radicar/firmar
     "pendiente":"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2",
     "radicado": "M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4 12 14.01l-3-3",
     "escalado": "m10.29 3.86-8.18 14A2 2 0 0 0 3.87 21h16.26a2 2 0 0 0 1.76-3l-8.18-14a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01",

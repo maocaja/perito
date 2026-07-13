@@ -2,6 +2,7 @@
    Fase 0 (declutter): tabla de datos ÚNICA (fusiona 'Datos del siniestro' + 'Información extraída'), panel
    derecho enfocado en la DECISIÓN, secundarios plegados. Encode-not-hide: el rastro agéntico y la confianza
    se CODIFICAN (peso/color), no se ocultan (W18/P2/P7). Se renderiza en el include inicial y en el swap #wb-caso. #}
+{% import "_macros.html" as ui %}
 {% set caso = detalle.caso %}
 {% set rec = detalle.recomendacion %}
 
@@ -9,7 +10,7 @@
   {# V1·1 · Identidad del caso: el CASO es enorme (imposible de perder); el chrome se calla. La confianza global y
      el tiempo estimado salen del header (confianza invisible salvo que importe; el esfuerzo vive en la Decisión). #}
   <header class="wb-hero" data-slot="header">
-    <h1 class="wb-hero-title">{{ detalle.clasificacion.tipo|replace('_',' ')|title }}</h1>
+    <h1 class="wb-hero-title">{{ detalle.clasificacion.tipo_humano }}</h1>
     <div class="wb-hero-sub">
       <span class="wb-hero-aseg">{{ detalle.asegurado.nombre }}</span>
       {% if detalle.asegurado.origen == 'demo' %}<span class="badge-demo" title="Dato de demostración — aún no se extrae el asegurado (P7)">demo</span>{% endif %}
@@ -25,13 +26,28 @@
               'REQUIERE_REVISION': ('warn','⚠','Necesita revisión'),
               'APROBADO': ('ok','🔒','Aprobado'),
               'RECHAZADO': ('neutral','🔒','Rechazado')}.get(est, ('neutral','•', est|replace('_',' ')|title)) %}
-  <div class="wb-status nivel-{{ S[0] }}" data-slot="status">
+  {# N9 · en un caso TERMINAL, el banner de estado y la tarjeta de confirmación decían lo mismo (estado +
+     transición). Se fusionan: para APROBADO/RECHAZADO se muestra SOLO la tarjeta `wb-confirm` (estado +
+     transición + referencia en una). El banner de estado queda para los estados NO terminales. #}
+  {% if est not in ('APROBADO', 'RECHAZADO') %}
+  {# L6 · a11y: región viva → el cambio de estado (tras recalcular/corregir) se anuncia a lector de pantalla. #}
+  <div class="wb-status nivel-{{ S[0] }}" data-slot="status" role="status" aria-live="polite">
     <span class="wb-status-ic" aria-hidden="true">{{ S[1] }}</span>
     <div class="wb-status-body">
-      <div class="wb-status-label">{{ S[2] }}{% if est == 'APROBADO' and caso.aprobado_por %} · {{ caso.aprobado_por|redact }}{% endif %}</div>
+      <div class="wb-status-label">{{ S[2] }}</div>
       {% if est != 'REQUIERE_REVISION' %}<div class="wb-status-sub">{{ rec.texto|redact }}</div>{% endif %}
     </div>
   </div>
+  {% else %}
+  {# L5 · Confirmación FUERTE tras una acción terminal: estado + transición + referencia, una sola tarjeta. #}
+  <div class="wb-confirm nivel-{{ S[0] }}" data-slot="confirmacion" role="status" aria-live="polite">
+    <div class="wb-confirm-body">
+      <div class="wb-confirm-title">{{ '✅ Caso aprobado y radicado' if est == 'APROBADO' else '⛔ Siniestro rechazado' }}</div>
+      <div class="wb-confirm-sub">Referencia del caso <strong class="mono">#{{ caso.id[:8]|upper }}</strong> · decisión registrada{% if caso.aprobado_por %} por {{ caso.aprobado_por|redact }}{% endif %}.</div>
+    </div>
+    <a class="btn btn-ghost" href="/workbench?rol={{ rol }}">Continuar →</a>
+  </div>
+  {% endif %}
 
   {# V1·3 (base A2) · Cuando el caso está BLOQUEADO (REQUIERE_REVISION), el bloque de atención con el campo
      editable EMBEBIDO y la firma in situ: se corrige aquí y el SERVIDOR re-dictamina (motor determinístico, P2),
@@ -42,21 +58,17 @@
     <div class="wb-revisar-head">
       <span class="wb-revisar-ic" aria-hidden="true">{{ rec.icono }}</span>
       <div>
-        <div class="wb-revisar-title">Necesitas revisar — {{ rec.titulo|redact }}</div>
+        <div class="wb-revisar-title">{{ rec.titulo|redact }}</div>
         <div class="wb-revisar-text">{{ rec.texto|redact }}</div>
       </div>
     </div>
     <form class="wb-corregir-form wb-revisar-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
       <input type="hidden" name="rol" value="{{ rol }}">
-      {% for c in detalle.campos_corregibles %}
-      <label class="wb-corregir-campo">{{ c.label }}
-        <input type="text" name="{{ c.nombre }}" value="{{ c.valor|redact }}" autocomplete="off" placeholder="—">
-      </label>
-      {% endfor %}
-      <label class="wb-corregir-campo wb-corregir-firma">Firma (P1)
+      {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
+      <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
         <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
       </label>
-      <button class="btn btn-primary" type="submit">Corregir y recalcular</button>
+      <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
     </form>
   </section>
   {% endif %}
@@ -65,7 +77,7 @@
      ruidosa. La IA es INVISIBLE: se ve la historia, no el "agente". P7: ambos orígenes (LLM/base) son REALES —
      no hay mock que rotular; si la redactó el copiloto, una nota MUY sutil y honesta lo dice (no marketing). #}
   <section class="wb-historia" data-slot="resumen">
-    <h2 class="wb-eyebrow">Resumen del caso</h2>
+    <h2 class="wb-eyebrow">Resumen automático</h2>
     <p class="wb-narrativa">{{ detalle.resumen_ejecutivo.texto|redact }}</p>
     {% if detalle.resumen_ejecutivo.origen == 'agente' %}<div class="wb-historia-por">Redactado por el copiloto</div>{% endif %}
   </section>
@@ -81,41 +93,55 @@
      Confianza en calma (§4 encode-not-hide): alta → "✓ Verificado" con el % TENUE (presente en el DOM); solo se
      RESALTA lo que importa (media/baja/conflicto/ausente). "Lo que necesita atención" salta; el resto se ve
      tranquilo/completo. Click (o Enter) en un campo → su evidencia (salto a la fuente exacta, V1·4). #}
+  {# M6 · "primero la excepción": cuando el caso está BLOQUEADO, los datos YA verificados se colapsan bajo
+     "Ver información extraída" (a un click) para que la excepción + el form manden. encode-not-hide: los campos
+     siguen en el DOM. En un caso LISTO, se muestran expandidos (son el objeto de la firma). Sin duplicar el
+     loop: solo se abre/cierra el `<details>` condicionalmente. #}
   <section class="wb-datos" data-slot="datos">
-    <h2 class="wb-eyebrow">Datos del siniestro</h2>
+    {% set bloqueado = caso.estado.value == 'REQUIERE_REVISION' %}
+    {% if bloqueado %}<details class="wb-datos-fold"><summary class="wb-eyebrow">Ver información extraída</summary>
+    {% else %}<h2 class="wb-eyebrow">Datos del siniestro</h2>{% endif %}
     <div class="wb-fields">
       {% for c in detalle.datos_principales %}
       {% if c.ausente %}
         <div class="wb-field is-falta">
           <span class="wb-field-ic" aria-hidden="true">⚠</span>
-          <span class="wb-field-main"><span class="wb-field-label">{{ c.label }}</span></span>
-          <span class="wb-field-state"><span class="req-tag">Falta</span></span>
+          {# N9 · el chip "No encontrado" (derecha) ya lo dice; el valor no lo repite, solo indica la acción. #}
+          <span class="wb-field-main"><span class="wb-field-label">{{ c.label }}</span><span class="wb-field-value dim">Ingrésalo arriba</span></span>
+          <span class="wb-field-state"><span class="req-tag">No encontrado</span></span>
         </div>
       {% else %}
         {% set conf = c.confianza or 0 %}
         {% set tier = 'alta' if conf >= 0.9 else ('media' if conf >= 0.7 else 'baja') %}
         <button class="wb-field wb-field-click conf-{{ tier }}" type="button"
                 data-campo="{{ c.label }}" data-origen="{{ c.origen }}"
-                title="Ver evidencia · fuente: {{ c.fuente }}{{ ' · dato de demostración' if c.origen == 'demo' }}"
+                title="Ver evidencia · fuente: {{ c.fuente }} · confianza {{ (conf*100)|round|int }}%{{ ' · dato de demostración' if c.origen == 'demo' }}"
                 hx-get="/workbench/evidencia/{{ caso.id }}?campo={{ c.label|urlencode }}" hx-target="#wb-drawer" hx-swap="innerHTML">
           <span class="wb-field-ic" aria-hidden="true">{{ '✓' if tier == 'alta' else '⚠' }}</span>
           <span class="wb-field-main">
-            <span class="wb-field-label">{{ c.label }}{% if c.origen == 'demo' %} <span class="badge-demo">demo</span>{% endif %}{% if c.clase == 'validado' %} <span class="wb-field-vv" title="Confirmado por varias fuentes (Evidence Correlator, M3)">✓✓</span>{% endif %}</span>
+            <span class="wb-field-label">{{ c.label }}{% if c.origen == 'demo' %} <span class="badge-demo">demo</span>{% endif %}{% if c.clase == 'validado' %} <span class="wb-field-vv" title="Confirmado por varias fuentes (comparación de evidencias)">✓✓</span>{% endif %}</span>
             <span class="wb-field-value">{{ c.valor }}</span>
           </span>
+          {# L2 · Confianza SOLO cuando pide criterio: 'Verificado' limpio en alta; % + 'revisar' cuando &lt;90%.
+             encode-not-hide: el % de los verificados NO se borra — vive en el `title` del botón (DOM + hover). #}
           <span class="wb-field-state">
             {% if tier == 'alta' %}
-              <span class="wb-field-ok">Verificado</span><span class="wb-conf-pct wb-conf-muted">{{ (conf*100)|round|int }}%</span>
+              <span class="wb-field-ok">Verificado</span>
             {% else %}
               <span class="wb-conf-pct">{{ (conf*100)|round|int }}%</span><span class="wb-field-flag">revisar</span>
             {% endif %}
-            <span class="wb-field-src">{{ c.fuente }}</span>
+            {# N5 (rev W24.1) · La IA es INVISIBLE en el flujo: no se rotula "IA" en cada fila (todo el sistema
+               es IA; repetirlo es ruido). Se muestra el ORIGEN (de dónde salió el dato: Correo/SOAT/Fotos) —eso
+               sí aporta contexto/trazabilidad—; la ÚNICA excepción marcada es "✍ Manual" (lo escribió el
+               operador), que sí cambia cómo el analista lee el dato. #}
+            <span class="wb-field-src wb-field-origen">{% if c.manual %}✍ Manual{% else %}{{ c.fuente|icono_fuente }} {{ c.fuente }}{% endif %}</span>
           </span>
         </button>
       {% endif %}
       {% endfor %}
     </div>
-    <div class="wb-datos-foot">Click en un campo para ver su evidencia · la cobertura la dictamina el <strong>motor determinístico, no el LLM</strong> (P2).</div>
+    <div class="wb-datos-foot">Haz clic en un campo para ver su evidencia. La cobertura la decide una regla de la póliza, no la IA.</div>
+    {% if bloqueado %}</details>{% endif %}
   </section>
 
   {# Fase 2 · Corrección inline (caso ya preparado): editar un campo mal extraído → el SERVIDOR re-corre C4 +
@@ -129,15 +155,11 @@
       <div class="card-body">
         <form class="wb-corregir-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
           <input type="hidden" name="rol" value="{{ rol }}">
-          {% for c in detalle.campos_corregibles %}
-          <label class="wb-corregir-campo">{{ c.label }}
-            <input type="text" name="{{ c.nombre }}" value="{{ c.valor|redact }}" autocomplete="off" placeholder="—">
-          </label>
-          {% endfor %}
-          <label class="wb-corregir-campo wb-corregir-firma">Firma (P1)
+          {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
+          <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
             <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
           </label>
-          <button class="btn btn-primary" type="submit">Corregir y recalcular</button>
+          <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
         </form>
       </div>
     </details>
@@ -154,7 +176,8 @@
       <button class="wb-doc" type="button" data-tipo="{{ d.tipo }}" data-doc="{{ loop.index0 }}"
               aria-label="Ver documento {{ d.etiqueta }} · {{ d.estado }}"
               hx-get="/workbench/documento/{{ caso.id }}?doc={{ loop.index0 }}" hx-target="#wb-drawer" hx-swap="innerHTML">
-        <span class="wb-doc-preview"><span class="wb-doc-ic" aria-hidden="true">{{ d.tipo|icono_tipo }}</span></span>
+        {% set d_asset = d|asset_url %}
+        <span class="wb-doc-preview">{% if d_asset and not d_asset.endswith('.pdf') %}<img class="wb-doc-thumb" src="{{ d_asset }}" alt="{{ d.etiqueta }}" loading="lazy">{% else %}<span class="wb-doc-ic" aria-hidden="true">{{ d.tipo|icono_tipo }}</span>{% endif %}</span>
         <span class="wb-doc-meta">
           <span class="wb-doc-label">{{ d.etiqueta }}</span>
           <span class="wb-doc-estado estado-{{ d.estado }}">{{ d.estado }}</span>
@@ -172,30 +195,38 @@
       <h2 class="wb-eyebrow">Actividad del caso</h2>
       <button class="wb-link wb-drawer-trigger" type="button" hx-get="/workbench/actividad/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Ver actividad técnica →</button>
     </div>
-    <ol class="wb-crono-list">
-      {% for p in detalle.timeline %}
-      <li class="wb-crono-step estado-{{ p.estado }}">
-        <span class="wb-crono-dot" aria-hidden="true">{{ p.icono }}</span>
-        <span class="wb-crono-label">{{ p.texto }}{% if p.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
-        {% if p.hora %}<span class="wb-crono-time mono">{{ p.hora }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ol>
+    {# N7 · densidad: se muestran los ÚLTIMOS 4 eventos; los anteriores se colapsan (evita una lista interminable
+       cuando hay 20+). encode-not-hide: el timeline completo sigue en el DOM, a un click. #}
+    {% macro crono_step(p) %}
+    <li class="wb-crono-step estado-{{ p.estado }}">
+      <span class="wb-crono-dot" aria-hidden="true">{{ p.icono }}</span>
+      <span class="wb-crono-label">{{ p.texto }}{% if p.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
+      {% if p.hora %}<span class="wb-crono-time mono">{{ p.hora }}</span>{% endif %}
+    </li>
+    {% endmacro %}
+    {% set tl = detalle.timeline %}
+    {% if tl|length > 4 %}
+    <details class="wb-crono-fold">
+      <summary>Ver los {{ tl|length - 4 }} eventos anteriores</summary>
+      <ol class="wb-crono-list">{% for p in tl[:-4] %}{{ crono_step(p) }}{% endfor %}</ol>
+    </details>
+    {% endif %}
+    <ol class="wb-crono-list">{% for p in tl[-4:] %}{{ crono_step(p) }}{% endfor %}</ol>
   </section>
 
   {# Secundarios plegados (progressive disclosure sin esconder): correo original + comparativa multi-correo #}
   <section class="card">
     <details>
       <summary class="card-head email-summary"><h2>Correo recibido · texto original</h2></summary>
-      <div class="card-body mono email-body">{{ detalle.aviso_redactado }}</div>
+      <div class="card-body mono email-body">{{ detalle.aviso_texto }}</div>
     </details>
   </section>
 
   {% if detalle.comparativa.disponible %}
   <section class="card wb-comp-aviso" data-slot="comparativa">
     <div class="card-body wb-comp-aviso-body">
-      <div><span aria-hidden="true">🗂️</span> <strong>{{ detalle.comparativa.fuentes|length }} correos</strong> asociados · {{ detalle.comparativa.cambios|length }} cambio(s) detectado(s) <span class="badge-demo" title="Agrupación multi-correo de demostración; el clustering real llega con U7/U8/M1">demo</span></div>
-      <button class="btn btn-ghost wb-drawer-trigger" type="button" hx-get="/workbench/comparativa/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Comparar correos</button>
+      <div><span aria-hidden="true">🗂️</span> <strong>{{ detalle.comparativa.fuentes|length }} fuentes</strong> comparadas · {{ detalle.comparativa.cambios|length }} hallazgo(s) de la comparación de evidencias{% if detalle.comparativa.origen == 'demo' %} <span class="badge-demo" title="Cruce de demostración">demo</span>{% endif %}</div>
+      <button class="btn btn-ghost wb-drawer-trigger" type="button" hx-get="/workbench/comparativa/{{ caso.id }}" hx-target="#wb-drawer" hx-swap="innerHTML">Comparar fuentes</button>
     </div>
   </section>
   {% endif %}
@@ -218,20 +249,32 @@
       {% set verificadas = evaluables|selectattr('estado','equalto','ok')|list %}
       {% set nivel_prep = 'ok' if detalle.health.pct >= 90 else ('warn' if detalle.health.pct >= 60 else 'bad') %}
       <div class="wb-eo-block wb-eo-prep">
-        <div class="wb-eo-h"><span>Preparación</span>
-          <span class="wb-eo-nm nivel-{{ nivel_prep }}">{{ verificadas|length }} de {{ evaluables|length }} verificaciones</span></div>
-        <div class="wb-eo-bar" role="img" aria-label="{{ verificadas|length }} de {{ evaluables|length }} verificaciones completas">
+        {% set hc_pend = detalle.health.checks|rejectattr('estado','equalto','ok')|rejectattr('estado','equalto','na')|list %}
+        {% set n_pend = hc_pend|length %}
+        {# N8 · el aviso "es informativa; decides tú (P1)" pasa a tooltip — se lee una vez, no ocupa una línea fija. #}
+        <div class="wb-eo-h"><span title="La preparación es informativa; la aprobación la decides tú (P1).">Preparación <span class="wb-eo-info" aria-hidden="true">ⓘ</span></span>
+          <span class="wb-eo-nm nivel-{{ nivel_prep }}">{{ verificadas|length }} de {{ evaluables|length }}{% if n_pend %} · {{ n_pend }} pendiente{{ 's' if n_pend != 1 }}{% endif %}</span></div>
+        <div class="wb-eo-bar" role="img" aria-label="{{ verificadas|length }} de {{ evaluables|length }} verificaciones completas, {{ n_pend }} pendiente(s)">
           <div class="wb-eo-bar-fill nivel-{{ nivel_prep }}" style="width:{{ (100 * verificadas|length / evaluables|length)|round|int if evaluables|length else 0 }}%"></div>
         </div>
-        <ul class="wb-health wb-health-compact">
-          {% for c in detalle.health.checks %}
-          <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
-            <span class="wb-hc-ic" aria-hidden="true">{{ '✔' if c.estado == 'ok' else ('—' if c.estado == 'na' else '⚠') }}</span>
-            <span class="wb-hc-label">{{ c.label }}{% if c.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="card-foot">La preparación es informativa; la aprobación la decides tú (P1).</div>
+        {# M1 · Densidad: solo el conteo por defecto; el detalle (pendientes primero, luego el resto) se despliega
+           a un click. encode-not-hide: la lista completa sigue en el DOM. #}
+        <details class="wb-hc-more">
+          <summary>{% if n_pend %}Ver {{ n_pend }} pendiente{{ 's' if n_pend != 1 }} y el resto{% else %}Ver las {{ detalle.health.checks|length }} verificaciones{% endif %}</summary>
+          <ul class="wb-health wb-health-compact">
+            {% for c in hc_pend %}
+            <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
+              <span class="wb-hc-ic" aria-hidden="true">⚠</span><span class="wb-hc-label">{{ c.label }}</span>
+            </li>
+            {% endfor %}
+            {% for c in detalle.health.checks if c.estado != 'warn' %}
+            <li class="wb-hc estado-{{ c.estado }}" title="{{ c.label }} · {{ c.detalle }}">
+              <span class="wb-hc-ic" aria-hidden="true">{{ '✔' if c.estado == 'ok' else '—' }}</span>
+              <span class="wb-hc-label">{{ c.label }}{% if c.demo %} <span class="badge-demo">demo</span>{% endif %}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
       </div>
 
       {# Cobertura · por qué — 🔒P2: PRESENTA la decisión del motor R1-R5, no re-decide. #}
@@ -240,7 +283,11 @@
         {% if detalle.cobertura.disponible %}
           {% set cob = detalle.cobertura %}
           <div class="dictamen-res nivel-{{ cob.nivel }}">{{ cob.label }}</div>
-          <div class="hint">Regla {{ cob.regla }} · <strong>Motor R1-R5</strong> dictamina, no el LLM (P2)</div>
+          {# L2 · Superficie humana; lo técnico (regla + motor determinístico) a un click — encode-not-hide + P2. #}
+          <div class="hint">Lo decide una regla de la póliza, no la IA.</div>
+          <details class="wb-tech"><summary>Ver regla aplicada</summary>
+            <div class="hint">Regla <strong>{{ cob.regla }}</strong> · motor determinístico R1–R5 (no el LLM).</div>
+          </details>
           <dl class="wb-cob">
             {% if cob.cobertura %}<div><dt>Cobertura</dt><dd>{{ cob.cobertura }}</dd></div>{% endif %}
             {% if cob.sublimite %}<div><dt>Sublímite</dt><dd>{{ cob.sublimite }}</dd></div>{% endif %}
@@ -277,24 +324,58 @@
       <div class="wb-reco tone-{{ rec.tono }}">
         <span class="wb-reco-ic" aria-hidden="true">{{ rec.icono }}</span>
         <div class="wb-reco-body">
-          <div class="wb-reco-eyebrow">Acción recomendada</div>
-          <div class="wb-reco-title">{{ rec.titulo|redact }}</div>
-          <div class="wb-reco-text">{{ rec.texto|redact }}</div>
+          <div class="wb-reco-eyebrow">Siguiente paso</div>
+          {# M1 · el panel enfoca la ACCIÓN (no re-enuncia el problema, que ya está en el banner + bloque central) #}
+          <div class="wb-reco-title">{{ (rec.accion.titulo if rec.accion else rec.titulo)|redact }}</div>
+          {# Dedup (L1): el detalle completo vive en el bloque de resolución central; aquí NO se repite cuando
+             el caso está bloqueado (REQUIERE_REVISION). En los demás estados sí, porque no hay bloque central. #}
+          {% if caso.estado.value != 'REQUIERE_REVISION' %}<div class="wb-reco-text">{{ rec.texto|redact }}</div>{% endif %}
           <div class="wb-reco-effort">Esfuerzo estimado · <strong>{{ detalle.tiempo_estimado.texto }}</strong> <span class="hint">estimado</span></div>
         </div>
       </div>
 
       <div class="wb-acciones">
-        <input type="text" id="wb-firma" placeholder="Tu nombre (firma, P1)" autocomplete="off">
-        {# Acción PRIMARIA (una, dominante). Verde = firmar/go. #}
-        <form method="post" action="/casos/{{ caso.id }}/radicar" class="wb-firma-form"
-              data-confirm="¿Radicar este caso? Quedará APROBADO con tu firma.">
+        {# N6 · La firma aparece EN EL PUNTO DE ACCIÓN, no flotando arriba del panel. Va con la primaria salvo
+           que la primaria abra un borrador (Preparar solicitud → la firma va al ENVIAR, dentro del drawer). Si
+           la primaria no exige firma (drawer) o no hay primaria, la firma acompaña las acciones terminales de
+           "Más acciones". 🔒P1: hay exactamente UN #wb-firma; el gate REAL es el servidor (usuario requerido). #}
+        {% set firma_con_primaria = rec.accion and not rec.accion.drawer %}
+        {% macro firma_input(ayuda) %}
+        <label class="wb-firma-label">Firma del analista
+          <input type="text" id="wb-firma" placeholder="Tu nombre" autocomplete="off">
+        </label>
+        <div class="hint wb-firma-hint">{{ ayuda }}</div>
+        {% endmacro %}
+        {# L1 · Acción PRIMARIA ÚNICA por estado (recomendación == acción, `rec.accion`). Verde/go solo cuando
+           es Radicar (terminal con firma). None ⇒ caso resuelto, sin primaria. 🔒P1: el gate real es el servidor. #}
+        {% if rec.accion %}
+        {% if rec.accion.drawer %}
+        {# M5 · la primaria PREPARA un borrador (draft≠send, P1): abre el drawer con la solicitud ya redactada
+           (nombra el dato faltante); el analista la revisa y la envía DESDE el drawer con su firma. Abrir el
+           borrador no exige firma (la firma va al enviar), por eso es un hx-post directo, no el form de firma. #}
+        <button class="btn btn-primary btn-lg" type="button"
+                hx-post="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" hx-target="#wb-drawer" hx-swap="innerHTML"
+                title="Redacta un borrador de solicitud al asegurado; tú lo revisas y envías (P1: draft ≠ send)">{{ rec.accion.label }}</button>
+        {% else %}
+        {# N6 · firma inmediatamente ANTES de la acción terminal (Radicar/Escalar): se firma donde se decide. #}
+        {{ firma_input('Obligatoria para ' ~ ('radicar' if rec.accion.kind == 'go' else 'esta acción') ~ '.') }}
+        <form method="post" action="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" class="wb-firma-form"
+              {% if rec.accion.confirm %}data-confirm="{{ rec.accion.confirm }}"{% endif %}>
           <input type="hidden" name="usuario" class="wb-firma-in">
-          <button class="btn btn-radicar btn-lg" type="submit" {{ 'disabled' if caso.estado.value != 'LISTO_PARA_APROBAR' }}>Radicar caso</button>
+          {% if rec.accion.motivo %}<input type="hidden" name="motivo" value="{{ rec.accion.motivo }}">{% endif %}
+          <button class="btn {{ 'btn-radicar' if rec.accion.kind == 'go' else 'btn-primary' }} btn-lg" type="submit"{% if rec.accion.kind == 'go' %} title="Crear formalmente el expediente y enviarlo al siguiente equipo"{% endif %}>{{ rec.accion.label }}</button>
         </form>
+        {% endif %}
+        {% endif %}
 
-        {# Secundarias (calmas, de-emphasized). Rechazar sigue destructivo (rojo) pero NO domina — 🔒P1: el humano
-           SÍ puede negar; firma + motivo obligatorios; 409 si ya se decidió. #}
+        {# L3 · Densidad: las secundarias (rechazar/fraude/escalar/carta/guardar) NO compiten con la primaria;
+           viven bajo "Más acciones" (disclosure). Toda la funcionalidad sigue disponible, sin ocupar la
+           superficie. 🔒P1: el humano SÍ puede negar — Rechazar está aquí, a un click. #}
+        <details class="wb-mas" data-slot="mas-acciones">
+          <summary>Más acciones</summary>
+        {# N6 · si la primaria no trajo la firma (abre drawer o no hay primaria), va aquí — donde viven las
+           acciones terminales secundarias (rechazar/escalar). Garantiza UN solo #wb-firma en la página. #}
+        {% if not firma_con_primaria %}{{ firma_input('Obligatoria para rechazar o escalar.') }}{% endif %}
         {% if caso.estado.value not in ('APROBADO', 'RECHAZADO') %}
         <form method="post" action="/casos/{{ caso.id }}/rechazar" class="wb-firma-form wb-rechazar-form"
               data-confirm="¿Rechazar este siniestro? Quedará RECHAZADO con tu firma.">
@@ -304,6 +385,8 @@
         </form>
         {% endif %}
         <div class="wb-acc-grid">
+          {# 'Solicitar documentos' (envío mock directo) queda como secundaria: la primaria 'Preparar
+             solicitud' (M5) abre un borrador editable; esta es la vía rápida sin revisar el texto. #}
           <form method="post" action="/casos/{{ caso.id }}/solicitar_docs" class="wb-firma-form">
             <input type="hidden" name="usuario" class="wb-firma-in">
             <button class="btn btn-ghost" type="submit">Solicitar documentos</button>
@@ -311,15 +394,18 @@
           <form method="post" action="/casos/{{ caso.id }}/enviar_fraude" class="wb-firma-form"
                 data-confirm="¿Derivar al carril de fraude (SIU)? Es una sugerencia de revisión, no decide fraude (P6).">
             <input type="hidden" name="usuario" class="wb-firma-in">
-            <button class="btn btn-ghost" type="submit" title="Deriva al carril SIU — no decide fraude (P6)">Escalar a fraude</button>
+            <button class="btn btn-ghost" type="submit" title="Deriva al carril SIU — no decide fraude (P6)">Enviar a análisis de irregularidades</button>
           </form>
+          {% if not (rec.accion and rec.accion.endpoint == 'escalar') %}
           <form method="post" action="/casos/{{ caso.id }}/escalar" class="wb-firma-form"
                 data-confirm="¿Escalar este caso a revisión humana?">
             <input type="hidden" name="usuario" class="wb-firma-in"><input type="hidden" name="motivo" value="Escalado desde la workbench">
-            <button class="btn btn-ghost" type="submit">Escalar a revisión</button>
+            <button class="btn btn-ghost" type="submit" title="Enviar el caso a un especialista para evaluación manual">Enviar a revisión especializada</button>
           </form>
-          {# W20/A7: Carta al asegurado (drawer). Solo cuando aplica (pedir datos / resolución). P1: draft ≠ send. #}
-          {% if detalle.carta_tipo %}
+          {% endif %}
+          {# W20/A7: Carta al asegurado (drawer). Solo cuando aplica (pedir datos / resolución). P1: draft ≠ send.
+             M5 · dedup: si la PRIMARIA ya es el borrador de solicitud (drawer), no repetir aquí la misma carta. #}
+          {% if detalle.carta_tipo and not (rec.accion and rec.accion.drawer) %}
           <button class="btn btn-ghost" type="button" hx-post="/casos/{{ caso.id }}/carta" hx-target="#wb-drawer" hx-swap="innerHTML"
                   title="Genera un borrador de carta al asegurado; tú lo firmas y envías (P1)">✍ Preparar carta</button>
           {% endif %}
@@ -329,6 +415,7 @@
           <input type="text" name="nota" placeholder="Nota / borrador…" autocomplete="off">
           <button class="btn btn-ghost" type="submit">Guardar</button>
         </form>
+        </details>
         {% if caso.derivado_siu_por %}<div class="wb-acc-flag">🕵️ Derivado a SIU por {{ caso.derivado_siu_por|redact }}</div>{% endif %}
         {% if caso.solicitud_docs %}<div class="wb-acc-flag">📄 {{ caso.solicitud_docs|redact }}</div>{% endif %}
         {% if caso.nota_operador %}<div class="wb-acc-flag">📝 {{ caso.nota_operador|redact }}</div>{% endif %}
@@ -336,10 +423,11 @@
     </div>
   </section>
 
-  {# Preguntar a la IA — copiloto conversacional contextual (MOCK, solo explica; P1/P6/P7) #}
+  {# N9 · "Consultar el caso" (antes "Preguntar a la IA"): toda la pantalla ya la generó la IA; no hace falta
+     repetir "IA" en cada bloque. Copiloto conversacional contextual (MOCK, solo explica; P1/P6/P7). #}
   <section class="card" data-slot="chat">
     <details>
-      <summary class="card-head email-summary"><h2>Preguntar a la IA</h2><span class="badge-demo" title="Copiloto de demostración: respuestas de ejemplo sobre este caso, no una IA funcional (P7)">demo</span></summary>
+      <summary class="card-head email-summary"><h2>Consultar el caso</h2><span class="badge-demo" title="Copiloto de demostración: respuestas de ejemplo sobre este caso, no una IA funcional (P7)">demo</span></summary>
       <div class="card-body">
         <div class="wb-chat-log" id="wb-chat-log">
           <div class="wb-chat-msg wb-chat-ai"><span aria-hidden="true">🤖</span> Pregúntame por qué falta un documento, la cobertura o los riesgos de este caso.</div>

@@ -77,8 +77,8 @@ def test_workbench_caso_sin_extraccion_renderiza(client):
     r = client.get(f"/workbench/caso/{caso.id}")
     assert r.status_code == 200
     assert "Datos del siniestro" in r.text
-    # V1·3: sin extracción los campos-objeto no revientan; los ausentes se marcan "Falta" (no crash).
-    assert "Falta" in r.text
+    # sin extracción los campos-objeto no revientan; los ausentes se marcan "No encontrado" (L3a, no crash).
+    assert "No encontrado" in r.text
 
 
 def test_cola_item_apunta_al_parcial_via_htmx(client):
@@ -90,13 +90,14 @@ def test_cola_item_apunta_al_parcial_via_htmx(client):
 
 # ---------- P1 / passive ----------
 
-def test_radicar_deshabilitado_si_no_listo(client):
-    """P1: 'Radicar' (aprobar) deshabilitado salvo LISTO_PARA_APROBAR — el gate real es HITL."""
+def test_radicar_no_se_ofrece_si_no_listo(client):
+    """P1: 'Radicar' solo se ofrece en LISTO_PARA_APROBAR (L1: en otros estados la primaria es NO terminal —
+    solicitar / enviar a revisión; ya no se muestra un Radicar deshabilitado)."""
     caso = next((c for c in get_caso_repository().list() if c.estado != EstadoCaso.LISTO_PARA_APROBAR), None)
     if caso is None:
         pytest.skip("todos los casos sembrados están LISTO_PARA_APROBAR")
     r = client.get(f"/workbench/caso/{caso.id}")
-    assert "disabled" in r.text  # el botón Radicar viene deshabilitado
+    assert "/radicar" not in r.text  # Radicar no se ofrece fuera de LISTO (gate P1)
 
 
 def test_workbench_no_muta_estado(client):

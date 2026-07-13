@@ -56,9 +56,22 @@ def _tipo_galeria(nombre: str) -> str:
     return "otro"
 
 
-def _etiqueta(tipo: str, indice_por_tipo: int) -> str:
-    """Etiqueta legible SIN PII ('Foto 1', 'PDF 2'). Los nombres semánticos ('Foto Vehículo Frente') llegan
-    con M2/M3 (extracción/correlación); hasta entonces, honesto: tipo + posición (P7)."""
+# Tipo de documento reconocible por su nombre → etiqueta semántica legible (M1-lite, determinístico). Un
+# keyword de TIPO ('denuncia', 'soat') NO es PII (no identifica a nadie): se usa solo para nombrar la fuente
+# en el cruce/galería, nunca se muestra el filename crudo (P5). Da al operador "Denuncia dice X; SOAT dice Y".
+_ETIQUETA_SEMANTICA = {
+    "denuncia": "Denuncia", "soat": "SOAT", "factura": "Factura",
+    "cotizacion": "Cotización", "cotización": "Cotización", "peritaje": "Peritaje",
+}
+
+
+def _etiqueta(nombre: str, tipo: str, indice_por_tipo: int) -> str:
+    """Etiqueta legible SIN PII. Si el nombre de archivo delata un TIPO conocido de documento (denuncia/soat/…)
+    se usa su nombre semántico; si no, honesto: tipo + posición ('Foto 1', 'PDF 2') (P7)."""
+    n = (nombre or "").lower()
+    for clave, etiqueta in _ETIQUETA_SEMANTICA.items():
+        if clave in n:
+            return etiqueta
     nombre_tipo = {"foto": "Foto", "pdf": "PDF", "documento": "Documento",
                    "audio": "Audio", "video": "Video", "otro": "Adjunto"}.get(tipo, "Adjunto")
     return f"{nombre_tipo} {indice_por_tipo}"
@@ -74,7 +87,9 @@ def procesar_adjuntos(crudos: list[tuple[str, bytes]]) -> list[Adjunto]:
     conteo_por_tipo: dict[str, int] = {}
     for nombre, contenido in crudos[:MAX_ADJUNTOS_POR_CASO]:  # P4: cota de nº
         if not contenido or len(contenido) > MAX_BYTES_POR_ADJUNTO:  # P4: cota de tamaño
-            logger.info("Document AI: adjunto '%s' omitido (vacío o > %s bytes).", nombre, MAX_BYTES_POR_ADJUNTO)
+            # P5: el filename puede llevar PII (cédula sin marcador) → se redacta antes de loguear.
+            logger.info("Document AI: adjunto '%s' omitido (vacío o > %s bytes).",
+                        _redactar_nombre(nombre), MAX_BYTES_POR_ADJUNTO)
             continue
         tipo = _tipo_galeria(nombre)
         conteo_por_tipo[tipo] = conteo_por_tipo.get(tipo, 0) + 1
@@ -84,7 +99,7 @@ def procesar_adjuntos(crudos: list[tuple[str, bytes]]) -> list[Adjunto]:
         adjuntos.append(Adjunto(
             nombre=_redactar_nombre(nombre),             # P5: un filename puede llevar PII (cédula sin marcador)
             tipo=tipo,
-            etiqueta=_etiqueta(tipo, conteo_por_tipo[tipo]),
+            etiqueta=_etiqueta(nombre, tipo, conteo_por_tipo[tipo]),
             texto=leido.texto,                            # ya redactado por leer_adjunto (P5)
             confianza=leido.confianza,
             huella=huella,

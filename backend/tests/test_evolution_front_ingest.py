@@ -42,7 +42,7 @@ def test_nuevo_form_200_con_presets_y_textarea(client):
 # ---------- Presets determinísticos: cada uno su camino esperado ----------
 
 @pytest.mark.parametrize("escenario,resultado,estado,con_alerta", [
-    ("feliz", ResultadoCobertura.CUBIERTO_PARCIAL, EstadoCaso.LISTO_PARA_APROBAR, False),
+    ("feliz", ResultadoCobertura.CUBIERTO, EstadoCaso.LISTO_PARA_APROBAR, False),  # deducible 0 → CUBIERTO pleno
     ("fraude", ResultadoCobertura.CUBIERTO_PARCIAL, EstadoCaso.LISTO_PARA_APROBAR, True),
     ("cobertura-negativa", ResultadoCobertura.NO_CUBIERTO, EstadoCaso.LISTO_PARA_APROBAR, False),
     ("no-encontrada", ResultadoCobertura.REQUIERE_REVISION, EstadoCaso.REQUIERE_REVISION, False),

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import settings
@@ -29,6 +29,7 @@ from app.dashboard import evidencia as _evidencia
 from app.dashboard import comparativa as _comparativa
 from app.dashboard import productividad as _productividad
 from app.dashboard import copiloto as _copiloto
+from app.dashboard import demo_assets as _demo_assets
 
 router = APIRouter(tags=["dashboard"])
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -40,6 +41,13 @@ from app.dashboard import branding  # noqa: E402
 branding.registrar(_TEMPLATES)
 # W11: la plantilla depende de la fuente de verdad tipo→ícono (DRY/OCP), no de un hardcode.
 _TEMPLATES.env.filters["icono_tipo"] = _documentos.icono_de
+# Demo: URL del asset real (foto/PDF) de un documento si existe en `demo_assets/`; None → mock (P5).
+_TEMPLATES.env.filters["asset_url"] = _demo_assets.url_de
+# L2: etiquetas humanas — FUENTE ÚNICA compartida (Workbench y panel), sin mapas duplicados.
+_TEMPLATES.env.filters["icono_fuente"] = vista_caso.icono_fuente  # N5/N9: glifo de la fuente de un campo
+_TEMPLATES.env.filters["label_campo"] = vista_caso.label_campo
+_TEMPLATES.env.filters["label_estado"] = vista_caso.label_estado
+_TEMPLATES.env.filters["label_cobertura"] = vista_caso.label_cobertura
 
 # Tasa blended ESTIMADA (Haiku ~$1/$5, Sonnet ~$3/$15 in/out por 1M) — NO facturable, solo orientativa.
 COSTO_USD_POR_1M_TOKENS = 8.0
@@ -94,7 +102,9 @@ def _detalle_context(caso, rol: str) -> dict:
     return {
         "rol": rol,
         "caso": caso,
-        "aviso_redactado": redact_pii_spans_es_co(caso.aviso.texto_crudo),
+        # Vista del operador (encargado autorizado): el correo ORIGINAL tal cual llegó. La minimización P5 es
+        # hacia el LLM (el prompt va redactado, `build_extraction_prompt_u2`), no hacia el operador legítimo.
+        "aviso_texto": caso.aviso.texto_crudo,
         "traza": traza,
         "resumen": vista_caso.resumen_copiloto(caso),
         "confianza": vista_caso.confianza_riesgo(caso, traza),
@@ -184,6 +194,7 @@ def _cola_filas(rol: str):
         "hace": _tiempo_relativo(c.timestamp_actualizacion, ahora),
         "ramo": vista_caso.ramo_de(c),
         "senal_fraude": vista_caso.senal_fraude(c),
+        "razon": vista_caso.razon_cola(c),            # L4: razón operativa (para elegir sin abrir)
         "prioridad": vista_caso.prioridad(c),
         "clasificacion": vista_caso.clasificar(c),
         "carril": vista_caso.clasificador_cola(c),   # W8: carril por razón
@@ -302,7 +313,19 @@ def workbench_documento(request: Request, caso_id: str, doc: int = Query(...),
     caso = _get_o_404(caso_id)
     docs = _documentos.documentos_de(caso)
     documento = docs[doc] if 0 <= doc < len(docs) else None
-    return _TEMPLATES.TemplateResponse(request, "workbench_documento.html", {"documento": documento})
+    return _TEMPLATES.TemplateResponse(request, "workbench_documento.html",
+                                       {"documento": documento, "asset_url": _demo_assets.url_de(documento)})
+
+
+@router.get("/workbench/asset/{nombre}")
+def workbench_asset(nombre: str):
+    """Sirve un asset de DEMO desde `demo_assets/` (solo-demo). 🔒P5: sirve ÚNICAMENTE archivos físicamente
+    presentes en esa carpeta (sintéticos, sin PII); nunca la media cruda de un correo (que no se persiste).
+    Blindaje anti-traversal en `ruta_de_asset` (basename + dentro de la carpeta)."""
+    ruta = _demo_assets.ruta_de_asset(nombre)
+    if not ruta:
+        raise HTTPException(status_code=404, detail="asset de demo no encontrado")
+    return FileResponse(ruta)
 
 
 @router.post("/workbench/corregir/{caso_id}", response_class=HTMLResponse)

@@ -35,7 +35,9 @@ def test_recomendacion_terminal_nunca_decide():
 def test_recomendacion_faltantes_pide_el_dato():
     caso = construir_caso_preset("campos-faltantes")
     rec = vista_caso.recomendacion(caso)
-    assert "monto_reclamado" in rec["texto"]
+    # L2: nombra el dato faltante en HUMANO ("valor de la reclamación"), no el nombre técnico crudo
+    assert "valor de la reclamación" in (rec["titulo"] + " " + rec["texto"]).lower()
+    assert "monto_reclamado" not in (rec["titulo"] + rec["texto"])
     assert rec["tono"] == "warn"
 
 
@@ -90,30 +92,25 @@ def test_hallazgos_verificador_ausente_no_disponible():
 
 # ---------------- C: strip de confianza ----------------
 
-def test_confianza_riesgo_cuatro_celdas():
+def test_confianza_riesgo_sin_cobertura():
+    """W24·N1: el strip de un vistazo es Extracción · Verificación · Fraude. La COBERTURA salió del strip —
+    vive UNA sola vez en el panel derecho (dedup: no repetir el estado de cobertura en strip+banner+panel)."""
     caso = construir_caso_preset("fraude")
     strip = vista_caso.confianza_riesgo(caso, None)
     labels = [c["label"] for c in strip]
-    assert labels == ["Extracción", "Verificación", "Fraude", "Cobertura"]
+    assert labels == ["Extracción", "Verificación", "Fraude"]
+    assert "Cobertura" not in labels
     assert strip[2]["valor"] == "ALTA"  # fraude preset → severidad ALTA
 
 
 # ---------------- P5: el detalle redacta los campos de display (defensa en profundidad) ----------------
 
-def test_caso_redacta_pii_en_display():
-    """Un campo solo-display (explicación de fraude) con PII se muestra REDACTADO en el caso (P5).
-
-    W20/A6: se verifica sobre el panel del caso en la Workbench (`/workbench/caso/{id}`); la página `detalle`
-    se retiró.
-    """
-    from fastapi.testclient import TestClient
-    from app.main import app
-    from app.dashboard.store import get_caso_repository, reset_caso_repository
-
-    reset_caso_repository()
+def test_explicacion_fraude_redacta_pii_en_texto_derivado():
+    """P5/P6 defensa en profundidad: la EXPLICACIÓN de fraude (texto DERIVADO/generado) no filtra PII cruda —
+    se redacta en el view-model. (Los CAMPOS del operador sí muestran el dato real; la explicación derivada se
+    mantiene conservadora — P6: la evidencia de fraude referencia el caso, no PII.)"""
     caso = construir_caso_preset("fraude")
     object.__setattr__(caso.alerta_fraude, "explicacion", "Verificar con el asegurado C.C. 1.098.765.432")
-    get_caso_repository().save(caso)
-    html = TestClient(app).get(f"/workbench/caso/{caso.id}").text
-    assert "1.098.765.432" not in html   # la cédula NO aparece cruda
-    assert "[REDACTED]" in html            # se redactó
+    riesgos = vista_caso.riesgos(caso)
+    assert "1.098.765.432" not in riesgos["explicacion"]   # la cédula NO se filtra al texto derivado
+    assert "[REDACTED]" in riesgos["explicacion"]

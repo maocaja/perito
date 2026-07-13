@@ -64,7 +64,7 @@ def test_render_cobertura(client):
         pytest.skip("no hay caso con dictamen")
     r = client.get(f"/workbench/caso/{caso.id}")
     assert "Cobertura · por qué" in r.text
-    assert "no el LLM (P2)" in r.text
+    assert "no el LLM" in r.text   # el motor sigue citado (en "Ver regla aplicada")
 
 
 if __name__ == "__main__":

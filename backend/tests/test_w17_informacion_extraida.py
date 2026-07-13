@@ -94,8 +94,9 @@ def test_cada_campo_cita_su_fuente():
         assert c.fuente and c.fuente != ""
 
 
-def test_valores_redactados():
-    """P5: un asegurado real con cédula no aparece crudo."""
+def test_valores_visibles_para_el_operador():
+    """P5 (gobernanza): el operador ve el valor REAL del campo (dato tal cual se extrajo). La minimización
+    P5 es hacia el LLM (prompt redactado), no hacia el operador autorizado."""
     from app.contracts.extraccion import CampoExtraido, ExtraccionValidada, EvidenciaOrigen
     from app.contracts.enums import TipoOrigen
     caso = get_caso_repository().list()[0]
@@ -104,11 +105,11 @@ def test_valores_redactados():
         origen=EvidenciaOrigen(tipo=TipoOrigen.SPAN, referencia="s"), confianza=0.9, ausente=False)]
     caso2 = caso.model_copy(update={"extraccion": ExtraccionValidada(campos=campos)})
     ui = next(c for c in vista_caso.campos_extraidos(caso2) if c.label == "Asegurado")
-    assert "1.098.765.432" not in (ui.valor or "")
+    assert ui.valor == "Juan C.C. 1.098.765.432"   # el operador ve el dato real
 
 
-def test_valores_redactados_email_y_telefono():
-    """P5 (defensa en profundidad, varios tipos): email/teléfono en un campo real no aparecen crudos."""
+def test_valores_email_y_telefono_visibles_para_el_operador():
+    """P5 (gobernanza): email/teléfono en un campo se muestran al operador (dato real). Minimización = al LLM."""
     from app.contracts.extraccion import CampoExtraido, ExtraccionValidada, EvidenciaOrigen
     from app.contracts.enums import TipoOrigen
     caso = get_caso_repository().list()[0]
@@ -117,8 +118,7 @@ def test_valores_redactados_email_y_telefono():
         origen=EvidenciaOrigen(tipo=TipoOrigen.SPAN, referencia="s"), confianza=0.9, ausente=False)]
     caso2 = caso.model_copy(update={"extraccion": ExtraccionValidada(campos=campos)})
     ui = next(c for c in vista_caso.campos_extraidos(caso2) if c.label == "Asegurado")
-    assert "ana@correo.com" not in (ui.valor or "")
-    assert "310 555 8899" not in (ui.valor or "")
+    assert "ana@correo.com" in (ui.valor or "") and "310 555 8899" in (ui.valor or "")
 
 
 # ---------- render ----------

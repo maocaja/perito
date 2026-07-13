@@ -74,13 +74,13 @@ def test_caso_muestra_dictamen_con_clausula(client):
 
 # ---------- P5: aviso redactado ----------
 
-def test_p5_aviso_redactado_en_caso(client):
-    """P5 fail-closed: la cédula cruda NO aparece en el HTML del caso; sí el marcador [REDACTED]."""
+def test_p5_operador_ve_el_correo_original(client):
+    """P5 (dos niveles): el OPERADOR —encargado autorizado con finalidad legítima (Ley 1581)— ve el correo
+    ORIGINAL con los datos reales. La minimización P5 es hacia el LLM (el prompt va redactado,
+    `build_extraction_prompt_u2` — verificado en test_u2/test_demo_cierre), no hacia el operador legítimo."""
     caso = _caso_con_pii()
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "1.098.765.432" not in html   # cédula cruda NO se filtra
-    assert "3115551234" not in html      # celular crudo NO se filtra
-    assert "[REDACTED]" in html          # sí hay redacción
+    assert "1.098.765.432" in html   # el operador ve la cédula real (es su trabajo verificar identidad)
 
 
 # ---------- P1: HITL (usuario obligatorio, delega, terminal con firma) ----------
@@ -145,11 +145,11 @@ def test_panel_metricas_render(client):
     """El panel muestra las métricas de operación + las garantías (separadas, P7)."""
     r = client.get("/panel")
     assert r.status_code == 200
-    assert "Métricas de operación" in r.text
-    assert "Garantías" in r.text and "RULE-CTR-03" in r.text
-    assert "estimado" in r.text  # costo rotulado como estimado (no facturable)
+    assert "Qué está pasando" in r.text                       # W24·N3: sección de métricas de operación
+    assert "Ver controles" in r.text and "RULE-CTR-03" in r.text  # garantías colapsadas, controles siguen en el DOM
+    assert "estimado" in r.text  # costo rotulado como estimado (no facturable), ahora en Detalle técnico
     total = len(get_caso_repository().list())
-    assert str(total) in r.text  # el KPI de casos totales
+    assert str(total) in r.text  # el KPI de backlog total
 
 
 def test_panel_metricas_cero_casos_no_rompe(client):

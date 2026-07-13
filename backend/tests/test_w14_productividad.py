@@ -40,7 +40,7 @@ def test_render_productividad(client):
     # decisión, enfocada en el caso; la productividad es una vista de jornada, no de caso.
     html = client.get("/panel").text
     assert "Tu productividad hoy" in html
-    assert "Casos procesados" in html
+    assert "Procesados hoy" in html      # W24·N3: aclara que es del día (vs Backlog total)
     assert "SLA cumplimiento" in html
     assert "wb-prod-chart" in html      # el gráfico
     assert "badge-demo" in html          # métricas mock rotuladas

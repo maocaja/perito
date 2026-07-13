@@ -151,8 +151,28 @@ def test_render_muestra_la_historia(client):
     (la IA es invisible — el origen LLM/base se comunica, si acaso, con una nota sutil, no un badge)."""
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
     assert "wb-historia" in html
-    assert "Resumen del caso" in html
+    assert "Resumen automático" in html   # W24·N2 (rev): eyebrow del resumen (sin repetir 'IA' en el flujo)
     assert "wb-agente-tag" not in html and "Summary Agent" not in html
+
+
+def test_resumen_no_llama_al_llm_fuera_de_modo_real(monkeypatch):
+    """El Summary Agent (LLM) solo corre en modo `real`; en deterministic/off usa la historia W4 DIRECTO,
+    sin tocar la API (respeta el modo: cero costo/latencia/ruido, no un fallback por error 400)."""
+    from app.dashboard import vista_caso
+    from app.demo.scenarios import construir_caso_preset
+    from app.config import settings
+    import app.llm.summary as summary
+
+    llamado = {"n": 0}
+    def _spy(caso):
+        llamado["n"] += 1
+        return ("historia del agente", "agente")
+    monkeypatch.setattr(summary, "call_summary_agent", _spy)
+    for modo in ("off", "deterministic"):
+        monkeypatch.setattr(settings, "demo_live", modo)
+        r = vista_caso.resumen_ejecutivo(construir_caso_preset("feliz"))
+        assert r["origen"] == "base"
+    assert llamado["n"] == 0   # nunca se invocó el agente LLM fuera de `real`
 
 
 if __name__ == "__main__":
