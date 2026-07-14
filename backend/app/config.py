@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     extractor_max_tokens: int = 2000
     verifier_max_tokens: int = 3000
 
+    # W19 SUMMARY AGENT — robustez (no-bloqueante). El resumen es best-effort: ante 529/overload
+    # cae al fallback W4 sin colgar el worker, y no re-llama el LLM del mismo caso en cada refresh.
+    summary_timeout_s: float = 4.0     # timeout del cliente Anthropic del Summary Agent
+    summary_max_retries: int = 0       # sin backoff: ante OverloadedError cae al fallback al instante
+    summary_cooldown_s: float = 20.0   # tras un fallo/guard, no reintentar el LLM de ese caso por N s
+
     # U2 ORCHESTRATION (P4)
     confidence_threshold: float = 0.70
     max_rounds: int = 1
