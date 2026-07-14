@@ -32,7 +32,7 @@ def test_avanzar_carga_el_siguiente(client):
     r = client.get(f"/workbench?caso_id={primero.id}&avanzar=1")
     assert r.status_code == 200
     # el header del caso activo muestra el id corto del SIGUIENTE, no del primero
-    assert segundo.id[:8] in r.text
+    assert segundo.id in r.text
 
 
 def test_avanzar_en_el_ultimo_se_queda(client):
@@ -40,7 +40,7 @@ def test_avanzar_en_el_ultimo_se_queda(client):
     ultimo = cola[-1]
     r = client.get(f"/workbench?caso_id={ultimo.id}&avanzar=1")
     assert r.status_code == 200
-    assert ultimo.id[:8] in r.text  # no hay siguiente → se queda en el último
+    assert ultimo.id in r.text  # no hay siguiente → se queda en el último
 
 
 # ---------- teclado presente pero sin bypass ----------

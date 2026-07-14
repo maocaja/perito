@@ -36,7 +36,7 @@
          title="{{ f.carril.etiqueta }} — {{ f.carril.motivo }}">
         {% if f.senal_fraude %}<div class="wb-card-flag">🕵️ {{ f.senal_fraude }}</div>{% endif %}
         <div class="wb-card-aseg">{{ f.resumen.asegurado }}</div>
-        <div class="wb-card-tipo">{{ f.clasificacion.tipo_humano }} <span class="wb-card-id mono">#{{ f.caso.id[:8]|upper }}</span></div>
+        <div class="wb-card-tipo">{{ f.clasificacion.tipo_humano }} <span class="wb-card-id mono">#{{ f.caso.id }}</span></div>
         {# L4 · razón operativa (por qué está aquí) — para elegir el siguiente sin abrir. #}
         {% if f.razon %}<div class="wb-card-razon">{{ f.razon }}</div>{% endif %}
         <div class="wb-card-top">

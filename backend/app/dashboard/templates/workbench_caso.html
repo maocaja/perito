@@ -15,7 +15,7 @@
       <span class="wb-hero-aseg">{{ detalle.asegurado.nombre }}</span>
       {% if detalle.asegurado.origen == 'demo' %}<span class="badge-demo" title="Dato de demostración — aún no se extrae el asegurado (P7)">demo</span>{% endif %}
       <span class="dim">·</span> {{ detalle.clasificacion.producto }}
-      <span class="dim">·</span> <span class="mono">#{{ caso.id[:8] }}</span>
+      <span class="dim">·</span> <span class="mono">#{{ caso.id }}</span>
     </div>
   </header>
 
@@ -43,7 +43,7 @@
   <div class="wb-confirm nivel-{{ S[0] }}" data-slot="confirmacion" role="status" aria-live="polite">
     <div class="wb-confirm-body">
       <div class="wb-confirm-title">{{ '✅ Caso aprobado y radicado' if est == 'APROBADO' else '⛔ Siniestro rechazado' }}</div>
-      <div class="wb-confirm-sub">Referencia del caso <strong class="mono">#{{ caso.id[:8]|upper }}</strong> · decisión registrada{% if caso.aprobado_por %} por {{ caso.aprobado_por|redact }}{% endif %}.</div>
+      <div class="wb-confirm-sub">Referencia del caso <strong class="mono">#{{ caso.id }}</strong> · decisión registrada{% if caso.aprobado_por %} por {{ caso.aprobado_por|redact }}{% endif %}.</div>
     </div>
     <a class="btn btn-ghost" href="/workbench?rol={{ rol }}">Continuar →</a>
   </div>
@@ -170,7 +170,8 @@
      visual. Click (o Enter, nativo del <button>) → visor overlay (drawer, reusa W12). P5: preview = huella/mock
      redactado, NUNCA la media cruda. M1 la vuelve real. #}
   <section class="wb-docs" data-slot="documentos">
-    <h2 class="wb-eyebrow">Documentos e imágenes <span class="wb-eyebrow-n">{{ detalle.documentos|length }}</span>{% if detalle.documentos and detalle.documentos[0].origen == 'demo' %} <span class="badge-demo" title="Adjuntos de demostración; los reales llegan con Document AI (M1)">demo</span>{% endif %}</h2>
+    <h2 class="wb-eyebrow">Documentos e imágenes <span class="wb-eyebrow-n">{{ detalle.documentos|length }}</span></h2>
+    {% if detalle.documentos %}
     <div class="wb-galeria">
       {% for d in detalle.documentos %}
       <button class="wb-doc" type="button" data-tipo="{{ d.tipo }}" data-doc="{{ loop.index0 }}"
@@ -185,6 +186,10 @@
       </button>
       {% endfor %}
     </div>
+    {% else %}
+    {# P7: si el correo no trajo adjuntos, se dice — no se fabrican documentos. #}
+    <p class="wb-docs-vacio">El correo no traía documentos adjuntos.</p>
+    {% endif %}
   </section>
 
   {# V1·6 · Cronología HUMANA por defecto (evento + hora), no técnica: el operador ve QUÉ pasó, no la orquesta.

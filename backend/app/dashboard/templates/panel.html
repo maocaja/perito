@@ -85,7 +85,7 @@
 {% for r in replays %}
 <div class="card" style="margin-bottom:16px">
   <div class="card-head">
-    <span class="mono" style="font-weight:600;font-size:13px">#{{ r.caso_id[:8] }}</span>
+    <span class="mono" style="font-weight:600;font-size:13px">#{{ r.caso_id }}</span>
     {{ ui.estado_badge(r.caso_estado) }}
     <span class="spacer mono" style="font-size:11.5px;color:var(--text-3)">{{ r.token_summary.tokens_total }} tok · in {{ r.token_summary.tokens_in }} / out {{ r.token_summary.tokens_out }}</span>
     <a class="btn" style="padding:5px 11px;font-size:12px" href="/panel/export/{{ r.caso_id }}">Export JSON (PIA)</a>

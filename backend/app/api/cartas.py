@@ -38,7 +38,7 @@ def _key_real() -> bool:
 
 def plantilla_carta(caso, tipo: str) -> str:
     """Borrador determinístico. La resolución cita el dictamen LITERAL (P2/P7)."""
-    cid = caso.id[:8]
+    cid = caso.id  # código de siniestro completo (SIN-AÑO-NNNN)
     if tipo == "datos":
         faltantes = ", ".join(_CAMPO_ES.get(c, c) for c in vista_caso.faltantes(caso))
         return (
@@ -143,7 +143,7 @@ def enviar_carta(request: Request, caso_id: str,
         raise HTTPException(status_code=400, detail="No aplica carta para este estado")
     cuerpo = (contenido or "").strip() or plantilla_carta(caso, tipo)
     try:
-        Mailbox.from_settings().enviar(asunto=f"Su siniestro {caso.id[:8]} — Perito", cuerpo=cuerpo)
+        Mailbox.from_settings().enviar(asunto=f"Su siniestro {caso.id} — Perito", cuerpo=cuerpo)
     except Exception as e:  # fail-safe (P): caso intacto, sin 500 — se re-muestra el borrador con el error
         return _render_carta_drawer(request, caso, borrador=cuerpo, carta_tipo=tipo,
                                     carta_error=f"No se pudo enviar la carta: {e}")

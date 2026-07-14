@@ -71,9 +71,14 @@ def test_a2_no_bloqueado_usa_banner_no_hero(client):
 
 # ───────────────────────── A3 · Visor de documento (drawer) ─────────────────────────
 
+def _caso_con_adjuntos():
+    """Un caso sembrado con adjuntos reales (auto); robusto al orden de `list()` (el de vivienda no trae)."""
+    return next(c for c in get_caso_repository().list() if c.adjuntos)
+
+
 def test_a3_wb_doc_abre_visor(client):
     """El documento en la galería es un control que abre el visor (drawer) por HTMX."""
-    caso = get_caso_repository().list()[0]
+    caso = _caso_con_adjuntos()
     html = client.get(f"/workbench/caso/{caso.id}").text
     assert f'hx-get="/workbench/documento/{caso.id}?doc=0"' in html
     # V1·4: el documento es un <button> nativo (teclado-first: Enter/Espacio disparan el click sin role/tabindex).
@@ -83,7 +88,7 @@ def test_a3_wb_doc_abre_visor(client):
 def test_a3_visor_muestra_etiqueta_y_no_media_cruda(client):
     """P5: el visor muestra etiqueta + huella/mock, NUNCA el nombre de archivo crudo ni media cruda."""
     from app.dashboard import documentos as _documentos
-    caso = get_caso_repository().list()[0]
+    caso = _caso_con_adjuntos()
     doc0 = _documentos.documentos_de(caso)[0]
     html = client.get(f"/workbench/documento/{caso.id}?doc=0").text
     assert doc0.etiqueta in html                # se muestra la etiqueta legible

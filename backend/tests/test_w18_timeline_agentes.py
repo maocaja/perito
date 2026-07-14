@@ -1,8 +1,8 @@
 """Tests W18 — Timeline agent-native.
 
 🔴 Blindaje agéntico: los pasos de AGENTES salen SOLO de la traza real (nunca fabricados); un agente que no
-corrió no aparece; un agente NUEVO aparece sin tocar la vista (mapa extensible). Los conteos de docs (mock)
-van rotulados y visualmente distintos.
+corrió no aparece; un agente NUEVO aparece sin tocar la vista (mapa extensible). Los conteos de docs son
+REALES (los adjuntos del correo) y visualmente distintos de los pasos de agentes.
 """
 
 import pytest
@@ -24,6 +24,11 @@ def _un_caso():
     return get_caso_repository().list()[0]
 
 
+def _caso_con_adjuntos():
+    """Caso sembrado con adjuntos reales (auto); robusto al orden de `list()` (el de vivienda no trae)."""
+    return next(c for c in get_caso_repository().list() if c.adjuntos)
+
+
 def _traza(*nodos):
     return {"trace_events": [{"nodo": n, "resultado": "ok", "timestamp": "2026-07-10T10:00:0%d" % i,
                               "tokens_in": 200, "tokens_out": 50} for i, n in enumerate(nodos)]}
@@ -31,32 +36,34 @@ def _traza(*nodos):
 
 # ---------- 🔴 pasos de agentes SOLO de la traza ----------
 
-_NOMBRES_AGENTE = ("Extractor", "Verificador", "Grounding", "Motor", "Fraude", "Document AI",
-                   "Correlación", "Resumen")
+# Frases (en lenguaje de operador) que identifican un paso de AGENTE en el timeline. Distintas de los
+# pasos no-agente ("Correo recibido", "Leyó N fotografía(s)", estado final) para no dar falso positivo.
+_NOMBRES_AGENTE = ("Leí los datos", "Verifiqué", "Busqué la póliza", "Evalué la cobertura",
+                   "sospechoso", "documentos adjuntos", "Crucé las fuentes", "Analicé el caso")
 
 
 def test_sin_traza_no_hay_pasos_de_agente():
-    """Sin traza → ningún paso de agente fabricado (solo correo + docs demo + estado)."""
+    """Sin traza → ningún paso de agente fabricado (solo correo + docs reales si los hubo + estado)."""
     pasos = vista_caso.timeline(_un_caso(), traza=None)
     agentes = [p for p in pasos if any(n in p["texto"] for n in _NOMBRES_AGENTE)]
     assert agentes == []  # no se inventa ningún agente si no corrió
 
 
 def test_agente_que_no_corrio_no_aparece():
-    """Traza con solo el Extractor → NO aparecen Verificador/Motor (no fabricados)."""
+    """Traza con solo la lectura de datos → NO aparecen la verificación ni la evaluación (no fabricados)."""
     pasos = vista_caso.timeline(_un_caso(), _traza("c2_extraccion"))
     textos = " ".join(p["texto"] for p in pasos)
-    assert "Extractor" in textos
-    assert "Verificador" not in textos and "Motor" not in textos
+    assert "Leí los datos" in textos
+    assert "Verifiqué" not in textos and "Evalué la cobertura" not in textos
 
 
 def test_agente_nuevo_aparece_sin_tocar_la_vista():
-    """Un agente NUEVO (M1 Document AI / M3 Correlator / W19 Summary) que emite traza → se renderiza."""
+    """Un paso NUEVO (M1 documentos / M3 cruce de fuentes / W19 análisis) que emite traza → se renderiza."""
     pasos = vista_caso.timeline(_un_caso(), _traza("document_ai", "evidence_correlator", "summary_agent"))
     textos = " ".join(p["texto"] for p in pasos)
-    assert "Document AI" in textos
-    assert "Correlación de evidencia" in textos
-    assert "Resumen" in textos
+    assert "Leí los documentos adjuntos" in textos
+    assert "Crucé las fuentes" in textos
+    assert "Analicé el caso" in textos
 
 
 def test_nodo_desconocido_no_crashea():
@@ -65,28 +72,29 @@ def test_nodo_desconocido_no_crashea():
     assert any("agente_del_futuro_xyz" in p["texto"] for p in pasos)
 
 
-# ---------- separación demo vs real ----------
+# ---------- separación docs reales vs agentes ----------
 
-def test_conteos_demo_distintos_de_los_agentes():
-    pasos = vista_caso.timeline(_un_caso(), _traza("c2_extraccion"))
-    docs = [p for p in pasos if p.get("demo")]
-    agentes = [p for p in pasos if not p.get("demo") and "Extractor" in p["texto"]]
-    assert docs and all("PDF" in p["texto"] or "fotografía" in p["texto"] for p in docs)
+def test_conteos_de_docs_distintos_de_los_agentes():
+    """Los pasos de lectura de documentos (conteos REALES del correo) son distintos de los pasos de
+    agentes de la traza; ninguno va rotulado demo (ya no se fabrican conteos)."""
+    pasos = vista_caso.timeline(_caso_con_adjuntos(), _traza("c2_extraccion"))
+    docs = [p for p in pasos if "PDF" in p["texto"] or "fotografía" in p["texto"]]
+    agentes = [p for p in pasos if "Leí los datos" in p["texto"]]
+    assert docs and all(p["demo"] is False for p in docs)      # docs reales, no fabricados
     assert agentes and all(p["demo"] is False for p in agentes)
 
 
 def test_tokens_en_pasos_de_agente():
     pasos = vista_caso.timeline(_un_caso(), _traza("c2_extraccion"))
-    extractor = next(p for p in pasos if "Extractor" in p["texto"])
-    assert extractor["tokens"] == 250  # 200 in + 50 out (real de la traza)
+    lectura = next(p for p in pasos if "Leí los datos" in p["texto"])
+    assert lectura["tokens"] == 250  # 200 in + 50 out (real de la traza)
 
 
 # ---------- render ----------
 
-def test_render_horizontal_y_demo_distinto(client):
+def test_render_cronologia_humana(client):
     html = client.get(f"/workbench/caso/{_un_caso().id}").text
     assert "wb-crono" in html            # V1·6: cronología HUMANA (vertical), no un strip técnico horizontal
-    assert "badge-demo" in html          # los pasos demo (conteos) van rotulados
     assert "Ver actividad técnica" in html  # el rastro técnico real sigue a un click (drawer, encode-not-hide)
 
 

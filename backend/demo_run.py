@@ -215,6 +215,7 @@ def _correr_escenario(esc, real, cotas, repo) -> None:
     if real:
         print(f"Aviso: {esc['aviso']}")
         caso = intake_crear_caso(AvisoNormalizado(texto_crudo=esc["aviso"], calidad=CalidadDoc.LIMPIO))
+        caso = caso.model_copy(update={"id": repo.reservar_codigo()})  # código de siniestro definitivo
         tracer = Tracer(caso.id)
         try:
             caso = orquestar_fnol(caso, c8, cotas, tracer)
@@ -227,6 +228,7 @@ def _correr_escenario(esc, real, cotas, repo) -> None:
         get_replay_store().save(tracer, caso.estado.value, caso.motivo_escalamiento)  # → Langfuse si on
     else:
         caso = construir_caso_preset(esc["key"])  # determinístico, sin LLM
+        caso = caso.model_copy(update={"id": repo.reservar_codigo()})  # código de siniestro definitivo
         repo.save(caso)
         sembrar_traza_demo(caso)
         tracer = None

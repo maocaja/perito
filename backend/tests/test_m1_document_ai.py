@@ -88,11 +88,11 @@ def test_documentos_de_real_cuando_hay_adjuntos():
     assert all(hasattr(d, "etiqueta") and hasattr(d, "huella") for d in docs)  # mismo contrato
 
 
-def test_providers_caen_al_mock_sin_adjuntos():
-    """Retro-compat (P7): un caso SIN adjuntos sigue mostrando el mock rotulado `demo`."""
+def test_sin_adjuntos_no_fabrica_documentos_ni_conteo():
+    """🔒 P7: un caso SIN adjuntos NO fabrica documentos ni conteo — galería vacía y conteo real en cero."""
     caso = intake_crear_caso(AvisoNormalizado(texto_crudo="x", calidad=CalidadDoc.LIMPIO))
-    assert {d.origen for d in documentos_de(caso)} == {"demo"}
-    assert conteo_adjuntos(caso)["origen"] == "demo"
+    assert documentos_de(caso) == []
+    assert conteo_adjuntos(caso) == {"pdfs": 0, "fotos": 0, "origen": "real"}
 
 
 def test_conteo_adjuntos_real():

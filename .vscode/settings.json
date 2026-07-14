@@ -1,0 +1,8 @@
+{
+  // Las plantillas Jinja usan expresiones {{ ... }} dentro de style="..."
+  // (p.ej. width dinámico de una barra). El validador CSS embebido de VS Code
+  // intenta parsear el atributo como CSS puro y las llaves de Jinja disparan
+  // falsos positivos (emptyRules / identifier expected / } expected).
+  // El CSS renderizado es válido; desactivamos solo esa validación.
+  "html.validate.styles": false
+}
