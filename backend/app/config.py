@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     poll_interval_s: int = Field(default=5, gt=0)     # segundos entre ciclos de lectura IMAP
     mail_total: int = Field(default=5, gt=0)          # tope de correos que envía el generador (demo corta)
 
+    @field_validator("session_secret")
+    @classmethod
+    def _valida_session_secret(cls, v):
+        """El secreto firma la cookie de sesión (identidad de estación, P1). En producción NUNCA puede ser el
+        default débil de dev — si `ENVIRONMENT=production` y sigue el default → fail-closed al arranque."""
+        import os
+        if v == "perito-dev-session-no-secreto" and os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}:
+            raise ValueError("session_secret debe configurarse desde env en producción (no el default de dev, P1)")
+        return v
+
     @field_validator("demo_live", mode="before")
     @classmethod
     def _normaliza_demo_live(cls, v):

@@ -338,7 +338,8 @@ def workbench_identificar(request: Request, firmante: str = Form(""),
         request.session["firmante"] = nombre
     else:
         request.session.pop("firmante", None)
-    destino = next if next.startswith("/") else "/workbench?rol=ANALISTA"   # evita open-redirect
+    # evita open-redirect: solo rutas internas; `//host` (protocol-relative) NO es interna → se rechaza (CWE-601)
+    destino = next if (next.startswith("/") and not next.startswith("//")) else "/workbench?rol=ANALISTA"
     return RedirectResponse(destino, status_code=303)
 
 

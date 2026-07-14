@@ -353,7 +353,6 @@
         {% else %}
         <form method="post" action="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" class="wb-firma-form"
               {% if rec.accion.confirm %}data-confirm="{{ rec.accion.confirm }}"{% endif %}>
-          <input type="hidden" name="usuario" class="wb-firma-in">
           {% if rec.accion.motivo %}<input type="hidden" name="motivo" value="{{ rec.accion.motivo }}">{% endif %}
           <button class="btn {{ 'btn-radicar' if rec.accion.kind == 'go' else 'btn-primary' }} btn-lg" type="submit"{% if rec.accion.kind == 'go' %} title="Crear formalmente el expediente y enviarlo al siguiente equipo"{% endif %}>{{ rec.accion.label }}</button>
         </form>
@@ -370,7 +369,6 @@
         {% if caso.estado.value not in ('APROBADO', 'RECHAZADO') %}
         <form method="post" action="/casos/{{ caso.id }}/rechazar" class="wb-firma-form wb-rechazar-form"
               data-confirm="¿Rechazar este siniestro? Quedará RECHAZADO con tu firma.">
-          <input type="hidden" name="usuario" class="wb-firma-in">
           <input type="text" name="motivo" placeholder="Motivo del rechazo (obligatorio)" autocomplete="off" required>
           <button class="btn btn-danger" type="submit">Rechazar siniestro</button>
         </form>
@@ -379,18 +377,16 @@
           {# 'Solicitar documentos' (envío mock directo) queda como secundaria: la primaria 'Preparar
              solicitud' (M5) abre un borrador editable; esta es la vía rápida sin revisar el texto. #}
           <form method="post" action="/casos/{{ caso.id }}/solicitar_docs" class="wb-firma-form">
-            <input type="hidden" name="usuario" class="wb-firma-in">
-            <button class="btn btn-ghost" type="submit">Solicitar documentos</button>
+              <button class="btn btn-ghost" type="submit">Solicitar documentos</button>
           </form>
           <form method="post" action="/casos/{{ caso.id }}/enviar_fraude" class="wb-firma-form"
                 data-confirm="¿Derivar al carril de fraude (SIU)? Es una sugerencia de revisión, no decide fraude (P6).">
-            <input type="hidden" name="usuario" class="wb-firma-in">
-            <button class="btn btn-ghost" type="submit" title="Deriva al carril SIU — no decide fraude (P6)">Enviar a análisis de irregularidades</button>
+              <button class="btn btn-ghost" type="submit" title="Deriva al carril SIU — no decide fraude (P6)">Enviar a análisis de irregularidades</button>
           </form>
           {% if not (rec.accion and rec.accion.endpoint == 'escalar') %}
           <form method="post" action="/casos/{{ caso.id }}/escalar" class="wb-firma-form"
                 data-confirm="¿Escalar este caso a revisión humana?">
-            <input type="hidden" name="usuario" class="wb-firma-in"><input type="hidden" name="motivo" value="Escalado desde la workbench">
+            <input type="hidden" name="motivo" value="Escalado desde la workbench">
             <button class="btn btn-ghost" type="submit" title="Enviar el caso a un especialista para evaluación manual">Enviar a revisión especializada</button>
           </form>
           {% endif %}
@@ -402,7 +398,6 @@
           {% endif %}
         </div>
         <form method="post" action="/casos/{{ caso.id }}/guardar_borrador" class="wb-firma-form wb-borrador">
-          <input type="hidden" name="usuario" class="wb-firma-in">
           <input type="text" name="nota" placeholder="Nota / borrador…" autocomplete="off">
           <button class="btn btn-ghost" type="submit">Guardar</button>
         </form>

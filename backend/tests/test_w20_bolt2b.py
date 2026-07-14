@@ -53,7 +53,10 @@ def test_a2_bloqueado_muestra_hero_con_campo_editable(client):
     html = client.get(f"/workbench/caso/{caso.id}").text
     assert "Necesita revisión" in html   # L1: el banner lo dice una vez (sin repetir "Necesitas revisar —")
     assert f'hx-post="/workbench/corregir/{caso.id}"' in html   # el campo editable posta a la corrección
-    assert 'name="usuario"' in html and "required" in html      # firma obligatoria embebida (P1)
+    # Firma de estación (D): la firma ya NO va inline — es de sesión. El form de corrección sigue,
+    # pero sin campo "Firma del analista"; el gate P1 vive en el servidor (_firma session-first).
+    assert "Firma del analista" not in html and 'id="wb-firma"' not in html
+    assert "Guardar y verificar" in html
     # mutuamente excluyente: el colapsable "Corregir datos" (vía de un caso LISTO) NO aparece aquí
     assert "Corregir datos" not in html
 
