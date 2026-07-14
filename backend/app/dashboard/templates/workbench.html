@@ -110,9 +110,12 @@
     if(pre){ activo = pre.getAttribute('data-caso-id'); }
     document.addEventListener('click', function(e){
       var item = e.target.closest('.wb-cola-item'); if(!item) return;
+      activo = item.getAttribute('data-caso-id');
+      // Si htmx no cargó (raro) → NO preventDefault: dejamos que el href navegue (fallback funcional, sin silencio).
+      if(!(window.htmx && window.htmx.ajax)) return;
       e.preventDefault();   // el detalle se carga vía htmx.ajax (NO atado a la fila) → inmune al swap de la cola cada 3s
-      activo = item.getAttribute('data-caso-id'); marcar(activo);
-      htmx.ajax('GET', '/workbench/caso/' + activo, '#wb-caso');   // carga robusta del detalle
+      marcar(activo);
+      htmx.ajax('GET', '/workbench/caso/' + encodeURIComponent(activo), '#wb-caso');   // carga robusta del detalle
     });
     document.body.addEventListener('htmx:afterSwap', function(){ if(activo) marcar(activo); });
   })();
