@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.dashboard.c11 import router as dashboard_router
@@ -37,6 +38,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Firma de estación (identidad de sesión ligera): cookie de sesión firmada. La identidad del
+    # analista (`firmante`) se captura una vez y firma cada acción (P1). No es auth real (sin passwords).
+    app.add_middleware(SessionMiddleware, secret_key=settings.session_secret, same_site="lax")
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
     app.include_router(dashboard_router)

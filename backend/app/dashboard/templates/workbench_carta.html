@@ -16,7 +16,6 @@
             hx-target="#wb-drawer" hx-swap="innerHTML" class="wb-carta-form">
         <label class="hint" for="wb-carta-cuerpo">Borrador (editable antes de enviar)</label>
         <textarea id="wb-carta-cuerpo" class="wb-carta-cuerpo" name="contenido" aria-label="Borrador de la carta">{{ borrador }}</textarea>
-        <input class="wb-carta-firma" type="text" name="usuario" placeholder="Tu nombre (firma, P1) para enviar" autocomplete="off" required>
         <button class="btn btn-primary" type="submit">Enviar al asegurado</button>
       </form>
     {% endif %}

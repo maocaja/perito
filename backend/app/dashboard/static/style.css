@@ -800,3 +800,15 @@ embed.wb-ev-media { width:100%; height:62vh; }  /* PDF real embebido */
 .wb-carta-cuerpo { min-height:200px; padding:11px 13px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; line-height:1.5; resize:vertical; }
 .wb-carta-firma { padding:9px 11px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
 .wb-carta-ok { padding:14px 16px; border-radius:10px; background:var(--ok-soft, rgba(34,197,94,.12)); color:var(--text); font-size:13.5px; line-height:1.5; }
+
+/* Firma de estación (identidad de sesión ligera) — chip del topbar + overlay de captura única */
+.pill-firma { display:inline-flex; align-items:center; gap:2px; font-size:12.5px; padding:5px 10px; border:1px solid var(--border-strong); border-radius:999px; color:var(--text); white-space:nowrap; }
+.pill-firma .dim { color:var(--text-dim, #8a8f98); }
+.pill-firma-cambiar { margin-left:8px; color:var(--brand); text-decoration:none; font-weight:600; }
+.pill-firma-cambiar:hover { text-decoration:underline; }
+.wb-identify { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }
+.wb-identify-card { background:var(--surface); border:1px solid var(--border-strong); border-radius:14px; padding:26px 30px; max-width:400px; width:92%; box-shadow:0 24px 70px rgba(0,0,0,.4); display:flex; flex-direction:column; gap:12px; }
+.wb-identify-card h2 { margin:0; font-size:20px; color:var(--text); }
+.wb-identify-card .dim { margin:0; color:var(--text-dim, #8a8f98); font-size:13px; line-height:1.5; }
+.wb-identify-card input[type=text] { padding:10px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--bg, var(--surface)); color:var(--text); font:inherit; font-size:15px; }
+.wb-identify-card .btn { margin-top:4px; }

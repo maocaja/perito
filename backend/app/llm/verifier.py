@@ -14,6 +14,7 @@ import logging
 from datetime import datetime
 from anthropic import Anthropic
 from app.config import settings
+from app.security.redaction import redact_pii_spans_es_co
 from app.contracts.extraccion import ExtraccionValidada
 from app.contracts.verificacion import (
     VerificacionAdversarial,
@@ -60,26 +61,42 @@ def call_c3_verifier_capa1(
     
     # Step 1: Build verification prompt with .campos data
     try:
-        campos_str = "\n".join(
-            [f"- {c.nombre}: {c.valor}" for c in extraccion.campos if not c.ausente]
-        )
+        # 🔒 P5: los campos PII (cédula, teléfono, email) aparecen [REDACTED] en el aviso que ve el verificador
+        # → NO se pueden verificar contra el texto redactado (ni se debe re-exponer la PII). Se excluyen: un
+        # campo redactado no es una inconsistencia. (Antes: el verificador los marcaba siempre → 100% escalaba.)
+        # Doble guarda: por nombre de campo PII, y por valor (si al redactarlo queda [REDACTED], p.ej. teléfono).
+        _CAMPOS_PII = {"asegurado_cedula", "cedula", "telefono", "celular", "asegurado_email", "email", "correo"}
+        campos_verificables = [
+            c for c in extraccion.campos
+            if not c.ausente and c.valor is not None
+            and c.nombre not in _CAMPOS_PII
+            and "[REDACTED]" not in redact_pii_spans_es_co(str(c.valor))
+        ]
+        campos_str = "\n".join(f"- {c.nombre}: {c.valor}" for c in campos_verificables)
         prompt_ver = f"""
-You are an adversarial verifier. Re-read the claim notice below and confirm each 
-extracted field comes from the source OR is marked as absent.
+You are a verification agent. Re-read the claim notice and check that each extracted field is SUPPORTED by
+the source (or correctly marked absent). Your job is to catch INVENTED or CONTRADICTORY values — NOT to
+penalize wording or formatting.
 
 --- BEGIN REDACTED NOTICE ---
 {texto_redactado}
 --- END NOTICE ---
 
-Here is what was extracted:
+Extracted fields:
 {campos_str}
 
-For each field in the extraction:
-1. Confirm it appears in the source document, OR
-2. Confirm it is marked as absent=true, OR
-3. Flag it as potentially invented/inconsistent
+Rules:
+- A field is CONFIRMED if its value is supported by the source, even if reworded, normalized or reformatted.
+  These are STILL CONFIRMED (do NOT flag them): "unos 5.000.000 de pesos" ⇄ 5000000; a date written in words
+  or a different format; a policy number with or without dashes/spaces; a claim type described in prose
+  ("choqué el carro" ⇄ colisión / colisión vehicular).
+- Add a field to `inconsistencias` ONLY if its value is NOT supported by the source or CONTRADICTS it (invented).
+- A field correctly marked absent=true is fine — it is NOT an inconsistency.
+- `confianza` must be HIGH (>= 0.9) when every present field traces to the source; lower it ONLY for genuinely
+  unsupported or contradictory values.
 
-Return JSON with: confianza (0-1), inconsistencias (list of field names), recomendacion (ACEPTA/REVISA/RECHAZA).
+Return JSON with: confianza (0-1), inconsistencias (list of field names that are invented/contradictory),
+recomendacion (ACEPTA/REVISA/RECHAZA).
 """
     except Exception as e:
         logger.error(f"Verification prompt building failed: {str(e)}")

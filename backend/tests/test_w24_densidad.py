@@ -75,23 +75,21 @@ def test_render_campo_muestra_origen_no_ia(client):
 # ───────────────────────── N6 · firma única en el punto de acción ─────────────────────────
 
 def test_una_sola_firma_por_estado(client):
-    """N6: hay EXACTAMENTE un #wb-firma en la página (el JS lo busca por id; dos romperían el copiado)."""
+    """Firma de estación (D): la identidad es de SESIÓN, no por acción → CERO campos de firma inline en el
+    detalle del caso (ningún '#wb-firma') en cualquier estado."""
     for key in ("campos-faltantes", "feliz"):
         caso = _guardar(key)
         html = client.get(f"/workbench/caso/{caso.id}").text
-        assert html.count('id="wb-firma"') == 1
+        assert html.count('id="wb-firma"') == 0
 
 
 def test_firma_no_flota_arriba_va_con_la_accion(client):
-    """N6: en un caso LISTO la firma acompaña a Radicar (punto de acción), no flota al inicio del panel.
-    Se verifica que la firma aparece DESPUÉS del resumen/estado, cerca del botón terminal."""
+    """Firma de estación (D): la acción terminal (Radicar) sigue presente, pero SIN campo de firma inline —
+    la firma es de sesión (topbar), no se teclea por acción."""
     caso = _guardar("feliz")
     html = client.get(f"/workbench/caso/{caso.id}").text
-    pos_firma = html.find('id="wb-firma"')
-    pos_radicar = html.find("Radicar caso")
-    assert pos_firma != -1 and pos_radicar != -1
-    # la firma está junto a la acción terminal (antes del botón, en su bloque), no al tope del panel
-    assert abs(pos_firma - pos_radicar) < 600
+    assert "Radicar caso" in html
+    assert 'id="wb-firma"' not in html
 
 
 def test_gate_de_firma_sigue_en_el_servidor(client):

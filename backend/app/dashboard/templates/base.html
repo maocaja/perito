@@ -39,13 +39,15 @@
       <div class="user">
         <div class="avatar">{{ 'VR' if rol_val == 'ANALISTA' else 'OP' }}</div>
         <div style="min-width:0">
-          <div style="font-size:12.5px;font-weight:600">{{ 'Valentina Ríos' if rol_val == 'ANALISTA' else 'Óscar Peña' }}</div>
+          <div style="font-size:12.5px;font-weight:600">{{ 'Diana Ríos' if rol_val == 'ANALISTA' else 'Óscar Peña' }}</div>
           <div style="font-size:11px;color:var(--text-3)">Rol · {{ rol_val|capitalize }}</div>
         </div>
       </div>
     </div>
   </aside>
 
+  {# Firma de estación (identidad de sesión ligera): quién firma las acciones. Se lee directo de la sesión. #}
+  {% set _firmante = request.session.get('firmante') if request.session else none %}
   <div class="main">
     <header class="topbar">
       <div class="crumb"><span class="dim">{{ branding.producto if branding else 'Perito' }}</span><span class="sep">/</span><span>{% block crumb %}{{ self.title() }}{% endblock %}</span></div>
@@ -61,6 +63,12 @@
           <a class="{{ 'active' if rol_val == 'ANALISTA' }}" href="/workbench?rol=ANALISTA">Analista</a>
           <a class="{{ 'active' if rol_val == 'CUMPLIMIENTO' }}" href="/panel?rol=CUMPLIMIENTO">Cumplimiento</a>
         </div>
+        {% if _firmante %}
+        <div class="pill-firma" title="Firmas las acciones como {{ _firmante|redact }}">
+          <span class="dim">Firmando como</span>&nbsp;<strong>{{ _firmante|redact }}</strong>
+          <a class="pill-firma-cambiar" href="?rol={{ rol_val }}&amp;identificar=1">cambiar</a>
+        </div>
+        {% endif %}
         <button class="icon-btn" id="bell" type="button" onclick="clearBell()" title="Notificaciones de nuevos casos" aria-label="Notificaciones de nuevos casos" style="position:relative">
           <span aria-hidden="true">🔔</span>
           <span class="bell-badge" id="bell-badge">0</span>
@@ -68,6 +76,18 @@
         <button class="icon-btn" type="button" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema (claro/oscuro)"><span id="theme-icon" aria-hidden="true">☾</span></button>
       </div>
     </header>
+    {# Captura única de identidad (P1): al entrar sin firmante, o al pulsar "cambiar" (?identificar=1). #}
+    {% if not _firmante or request.query_params.get('identificar') %}
+    <div class="wb-identify" role="dialog" aria-modal="true" aria-labelledby="wb-identify-t">
+      <form class="wb-identify-card" method="post" action="/workbench/identificar">
+        <input type="hidden" name="next" value="/workbench?rol={{ rol_val }}">
+        <h2 id="wb-identify-t">¿Quién eres?</h2>
+        <p class="dim">Te identificas una vez; cada acción quedará firmada con tu nombre. Sin contraseñas.</p>
+        <input type="text" name="firmante" value="{{ _firmante or '' }}" placeholder="Tu nombre" autocomplete="off" autofocus required>
+        <button class="btn btn-primary" type="submit">Entrar a la estación</button>
+      </form>
+    </div>
+    {% endif %}
     <div class="content">
       {% block content %}{% endblock %}
     </div>

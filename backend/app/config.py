@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # U2 API
     anthropic_api_key: str = Field(default="")
 
+    # Firma de estación (identidad de sesión ligera): secreto para firmar la cookie de sesión.
+    # Dev por default; en producción SIEMPRE desde env. No es auth real (sin passwords) — ver
+    # specs/aidlc/evolution/firma-unica-sesion.md.
+    session_secret: str = Field(default="perito-dev-session-no-secreto")
+
     # Demo en vivo — poller de Gmail (Unit H). `off` por default: el poller NUNCA arranca (cero
     # costo, sin key). `deterministic` = presets sin LLM (ensayo gratis). `real` = pipeline real
     # (agentes Claude; requiere anthropic_api_key). Control de costo = riesgo #2 del PRD.
@@ -66,7 +71,17 @@ class Settings(BaseSettings):
     imap_host: str = Field(default="imap.gmail.com")
     smtp_host: str = Field(default="smtp.gmail.com")
     poll_interval_s: int = Field(default=5, gt=0)     # segundos entre ciclos de lectura IMAP
-    mail_total: int = Field(default=15, gt=0)         # tope de correos que envía el generador
+    mail_total: int = Field(default=5, gt=0)          # tope de correos que envía el generador (demo corta)
+
+    @field_validator("session_secret")
+    @classmethod
+    def _valida_session_secret(cls, v):
+        """El secreto firma la cookie de sesión (identidad de estación, P1). En producción NUNCA puede ser el
+        default débil de dev — si `ENVIRONMENT=production` y sigue el default → fail-closed al arranque."""
+        import os
+        if v == "perito-dev-session-no-secreto" and os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}:
+            raise ValueError("session_secret debe configurarse desde env en producción (no el default de dev, P1)")
+        return v
 
     @field_validator("demo_live", mode="before")
     @classmethod

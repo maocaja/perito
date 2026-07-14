@@ -328,6 +328,21 @@ def workbench_asset(nombre: str):
     return FileResponse(ruta)
 
 
+@router.post("/workbench/identificar", response_class=RedirectResponse)
+def workbench_identificar(request: Request, firmante: str = Form(""),
+                         next: str = Form("/workbench?rol=ANALISTA")):
+    """Firma de estación (identidad de sesión ligera): guarda quién es el analista UNA vez; a partir de ahí
+    cada acción se firma sola (P1). Sin passwords. `firmante` vacío → limpia la identidad ('cambiar')."""
+    nombre = (firmante or "").strip()
+    if nombre:
+        request.session["firmante"] = nombre
+    else:
+        request.session.pop("firmante", None)
+    # evita open-redirect: solo rutas internas; `//host` (protocol-relative) NO es interna → se rechaza (CWE-601)
+    destino = next if (next.startswith("/") and not next.startswith("//")) else "/workbench?rol=ANALISTA"
+    return RedirectResponse(destino, status_code=303)
+
+
 @router.post("/workbench/corregir/{caso_id}", response_class=HTMLResponse)
 def workbench_corregir(request: Request, caso_id: str,
                        usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value),
@@ -335,9 +350,10 @@ def workbench_corregir(request: Request, caso_id: str,
                        tipo_siniestro: Optional[str] = Form(None), monto_reclamado: Optional[str] = Form(None)):
     """Fase 2: corrección inline. Delega en `aplicar_correccion` (SERVER re-corre C4 + motor determinístico,
     P2; firma P1; 409 si terminal) y devuelve el partial `#wb-caso` re-renderizado (sin recarga)."""
-    from app.api.hitl_actions import _validar_corregible, aplicar_correccion
-    caso = _validar_corregible(caso_id, usuario)  # P1 firma · 404 · 409 · 400
-    actualizado = aplicar_correccion(caso, usuario.strip(), {
+    from app.api.hitl_actions import _firma, _validar_corregible, aplicar_correccion
+    firma = _firma(request, usuario)              # P1 firma: sesión (UI) o fallback usuario (compat) → 400 si falta
+    caso = _validar_corregible(caso_id, firma)    # 404 · 409 · 400
+    actualizado = aplicar_correccion(caso, firma, {
         "numero_poliza": numero_poliza, "fecha_siniestro": fecha_siniestro,
         "tipo_siniestro": tipo_siniestro, "monto_reclamado": monto_reclamado,
     })
