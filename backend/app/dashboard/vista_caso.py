@@ -732,6 +732,24 @@ def _nivel_conf(x: float) -> str:
     return "ok" if x >= 0.9 else ("warn" if x >= 0.7 else "bad")
 
 
+def _conf_texto(conf: float) -> tuple[str, str]:
+    """W17 · La confianza del verificador, LEGIBLE (encode-not-hide): se lidera con el significado y el %
+    exacto + umbral viven en el tooltip. Un `0.20` pelado no le dice nada al analista.
+
+    Devuelve (valor, ayuda). Umbral de escalamiento = `confidence_threshold` (bajo → C3 sugiere revisar, P4)."""
+    from app.config import settings
+    conf = max(0.0, min(1.0, conf))            # clamp defensivo: la confianza vive en [0,1] (no rompe el render)
+    pct = round(conf * 100)
+    umbral = round(settings.confidence_threshold * 100)
+    if conf >= 0.9:
+        return "Verificado", f"El verificador confirmó los datos con la fuente ({pct}%)."
+    if conf >= settings.confidence_threshold:
+        return f"Revisar · {pct}%", (f"Confianza media ({pct}%): el verificador no confirmó del todo; "
+                                     f"conviene una mirada.")
+    return f"Sin confirmar · {pct}%", (f"Confianza baja ({pct}%, umbral {umbral}%): el verificador no pudo "
+                                       f"confirmar que los datos coincidan con la fuente → conviene revisar.")
+
+
 # ---------------------------------------------------------------- A · Resumen
 
 def resumen_copiloto(caso) -> dict:
@@ -791,11 +809,20 @@ def confianza_riesgo(caso, traza) -> list[dict]:
     presentes, falt = _presentes(caso), _faltantes(caso)
     verif = hallazgos_verificador(caso, traza)
     fr = caso.alerta_fraude
+    # W17 · Verificación legible (no un 0.20 pelado): significado + % + umbral en el tooltip (`ayuda`).
+    if verif["disponible"]:
+        v_val, v_ayuda = _conf_texto(verif["confianza"])
+    else:
+        v_val, v_ayuda = "No realizada", "El verificador no corrió (modo determinístico o sin traza)."
     return [
         # Extracción = completitud de campos (la confianza por campo va en la tabla, no aquí).
-        {"label": "Extracción", "valor": f"{len(presentes)} / {len(CAMPOS)} campos", "nivel": "ok" if not falt else "warn"},
-        {"label": "Verificación", "valor": f"{verif['confianza']:.2f}" if verif["disponible"] else "No realizada", "nivel": verif["nivel"]},
-        {"label": "Fraude", "valor": (fr.severidad if fr else "sin señales"), "nivel": ("bad" if fr and fr.severidad == "ALTA" else ("warn" if fr else "ok"))},
+        {"label": "Extracción", "valor": f"{len(presentes)} / {len(CAMPOS)} campos", "nivel": "ok" if not falt else "warn",
+         "ayuda": f"{len(presentes)} de {len(CAMPOS)} campos capturados del aviso."},
+        {"label": "Verificación", "valor": v_val, "nivel": verif["nivel"], "ayuda": v_ayuda},
+        {"label": "Fraude", "valor": (fr.severidad if fr else "sin señales"),
+         "nivel": ("bad" if fr and fr.severidad == "ALTA" else ("warn" if fr else "ok")),
+         "ayuda": (f"Señal de fraude ({fr.severidad}): solo sugiere revisar, no bloquea (P6)." if fr
+                   else "Sin señales de fraude.")},
     ]
 
 

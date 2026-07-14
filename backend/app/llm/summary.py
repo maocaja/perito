@@ -12,8 +12,11 @@ la plantilla determinística de W4 (`resumen_narrativo`). Nunca error, nunca inv
 Mockeable/hermético: sin key real (o key de test) usa el fallback → los tests no tocan red.
 """
 
+import hashlib
 import logging
 import re
+import time
+from collections import OrderedDict
 
 from app.config import settings
 from app.contracts.enums import ResultadoCobertura
@@ -22,6 +25,37 @@ from app.security.redaction import redact_pii_spans_es_co
 logger = logging.getLogger(__name__)
 
 _MAX_TOKENS = 500
+
+# W19 · Caché no-bloqueante del Summary Agent (evita re-llamar al LLM en cada auto-refresh de 3 s).
+# _AGENTE_CACHE: caso_id → (clave_estado, texto)   — resultado del LLM que pasó el guard (sticky).
+# _COOLDOWN:     caso_id → monotonic ts del último fallo — durante `summary_cooldown_s` se sirve W4 sin LLM.
+# La clave de estado = hash del prompt: si el caso no cambió, el prompt no cambia → se reutiliza; si cambió,
+# la clave cambia y se reintenta el LLM (auto-cura).
+# Cota LRU (`_CACHE_MAX`): en un proceso largo el caché NO crece sin fin — se expulsa el menos usado.
+# Single-worker: uvicorn corre un worker síncrono; el peor caso de una carrera sería una llamada LLM de más
+# (nunca corrupción ni violación de P1). Para multi-worker/escala → mover a un store compartido (Redis).
+_CACHE_MAX = 512
+_AGENTE_CACHE: "OrderedDict[str, tuple[str, str]]" = OrderedDict()
+_COOLDOWN: "OrderedDict[str, float]" = OrderedDict()
+
+
+def _lru_put(cache: OrderedDict, clave: str, valor) -> None:
+    """Inserta acotando el caché (LRU): el recién usado al final; expulsa el más viejo si excede `_CACHE_MAX`."""
+    cache[clave] = valor
+    cache.move_to_end(clave)
+    while len(cache) > _CACHE_MAX:
+        cache.popitem(last=False)
+
+
+def _clave_estado(caso) -> str:
+    """Hash del prompt: cambia si (y solo si) cambió algo que el resumen usa."""
+    return hashlib.sha256(construir_prompt(caso).encode("utf-8")).hexdigest()
+
+
+def _reset_caches() -> None:
+    """Limpia los cachés del Summary Agent. Para tests (autouse) y entre corridas."""
+    _AGENTE_CACHE.clear()
+    _COOLDOWN.clear()
 # Etiquetas de cobertura que, si aparecen en la narrativa, DEBEN coincidir con el veredicto del motor (P2).
 # ORDEN: de más específica a menos (la primera que matchea manda) + límites de palabra, para que "cubierto"
 # NO haga falso match dentro de "no cubierto"/"cubierto parcial".
@@ -133,7 +167,10 @@ def _guard_ok(texto: str, caso) -> bool:
 
 def _llm_redacta(caso) -> str:
     from anthropic import Anthropic
-    client = Anthropic(api_key=settings.anthropic_api_key)
+    # Fail-fast (W19): timeout corto + sin reintentos → ante 529/overload NO bloquea el worker con backoff;
+    # cae al fallback W4 al instante. El resumen es best-effort, no vale congelar la UI por él.
+    client = Anthropic(api_key=settings.anthropic_api_key,
+                       timeout=settings.summary_timeout_s, max_retries=settings.summary_max_retries)
     resp = client.messages.create(
         # Análisis/síntesis → modelo capaz (Sonnet), no el barato de extracción. El Analista es el que le
         # habla al operador; aquí SÍ se le da protagonismo al LLM (dentro del guard P1/P2).
@@ -149,12 +186,30 @@ def call_summary_agent(caso) -> tuple[str, str]:
     Fail-closed: sin LLM disponible / guard falla / excepción → fallback determinístico W4 (origen="base").
     """
     from app.dashboard.vista_caso import resumen_narrativo  # lazy: fallback (W4)
+    clave = _clave_estado(caso)
+
+    # 1) Caché sticky: el LLM ya redactó este caso (y no cambió) → reutilizar, 0 llamadas nuevas.
+    cacheado = _AGENTE_CACHE.get(caso.id)
+    if cacheado and cacheado[0] == clave:
+        _AGENTE_CACHE.move_to_end(caso.id)   # LRU: marcar como recién usado
+        return cacheado[1], "agente"
+
+    # 2) Cooldown: un fallo reciente para este caso → servir W4 sin re-llamar (corta el martilleo del refresh).
+    ultimo_fallo = _COOLDOWN.get(caso.id)
+    if ultimo_fallo is not None and (time.monotonic() - ultimo_fallo) < settings.summary_cooldown_s:
+        return resumen_narrativo(caso), "base"
+
+    # 3) Intentar el LLM (fail-fast). Éxito → cachea + limpia cooldown; fallo/guard → arranca cooldown.
     if _llm_disponible():
         try:
             texto = redact_pii_spans_es_co(_llm_redacta(caso).strip())  # P5 también en la salida
             if texto and _guard_ok(texto, caso):
+                _lru_put(_AGENTE_CACHE, caso.id, (clave, texto))
+                _COOLDOWN.pop(caso.id, None)
                 return texto, "agente"
             logger.info("Summary Agent: guard/salida no válida → fallback determinístico (W4).")
         except Exception as e:
+            # NUNCA loguear str(e)/e.args — pueden traer PII (URLs, tokens). Solo el tipo (P5).
             logger.warning("Summary Agent falló (%s) → fallback W4.", type(e).__name__)
+        _lru_put(_COOLDOWN, caso.id, time.monotonic())
     return resumen_narrativo(caso), "base"

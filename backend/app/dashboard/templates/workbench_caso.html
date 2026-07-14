@@ -85,7 +85,7 @@
   {# Tira de estado del pipeline (compacta, at-a-glance) — slot W6 #}
   <div class="wb-strip" data-slot="confianza">
     {% for c in detalle.confianza %}
-      <div class="wb-strip-item nivel-{{ c.nivel }}"><div class="hint">{{ c.label }}</div><div class="wb-strip-val">{{ c.valor }}</div></div>
+      <div class="wb-strip-item nivel-{{ c.nivel }}"{% if c.ayuda %} title="{{ c.ayuda }}"{% endif %}><div class="hint">{{ c.label }}</div><div class="wb-strip-val">{{ c.valor }}</div></div>
     {% endfor %}
   </div>
 
