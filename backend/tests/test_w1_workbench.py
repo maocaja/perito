@@ -82,10 +82,12 @@ def test_workbench_caso_sin_extraccion_renderiza(client):
 
 
 def test_cola_item_apunta_al_parcial_via_htmx(client):
-    """Cada ítem de la cola hace hx-get del parcial al #wb-caso (swap sin recargar el shell)."""
+    """Cada ítem de la cola carga el detalle en #wb-caso vía htmx.ajax desde JS (robusto al auto-poll de la cola:
+    la petición NO queda atada a la fila, que el poll reemplaza cada 3s)."""
     r = client.get("/workbench")
-    assert 'hx-get="/workbench/caso/' in r.text
-    assert 'hx-target="#wb-caso"' in r.text
+    assert 'data-caso-id="' in r.text                        # la fila identifica su caso
+    assert "htmx.ajax('GET', '/workbench/caso/'" in r.text   # el JS carga el parcial…
+    assert "'#wb-caso'" in r.text                             # …dentro de #wb-caso
 
 
 # ---------- P1 / passive ----------

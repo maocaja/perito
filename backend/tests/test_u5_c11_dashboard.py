@@ -44,7 +44,7 @@ def test_workbench_lista_casos(client):
     # W20/A6: la cola del operador vive en la Workbench (el board `/casos` se retiró).
     r = client.get("/workbench")
     assert r.status_code == 200
-    assert r.text.count("/workbench/caso/") >= 4  # un enlace por caso en la cola
+    assert r.text.count('data-caso-id="') >= 4  # una fila por caso en la cola (carga el detalle vía htmx.ajax)
 
 def test_workbench_filtro_por_estado(client):
     # El filtro por estado (Inbox/En Proceso/Radicados/Escalados) ocurre DENTRO de la Workbench (W8).

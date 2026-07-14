@@ -28,9 +28,10 @@
          poleada): SOLO navegación; conserva data-caso-id para la persistencia de selección. #}
       {# N4 · la urgencia se ESCANEA, no se lee: acento lateral por carril (rojo/ámbar/amarillo/verde) + fraude
          resaltado. La prioridad (MEDIA/BAJA) deja de ser lo único que pesa; el porqué operativo manda. #}
+      {# El detalle se carga vía htmx.ajax desde el JS (NO con hx-get en la fila): así la petición NO queda atada
+         a la fila, que el auto-poll reemplaza cada 3s → antes se abortaba el clic ("el caso no responde"). #}
       <a class="wb-cola-item row-link wb-cr-{{ f.carril.carril }} {{ 'active' if f.caso.id == caso_activo_id }}"
          href="/workbench?rol={{ rol }}&caso_id={{ f.caso.id }}"
-         hx-get="/workbench/caso/{{ f.caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML"
          data-caso-id="{{ f.caso.id }}" data-titulo="{{ f.clasificacion.tipo_humano }}"
          data-hora="{{ f.hora }}" data-fraude="{{ f.senal_fraude or '' }}"
          title="{{ f.carril.etiqueta }} — {{ f.carril.motivo }}">
@@ -109,7 +110,9 @@
     if(pre){ activo = pre.getAttribute('data-caso-id'); }
     document.addEventListener('click', function(e){
       var item = e.target.closest('.wb-cola-item'); if(!item) return;
+      e.preventDefault();   // el detalle se carga vía htmx.ajax (NO atado a la fila) → inmune al swap de la cola cada 3s
       activo = item.getAttribute('data-caso-id'); marcar(activo);
+      htmx.ajax('GET', '/workbench/caso/' + activo, '#wb-caso');   // carga robusta del detalle
     });
     document.body.addEventListener('htmx:afterSwap', function(){ if(activo) marcar(activo); });
   })();
