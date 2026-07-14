@@ -40,6 +40,10 @@ skills-lock.json
 .claude/skills/web-design-guidelines
 .claude/skills/writing-guidelines
 .claude/skills/deploy-to-vercel
+.claude/skills/pptx
+
+# Scratchpad / trabajo efímero (deck del pitch, experimentos) — no es producto, no se versiona aquí
+scratchpad/
 
 # OS / IDE
 .DS_Store
