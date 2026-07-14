@@ -135,8 +135,8 @@ def enviar_carta(request: Request, caso_id: str,
                  usuario: Optional[str] = Form(None), contenido: Optional[str] = Form(None),
                  rol: str = Form(RolUsuario.ANALISTA.value)):
     """P1: envío = acción humana firmada. Fail-safe: un fallo de SMTP no cambia el caso (no 500)."""
-    if not usuario or not usuario.strip():
-        raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
+    from app.api.hitl_actions import _firma
+    _firma(request, usuario)   # P1: firma de sesión (UI) o fallback `usuario` (compat) → 400 si falta
     caso = _get_o_404(caso_id)
     tipo = vista_caso.tipo_carta(caso)
     if tipo is None:

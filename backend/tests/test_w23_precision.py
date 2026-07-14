@@ -142,13 +142,12 @@ def test_correccion_con_enum_del_dropdown_redictamina(client):
 # ───────────────────────── M4 · microcopy (firma, verificación, tooltips) ─────────────────────────
 
 def test_firma_sin_p1_en_la_superficie(client):
-    """M4: la firma se rotula 'Firma del analista' (autoexplicativo); '(P1)' sale de la superficie del
-    operador (queda para auditoría/cumplimiento). El gate de firma obligatoria sigue intacto (required)."""
+    """Firma de estación (D): la identidad viene de la SESIÓN, no por acción → el detalle del caso ya no tiene
+    campo de firma inline ('Firma del analista' / '#wb-firma'). El gate P1 sigue en el servidor."""
     caso = _guardar("campos-faltantes")
     html = client.get(f"/workbench/caso/{caso.id}").text
-    assert "Firma del analista" in html
-    assert "Firma (P1)" not in html and "firma, P1" not in html
-    assert "Obligatoria para" in html   # W24·N6: la ayuda de firma explica el porqué (contextual a la acción)
+    assert 'id="wb-firma"' not in html
+    assert "Firma del analista" not in html
 
 
 def test_verificacion_no_realizada_en_humano(client):

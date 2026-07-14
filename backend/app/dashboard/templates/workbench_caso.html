@@ -65,9 +65,6 @@
     <form class="wb-corregir-form wb-revisar-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
       <input type="hidden" name="rol" value="{{ rol }}">
       {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
-      <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
-        <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
-      </label>
       <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
     </form>
   </section>
@@ -76,6 +73,15 @@
   {# V1·2 · La HISTORIA del caso en lenguaje natural (como un operador experto explicando), no campos ni card
      ruidosa. La IA es INVISIBLE: se ve la historia, no el "agente". P7: ambos orígenes (LLM/base) son REALES —
      no hay mock que rotular; si la redactó el copiloto, una nota MUY sutil y honesta lo dice (no marketing). #}
+  {# Correo recibido (texto original, redactado P5) ARRIBA del resumen: permite validar de un vistazo que lo
+     extraído coincide con la fuente. Abierto por defecto (la demo lo usa para cotejar). #}
+  <section class="card" data-slot="correo-original">
+    <details open>
+      <summary class="card-head email-summary"><h2>Correo recibido · texto original</h2></summary>
+      <div class="card-body mono email-body">{{ detalle.aviso_texto }}</div>
+    </details>
+  </section>
+
   <section class="wb-historia" data-slot="resumen">
     <h2 class="wb-eyebrow">Resumen automático</h2>
     <p class="wb-narrativa">{{ detalle.resumen_ejecutivo.texto|redact }}</p>
@@ -156,9 +162,6 @@
         <form class="wb-corregir-form" hx-post="/workbench/corregir/{{ caso.id }}" hx-target="#wb-caso" hx-swap="innerHTML">
           <input type="hidden" name="rol" value="{{ rol }}">
           {% for c in detalle.campos_corregibles %}{{ ui.corregir_campo(c) }}{% endfor %}
-          <label class="wb-corregir-campo wb-corregir-firma">Firma del analista
-            <input type="text" name="usuario" autocomplete="off" placeholder="Tu nombre" required>
-          </label>
           <button class="btn btn-primary" type="submit">Guardar y verificar</button><span class="htmx-indicator wb-guardando" aria-hidden="true">⟳ Guardando y re-evaluando…</span>
         </form>
       </div>
@@ -219,14 +222,7 @@
     <ol class="wb-crono-list">{% for p in tl[-4:] %}{{ crono_step(p) }}{% endfor %}</ol>
   </section>
 
-  {# Secundarios plegados (progressive disclosure sin esconder): correo original + comparativa multi-correo #}
-  <section class="card">
-    <details>
-      <summary class="card-head email-summary"><h2>Correo recibido · texto original</h2></summary>
-      <div class="card-body mono email-body">{{ detalle.aviso_texto }}</div>
-    </details>
-  </section>
-
+  {# Secundario plegado (progressive disclosure): comparativa multi-correo #}
   {% if detalle.comparativa.disponible %}
   <section class="card wb-comp-aviso" data-slot="comparativa">
     <div class="card-body wb-comp-aviso-body">
@@ -344,13 +340,6 @@
            que la primaria abra un borrador (Preparar solicitud → la firma va al ENVIAR, dentro del drawer). Si
            la primaria no exige firma (drawer) o no hay primaria, la firma acompaña las acciones terminales de
            "Más acciones". 🔒P1: hay exactamente UN #wb-firma; el gate REAL es el servidor (usuario requerido). #}
-        {% set firma_con_primaria = rec.accion and not rec.accion.drawer %}
-        {% macro firma_input(ayuda) %}
-        <label class="wb-firma-label">Firma del analista
-          <input type="text" id="wb-firma" placeholder="Tu nombre" autocomplete="off">
-        </label>
-        <div class="hint wb-firma-hint">{{ ayuda }}</div>
-        {% endmacro %}
         {# L1 · Acción PRIMARIA ÚNICA por estado (recomendación == acción, `rec.accion`). Verde/go solo cuando
            es Radicar (terminal con firma). None ⇒ caso resuelto, sin primaria. 🔒P1: el gate real es el servidor. #}
         {% if rec.accion %}
@@ -362,8 +351,6 @@
                 hx-post="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" hx-target="#wb-drawer" hx-swap="innerHTML"
                 title="Redacta un borrador de solicitud al asegurado; tú lo revisas y envías (P1: draft ≠ send)">{{ rec.accion.label }}</button>
         {% else %}
-        {# N6 · firma inmediatamente ANTES de la acción terminal (Radicar/Escalar): se firma donde se decide. #}
-        {{ firma_input('Obligatoria para ' ~ ('radicar' if rec.accion.kind == 'go' else 'esta acción') ~ '.') }}
         <form method="post" action="/casos/{{ caso.id }}/{{ rec.accion.endpoint }}" class="wb-firma-form"
               {% if rec.accion.confirm %}data-confirm="{{ rec.accion.confirm }}"{% endif %}>
           <input type="hidden" name="usuario" class="wb-firma-in">
@@ -380,7 +367,6 @@
           <summary>Más acciones</summary>
         {# N6 · si la primaria no trajo la firma (abre drawer o no hay primaria), va aquí — donde viven las
            acciones terminales secundarias (rechazar/escalar). Garantiza UN solo #wb-firma en la página. #}
-        {% if not firma_con_primaria %}{{ firma_input('Obligatoria para rechazar o escalar.') }}{% endif %}
         {% if caso.estado.value not in ('APROBADO', 'RECHAZADO') %}
         <form method="post" action="/casos/{{ caso.id }}/rechazar" class="wb-firma-form wb-rechazar-form"
               data-confirm="¿Rechazar este siniestro? Quedará RECHAZADO con tu firma.">

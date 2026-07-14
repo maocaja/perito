@@ -16,6 +16,7 @@ dependencies = [
     "pgvector>=0.2",        # adaptador cliente de la extensión pgvector (RAG, M10)
     "fastapi>=0.110",       # scaffold API (superficie real en U4)
     "python-multipart>=0.0.9", # FastAPI lo exige para parsear Form(...) — acciones HITL + corrección inline
+    "itsdangerous>=2.0",    # firma la cookie de sesión (SessionMiddleware) — identidad de estación (firma P1)
     "uvicorn>=0.29",        # server de dev
     "anthropic>=0.40",      # SDK Claude para los agentes reales de extracción/verificación (app/llm/)
     # langfuse: opcional (extra "obs" abajo) — solo se requiere si se configuran las keys de Langfuse (B1).

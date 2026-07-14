@@ -75,32 +75,11 @@
 <script>
   // W9 · JS mínimo (ADR-001): copia la firma compartida a las acciones antes del POST. El gate real es el
   // servidor (usuario requerido, P1); esto es solo comodidad de UI. Delegado → funciona tras swaps HTMX.
+  // W20·A4: si el form pide confirmación (data-confirm), abre el diálogo NATIVO confirm() antes del POST.
+  // La firma ya NO se teclea por acción: viene de la SESIÓN (identidad de estación); el gate P1 es del servidor.
   document.addEventListener('submit', function(e){
     var form = e.target;
-    var esFirmada = form.classList && form.classList.contains('wb-firma-form');
-    // Guarda de firma (comodidad de UI, NO reemplaza el gate P1 del servidor): las acciones firmadas usan el
-    // campo compartido #wb-firma. Si está vacío, NO dispares un POST condenado a un 400 crudo que te saca de la
-    // estación: enfoca la firma y señálala para que el operador escriba su nombre primero.
-    if(esFirmada){
-      var firmaEl = document.getElementById('wb-firma');
-      var firma = firmaEl ? firmaEl.value.trim() : '';
-      if(!firma){
-        e.preventDefault();
-        if(firmaEl){ firmaEl.focus(); firmaEl.classList.add('wb-firma-missing'); }
-        return;
-      }
-    }
-    // W20·A4: si el form pide confirmación (data-confirm), abre el diálogo NATIVO confirm() antes del POST.
-    // Sin lógica de decisión en cliente: solo fricción de confirmación; cancelar aborta el envío.
-    if(form.dataset && form.dataset.confirm && !window.confirm(form.dataset.confirm)){ e.preventDefault(); return; }
-    if(!esFirmada) return;
-    var el = document.getElementById('wb-firma');
-    var val = el ? el.value : '';
-    form.querySelectorAll('.wb-firma-in').forEach(function(i){ i.value = val; });
-  });
-  // Al escribir la firma, limpia la señal de "falta firma".
-  document.addEventListener('input', function(e){
-    if(e.target && e.target.id === 'wb-firma'){ e.target.classList.remove('wb-firma-missing'); }
+    if(form.dataset && form.dataset.confirm && !window.confirm(form.dataset.confirm)){ e.preventDefault(); }
   });
 
   // Fase 1 · Drawer: se abre cuando HTMX le mete contenido; se cierra con ✕, ESC (nativo <dialog>) o click fuera.

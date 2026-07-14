@@ -9,7 +9,7 @@ NUNCA terminal (P1); requiere firma (`usuario`); 409 si el caso ya fue decidido.
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from app.contracts.caso import Caso
@@ -130,10 +130,24 @@ def _get_activo(caso_id: str):
     return caso
 
 
-def _firma(usuario: Optional[str]) -> str:
-    if not usuario or not usuario.strip():
-        raise HTTPException(status_code=400, detail="usuario requerido (firma válida, P1)")
-    return usuario.strip()
+def firmante_de_sesion(request: Request) -> str:
+    """Identidad del firmante desde la sesión (login ligero de estación). '' si no se ha identificado."""
+    try:
+        return (request.session.get("firmante") or "").strip()
+    except (AssertionError, AttributeError):   # sin SessionMiddleware (no debería pasar en runtime)
+        return ""
+
+
+def _firma(request: Request, usuario: Optional[str] = None) -> str:
+    """Firma del analista (P1). Fuente de verdad = la SESIÓN (la UI se identifica una vez). `usuario` (form) es
+    un fallback de compatibilidad para callers programáticos/tests — la UI ya no lo envía. Fail-closed: si no hay
+    ni sesión ni fallback → 400 (nunca ejecuta sin firma humana registrada)."""
+    firmante = firmante_de_sesion(request)
+    if firmante:
+        return firmante
+    if usuario and usuario.strip():
+        return usuario.strip()
+    raise HTTPException(status_code=400, detail="firma requerida (identifícate en la estación, P1)")
 
 
 def _volver(caso_id: str, rol: str) -> RedirectResponse:
@@ -151,10 +165,10 @@ def _persistir_update(caso: Caso, updates: dict) -> Caso:
 
 
 @router.post("/casos/{caso_id}/radicar", response_class=RedirectResponse)
-def radicar(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+def radicar(request: Request, caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
     """Radicar = aprobación humana (reusa hitl.aprobar). 🔒 P1: exige `usuario`; solo desde LISTO_PARA_APROBAR."""
     from app.hitl.c8 import aprobar as hitl_aprobar
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     caso = _get_activo(caso_id)
     # 🔒 P1: refuerzo server-side del gate — solo se radica desde LISTO_PARA_APROBAR (no saltar revisión).
     if caso.estado != EstadoCaso.LISTO_PARA_APROBAR:
@@ -168,12 +182,12 @@ def radicar(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(R
 
 
 @router.post("/casos/{caso_id}/rechazar", response_class=RedirectResponse)
-def rechazar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
+def rechazar(request: Request, caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
              rol: str = Form(RolUsuario.ANALISTA.value)):
     """Rechazar = negar el siniestro (→ RECHAZADO, `hitl.rechazar`). 🔒 P1: exige `usuario` (firma) + `motivo`;
     409 si el caso ya fue decidido. El humano SÍ puede negar, no solo aprobar (W20/A7)."""
     from app.hitl.c8 import rechazar as hitl_rechazar
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     if not motivo or not motivo.strip():
         raise HTTPException(status_code=400, detail="motivo requerido para rechazar")
     caso = _get_activo(caso_id)
@@ -188,11 +202,11 @@ def rechazar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional
 
 
 @router.post("/casos/{caso_id}/escalar", response_class=RedirectResponse)
-def escalar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
+def escalar(request: Request, caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[str] = Form(None),
             rol: str = Form(RolUsuario.ANALISTA.value)):
     """Escalar a revisión humana (REQUIERE_REVISION). NO es terminal (P1). Vía HITL (transicionar)."""
     from app.hitl.c8 import transicionar
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     caso = _get_activo(caso_id)
     if caso.estado in _TERMINALES:
         raise HTTPException(status_code=409, detail="El caso ya fue decidido (P1)")
@@ -203,22 +217,22 @@ def escalar(caso_id: str, usuario: Optional[str] = Form(None), motivo: Optional[
 
 
 @router.post("/casos/{caso_id}/enviar_fraude", response_class=RedirectResponse)
-def enviar_fraude(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+def enviar_fraude(request: Request, caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
     """Enviar a fraude = ROUTING al carril SIU. 🔒 P6: NO crea alerta, NO cambia dictamen ni estado; solo
     anota `derivado_siu_por`. Es una acción de trabajo, no un veredicto."""
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     caso = _get_activo(caso_id)
     get_caso_repository().save(_persistir_update(caso, {"derivado_siu_por": firma}))
     return _volver(caso_id, rol)
 
 
 @router.post("/casos/{caso_id}/solicitar_docs", response_class=RedirectResponse)
-def solicitar_docs(caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
+def solicitar_docs(request: Request, caso_id: str, usuario: Optional[str] = Form(None), rol: str = Form(RolUsuario.ANALISTA.value)):
     """Acción SECUNDARIA (vía rápida): solicita los documentos faltantes en un paso. Envío MOCK (rotulado): NO
     envía correo real; NO cambia estado. La primaria del caso bloqueado es 'Preparar solicitud' (W23·M5), que
     abre un borrador editable en el drawer; esta es el atajo sin revisar el texto. Se compone de los faltantes."""
     from app.dashboard import vista_caso
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     caso = _get_activo(caso_id)
     falt = vista_caso.faltantes(caso)
     if not falt:
@@ -231,10 +245,10 @@ def solicitar_docs(caso_id: str, usuario: Optional[str] = Form(None), rol: str =
 
 
 @router.post("/casos/{caso_id}/guardar_borrador", response_class=RedirectResponse)
-def guardar_borrador(caso_id: str, usuario: Optional[str] = Form(None), nota: Optional[str] = Form(None),
+def guardar_borrador(request: Request, caso_id: str, usuario: Optional[str] = Form(None), nota: Optional[str] = Form(None),
                      rol: str = Form(RolUsuario.ANALISTA.value)):
     """Guarda una nota/borrador del operador. NO cambia estado (P1: nunca terminal)."""
-    firma = _firma(usuario)
+    firma = _firma(request, usuario)
     caso = _get_activo(caso_id)
     texto = (nota or "").strip()
     get_caso_repository().save(_persistir_update(caso, {"nota_operador": f"{firma}: {texto}" if texto else None}))
