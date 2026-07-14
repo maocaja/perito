@@ -151,11 +151,14 @@ def _procesar(correo) -> None:
         from app.demo.scenarios import construir_caso_preset
         from app.demo.seed import sembrar_traza_demo
 
+        from app.dashboard.store import con_codigo_de_siniestro
+
         key = _escenario_de_asunto(correo.asunto)
         try:
             caso = construir_caso_preset(key)
         except ValueError:
             caso = construir_caso_preset("feliz")
+        caso = con_codigo_de_siniestro(caso)  # código de siniestro definitivo ANTES de huellas/traza
         # Conserva el CORREO tal cual llegó como aviso (el operador debe ver lo que entró); la
         # extracción/dictamen son del preset (sin LLM). Números de póliza alineados → sin desajuste.
         caso = caso.model_copy(update={"aviso": AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO)})
@@ -187,7 +190,10 @@ def _procesar(correo) -> None:
     from app.observability.tracer import Tracer
     from app.orchestrator.c7 import orquestar_fnol
 
+    from app.dashboard.store import con_codigo_de_siniestro
+
     caso = intake_crear_caso(AvisoNormalizado(texto_crudo=correo.cuerpo, calidad=CalidadDoc.LIMPIO))
+    caso = con_codigo_de_siniestro(caso)  # código de siniestro definitivo ANTES de huellas/traza
     caso = _ingerir_adjuntos(caso, correo)  # M1: adjuntos leídos/redactados/huellados antes de orquestar
     tracer = Tracer(caso.id)
     try:

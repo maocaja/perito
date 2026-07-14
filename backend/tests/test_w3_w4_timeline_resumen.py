@@ -23,22 +23,44 @@ def _un_caso():
     return get_caso_repository().list()[0]
 
 
+def _caso_con_adjuntos():
+    """Un caso sembrado con adjuntos reales (los de auto); robusto al orden de `list()`."""
+    return next(c for c in get_caso_repository().list() if c.adjuntos)
+
+
+def _caso_sin_adjuntos():
+    """El caso de vivienda sembrado, sin adjuntos (correo sin documentos)."""
+    return next(c for c in get_caso_repository().list() if not c.adjuntos)
+
+
 # ---------- W3 timeline ----------
 
-def test_conteo_adjuntos_mock_rotulado():
-    d = vista_caso.conteo_adjuntos(_un_caso())
-    assert d["origen"] == "demo"
-    assert d["pdfs"] >= 1 and d["fotos"] >= 1
+def test_conteo_adjuntos_es_real():
+    """P7: el conteo refleja los adjuntos REALES del correo (nunca fabricados). `origen` siempre 'real'."""
+    d = vista_caso.conteo_adjuntos(_caso_con_adjuntos())
+    assert d["origen"] == "real"
+    assert d["pdfs"] >= 1 or d["fotos"] >= 1
+
+
+def test_conteo_adjuntos_en_cero_sin_correo_con_docs():
+    """P7: sin adjuntos, ceros reales (no un conteo inventado por hash)."""
+    assert vista_caso.conteo_adjuntos(_caso_sin_adjuntos()) == {"pdfs": 0, "fotos": 0, "origen": "real"}
 
 
 def test_timeline_arranca_en_correo_y_lee_docs():
-    pasos = vista_caso.timeline(_un_caso(), traza=None)
+    pasos = vista_caso.timeline(_caso_con_adjuntos(), traza=None)
     textos = [p["texto"] for p in pasos]
     assert textos[0] == "Correo recibido"
-    assert any("PDF" in t for t in textos)
-    assert any("fotografía" in t for t in textos)
-    # los pasos de docs van rotulados demo
-    assert any(p["demo"] for p in pasos if "PDF" in p["texto"])
+    assert any("PDF" in t or "fotografía" in t for t in textos)
+    # P7: los pasos de docs ya NO van rotulados demo (son adjuntos reales)
+    assert not any(p["demo"] for p in pasos)
+
+
+def test_timeline_sin_adjuntos_no_muestra_pasos_de_docs():
+    """P7: un correo sin adjuntos no inventa 'Leyó N PDF(s)'; el timeline salta de correo a agentes/estado."""
+    textos = [p["texto"] for p in vista_caso.timeline(_caso_sin_adjuntos(), traza=None)]
+    assert textos[0] == "Correo recibido"
+    assert not any("PDF" in t or "fotografía" in t for t in textos)
 
 
 def test_timeline_incluye_estado_final():
@@ -62,15 +84,14 @@ def test_timeline_estados_terminales(estado, esperado):
 def test_timeline_usa_pasos_reales_de_traza():
     """Los pasos de agentes salen de la traza (no se inventan): con eventos, aparecen."""
     traza = {"trace_events": [{"nodo": "c2_extraccion", "resultado": "ok", "timestamp": "2026-07-10T10:00:00"}]}
-    pasos = vista_caso.timeline(_un_caso(), traza)
-    assert len(pasos) >= 4  # correo + 2 docs + al menos 1 agente
+    pasos = vista_caso.timeline(_caso_con_adjuntos(), traza)
+    assert len(pasos) >= 4  # correo + docs reales + al menos 1 agente
 
 
 def test_render_timeline(client):
     r = client.get(f"/workbench/caso/{_un_caso().id}")
     assert "Actividad del caso" in r.text   # V1·6: cronología humana (antes "Lo que hizo la IA")
     assert "wb-crono" in r.text
-    assert "badge-demo" in r.text  # los conteos van rotulados
 
 
 # ---------- W4 resumen narrativo ----------

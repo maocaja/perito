@@ -51,7 +51,7 @@ def test_workbench_caso_explicito_por_query(client):
     caso = _un_caso()
     r = client.get(f"/workbench?caso_id={caso.id}")
     assert r.status_code == 200
-    assert caso.id[:8] in r.text  # el header muestra el id corto del caso pedido
+    assert caso.id in r.text  # el header muestra el código completo del siniestro (SIN-AÑO-NNNN)
 
 
 # ---------- swap HTMX del caso ----------

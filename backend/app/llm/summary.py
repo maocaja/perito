@@ -1,8 +1,12 @@
-"""app/llm/summary.py — Summary Agent (W19). El 6º agente: redacta la HISTORIA del caso con LLM.
+"""app/llm/summary.py — Analista del caso (interno: W19 Summary). Redacta un ANÁLISIS del caso con LLM.
 
-🔒 P1: describe, NO decide. Guard fail-closed (sin `PALABRAS_PROHIBIDAS`; no afirma un veredicto de cobertura
-distinto al del motor). Si el guard falla, el LLM no está disponible, o revienta → **fallback** a la plantilla
-determinística de W4 (`resumen_narrativo`). Nunca error, nunca invención.
+A diferencia de un narrador, recibe TODA la info del caso (extracción, faltantes, póliza, veredicto del
+motor con su regla/cláusula, señal de fraude con su porqué, adjuntos) y produce, en lenguaje de OPERADOR,
+qué pasó · qué revisar · dónde quedó y por qué. Usa un modelo capaz (Sonnet), no el de extracción.
+
+🔒 P1/P2: describe, NO decide. Guard fail-closed (sin `PALABRAS_PROHIBIDAS`; no afirma un veredicto de
+cobertura distinto al del motor). Si el guard falla, el LLM no está disponible, o revienta → **fallback** a
+la plantilla determinística de W4 (`resumen_narrativo`). Nunca error, nunca invención.
 
 🔒 P5: el prompt se arma de **campos estructurados YA REDACTADOS**, NUNCA del `texto_crudo` del correo.
 Mockeable/hermético: sin key real (o key de test) usa el fallback → los tests no tocan red.
@@ -17,7 +21,7 @@ from app.security.redaction import redact_pii_spans_es_co
 
 logger = logging.getLogger(__name__)
 
-_MAX_TOKENS = 400
+_MAX_TOKENS = 500
 # Etiquetas de cobertura que, si aparecen en la narrativa, DEBEN coincidir con el veredicto del motor (P2).
 # ORDEN: de más específica a menos (la primera que matchea manda) + límites de palabra, para que "cubierto"
 # NO haga falso match dentro de "no cubierto"/"cubierto parcial".
@@ -40,25 +44,75 @@ def _campo(caso, nombre: str):
     return next((c for c in caso.extraccion.campos if c.nombre == nombre and not c.ausente and c.valor), None)
 
 
+def _faltantes(caso) -> str:
+    """Campos que el aviso NO trajo (para que el analista diga EN CONCRETO qué revisar)."""
+    if not caso.extraccion:
+        return "todos (no se pudo leer el aviso)"
+    faltan = [c.nombre for c in caso.extraccion.campos if c.ausente]
+    return ", ".join(faltan) if faltan else "ninguno"
+
+
+def _dictamen_detalle(caso) -> str:
+    """Veredicto del motor CON su regla y cláusula citada (P2: el analista lo cita, no lo inventa)."""
+    d = caso.dictamen
+    if not d:
+        return "aún sin dictaminar"
+    detalle = f"{d.resultado.value} (regla {d.regla_aplicada}"
+    if d.clausula:
+        detalle += f", cláusula {d.clausula.referencia}: {d.clausula.texto}"
+    detalle += ")"
+    if d.cobertura_aplicada:
+        detalle += f"; cobertura aplicada: {d.cobertura_aplicada}"
+    return detalle
+
+
+def _fraude_detalle(caso) -> str:
+    """Señal de fraude con su EXPLICACIÓN (el porqué), redactada (P5). Informativa: solo sugiere (P6)."""
+    a = caso.alerta_fraude
+    if not a:
+        return "sin señales"
+    return f"severidad {a.severidad} — {redact_pii_spans_es_co(a.explicacion)}"
+
+
+def _docs_detalle(caso) -> str:
+    """Qué documentos trajo el correo (conteo por tipo), o que no trajo ninguno (P7)."""
+    adjuntos = getattr(caso, "adjuntos", None) or []
+    if not adjuntos:
+        return "el correo no trajo adjuntos"
+    por_tipo: dict[str, int] = {}
+    for a in adjuntos:
+        por_tipo[a.tipo] = por_tipo.get(a.tipo, 0) + 1
+    return ", ".join(f"{n} {tipo}" for tipo, n in por_tipo.items())
+
+
 def construir_prompt(caso) -> str:
-    """Arma el prompt del Summary Agent desde campos REDACTADOS (P5). No incluye `texto_crudo`."""
+    """Prompt del Analista del caso: arma TODA la info del caso (ya REDACTADA, P5) para un análisis
+    orientado a la decisión del operador. No incluye `texto_crudo`; los valores van redactados."""
     def val(nombre):
         c = _campo(caso, nombre)
         return redact_pii_spans_es_co(str(c.valor)) if c else "no disponible"
 
-    dictamen = caso.dictamen.resultado.value if caso.dictamen else "aún sin dictaminar"
-    fraude = f"señal {caso.alerta_fraude.severidad}" if caso.alerta_fraude else "sin señales"
+    poliza_estado = "encontrada" if (caso.poliza_match and caso.poliza_match.encontrada) else "NO encontrada"
     return (
-        "Eres un operador senior de siniestros. Redacta en 2-3 frases la HISTORIA del caso, en prosa clara y "
-        "neutral, para que un compañero lo entienda en segundos. DESCRIBE, no decidas: no apruebes, no rechaces, "
-        "no afirmes cobertura por tu cuenta. Datos (ya anonimizados):\n"
+        "Eres un analista senior de siniestros. Escribes para el OPERADOR que va a REVISAR y FIRMAR el caso.\n"
+        "Tu trabajo: leer TODO lo que produjo el análisis y entregarle, en 3-4 frases, un resumen CLARO que le "
+        "permita decidir en segundos. Español natural de siniestros. PROHIBIDO: jerga técnica, nombres de "
+        "agentes/modelos, números sueltos sin significado (p.ej. 'confianza 0.6').\n"
+        "🔒 REGLAS DURAS: DESCRIBE, no decidas — no apruebes, no rechaces, no afirmes una cobertura por tu "
+        "cuenta. La cobertura la decide el motor de reglas: cítala EXACTA, no la inventes ni la contradigas.\n\n"
+        "Estructura tu prosa así: (1) qué pasó (tipo, monto, en una frase); (2) qué debe REVISAR el operador "
+        "— lo que falta o no cuadra, EN CONCRETO — o di que no hay pendientes; (3) dónde quedó el caso y POR "
+        "QUÉ, citando la regla del motor.\n\n"
+        "INFORMACIÓN DEL CASO (ya anonimizada):\n"
         f"- Tipo de siniestro: {val('tipo_siniestro')}\n"
-        f"- Fecha: {val('fecha_siniestro')}\n"
+        f"- Fecha del siniestro: {val('fecha_siniestro')}\n"
         f"- Monto reclamado: {val('monto_reclamado')}\n"
-        f"- Póliza: {val('numero_poliza')}\n"
-        f"- Dictamen del motor (cítalo si lo mencionas): {dictamen}\n"
-        f"- Riesgo/fraude: {fraude}\n"
-        "Devuelve SOLO la narrativa, sin viñetas ni encabezados."
+        f"- Póliza: {val('numero_poliza')} ({poliza_estado})\n"
+        f"- Datos que FALTAN en el aviso: {_faltantes(caso)}\n"
+        f"- Veredicto del motor de cobertura: {_dictamen_detalle(caso)}\n"
+        f"- Señal de fraude/riesgo: {_fraude_detalle(caso)}\n"
+        f"- Documentos adjuntos: {_docs_detalle(caso)}\n\n"
+        "Devuelve SOLO el análisis en prosa, sin viñetas ni encabezados."
     )
 
 
@@ -81,7 +135,9 @@ def _llm_redacta(caso) -> str:
     from anthropic import Anthropic
     client = Anthropic(api_key=settings.anthropic_api_key)
     resp = client.messages.create(
-        model=settings.extractor_model, max_tokens=_MAX_TOKENS,
+        # Análisis/síntesis → modelo capaz (Sonnet), no el barato de extracción. El Analista es el que le
+        # habla al operador; aquí SÍ se le da protagonismo al LLM (dentro del guard P1/P2).
+        model=settings.verifier_model, max_tokens=_MAX_TOKENS,
         messages=[{"role": "user", "content": construir_prompt(caso)}],
     )
     return next((b.text for b in resp.content if hasattr(b, "text")), "") or ""

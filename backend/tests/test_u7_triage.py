@@ -151,7 +151,8 @@ def test_poller_no_siniestro_no_crea_caso(monkeypatch):
                         lambda a, c: TriageResult(ClaseCorreo.NO_SINIESTRO, 0.9, False, "queja"))
     guardados = []
     monkeypatch.setattr("app.dashboard.store.get_caso_repository",
-                        lambda: SimpleNamespace(save=lambda c: guardados.append(c)))
+                        lambda: SimpleNamespace(save=lambda c: guardados.append(c),
+                                                reservar_codigo=lambda: "SIN-2026-0001"))
     correo = SimpleNamespace(uid="1", asunto="Queja", cuerpo="inconforme")
     poller._procesar(correo)
     assert guardados == []  # no se creó ningún caso FNOL
@@ -175,7 +176,8 @@ def test_poller_escalamiento_crea_caso_no_pierde_aviso(monkeypatch):
                         lambda: SimpleNamespace(save=lambda *a, **k: None))
     guardados = []
     monkeypatch.setattr("app.dashboard.store.get_caso_repository",
-                        lambda: SimpleNamespace(save=lambda c: guardados.append(c)))
+                        lambda: SimpleNamespace(save=lambda c: guardados.append(c),
+                                                reservar_codigo=lambda: "SIN-2026-0001"))
 
     poller._procesar(SimpleNamespace(uid="7", asunto="ambiguo", cuerpo="no muy claro"))
 

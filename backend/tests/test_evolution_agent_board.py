@@ -67,10 +67,10 @@ def test_actividad_mapea_determinístico_y_real_y_fallback():
         {"nodo": "nodo_raro", "resultado": "x", "timestamp": ""},
     ], "token_summary": {"tokens_total": 530}}
     feed = vista_caso.actividad_agentes(traza)
-    assert feed[0]["etiqueta"].startswith("Extractor")     # determinístico
+    assert feed[0]["etiqueta"] == "Leí los datos del aviso"   # nodo 'extractor' (esquema determinístico)
     assert feed[0]["hora"] == "17:00:05" and feed[0]["tokens"] == 530
-    assert feed[1]["etiqueta"].startswith("Motor")          # real
-    assert feed[2]["etiqueta"] == "nodo_raro"               # fallback al nombre técnico
+    assert feed[1]["etiqueta"] == "Evalué la cobertura"       # nodo 'c5_motor_cobertura' (esquema real)
+    assert feed[2]["etiqueta"] == "nodo_raro"                 # fallback al nombre técnico
 
 
 def test_actividad_sin_traza_vacia():

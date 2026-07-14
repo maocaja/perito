@@ -24,29 +24,30 @@ CAMPOS = ["numero_poliza", "fecha_siniestro", "tipo_siniestro", "monto_reclamado
 # P1 fail-closed: la recomendación del copiloto NUNCA contiene estas palabras (no decide).
 PALABRAS_PROHIBIDAS = {"aprobado", "rechazado", "admitido", "cerrado", "aprobar", "rechazar"}
 
-# Nombre técnico de nodo → (etiqueta amigable, icono). Cubre AMBOS esquemas: determinístico
-# (seed.sembrar_traza_demo: intake/extractor/policy/motor/fraude) y real (orchestrator/c7:
-# c2_extraccion/c3_verificador/c4_policy_lookup/c5_motor_cobertura/c6_fraude/orquestador_*).
+# Nombre técnico de nodo → (etiqueta EN LENGUAJE DE OPERADOR, icono). El operador no sabe qué es un
+# "Extractor" ni un "Grounding": el timeline dice QUÉ PASÓ con el caso, en su idioma, sin nombres de
+# agente/modelo ni códigos de regla. Cubre ambos esquemas de nombres de nodo: determinístico
+# (seed.sembrar_traza_demo) y real (orchestrator/c7). Los nombres internos siguen en la traza técnica.
 _NODOS = {
-    "intake":               ("Intake · recibió el aviso", "📥"),
-    "orquestador_inicio":   ("Orquestador · inició el flujo", "▶️"),
-    "extractor":            ("Extractor · Haiku leyó el aviso", "🔍"),
-    "c2_extraccion":        ("Extractor · Haiku leyó el aviso", "🔍"),
-    "verifier":             ("Verificador · Sonnet revisó la extracción", "✔️"),
-    "c3_verificador":       ("Verificador · Sonnet revisó la extracción", "✔️"),
-    "policy":               ("Grounding · buscó la póliza", "📄"),
-    "c4_policy_lookup":     ("Grounding · buscó la póliza", "📄"),
-    "motor":                ("Motor R1–R5 · dictaminó la cobertura", "⚖️"),
-    "c5_motor_cobertura":   ("Motor R1–R5 · dictaminó la cobertura", "⚖️"),
-    "fraude":               ("Fraude · revisó inconsistencias", "🕵️"),
-    "c6_fraude":            ("Fraude · revisó inconsistencias", "🕵️"),
-    "c2_reextraccion":      ("Extractor · re-extrajo tras la crítica (loop reflexivo)", "🔁"),
-    "c3_reverificacion":    ("Verificador · re-revisó la extracción", "✔️"),
-    "orquestador_decision": ("Orquestador · dejó el caso listo para el humano", "🧑‍⚖️"),
-    # Agentes que se suman cuando emitan traza (M1/M3/W19), sin tocar la vista (mapa extensible):
-    "document_ai":          ("Document AI · leyó los adjuntos", "📎"),
-    "evidence_correlator":  ("Correlación de evidencia · cruzó fuentes", "🧩"),
-    "summary_agent":        ("Resumen · redactó la historia del caso", "✍️"),
+    "intake":               ("Aviso registrado", "📥"),
+    "orquestador_inicio":   ("Empecé a procesar el caso", "▶️"),
+    "extractor":            ("Leí los datos del aviso", "🔍"),
+    "c2_extraccion":        ("Leí los datos del aviso", "🔍"),
+    "verifier":             ("Verifiqué los datos", "✔️"),
+    "c3_verificador":       ("Verifiqué los datos", "✔️"),
+    "policy":               ("Busqué la póliza del cliente", "📄"),
+    "c4_policy_lookup":     ("Busqué la póliza del cliente", "📄"),
+    "motor":                ("Evalué la cobertura", "⚖️"),
+    "c5_motor_cobertura":   ("Evalué la cobertura", "⚖️"),
+    "fraude":               ("Revisé si había algo sospechoso", "🕵️"),
+    "c6_fraude":            ("Revisé si había algo sospechoso", "🕵️"),
+    "c2_reextraccion":      ("Volví a leer los datos tras la revisión", "🔁"),
+    "c3_reverificacion":    ("Volví a verificar los datos", "✔️"),
+    "orquestador_decision": ("Dejé el caso preparado para tu revisión", "🧑‍⚖️"),
+    # Pasos que se suman cuando corren (documentos, cruce de fuentes, análisis), sin tocar la vista:
+    "document_ai":          ("Leí los documentos adjuntos", "📎"),
+    "evidence_correlator":  ("Crucé las fuentes del caso", "🧩"),
+    "summary_agent":        ("Analicé el caso", "✍️"),
 }
 
 _C3_RE = re.compile(r"confianza=([0-9.]+),\s*señales=(\d+)")
@@ -954,28 +955,25 @@ def actividad_agentes(traza) -> list[dict]:
 # ---------------------------------------------------- W3 · Timeline visual de la IA
 
 def conteo_adjuntos(caso) -> dict:
-    """Conteo de adjuntos leídos por la IA. Interfaz {pdfs, fotos, origen}. Si el caso trae adjuntos REALES
-    (M1) → conteo real (origen='real'); si no, mock determinístico por caso (origen='demo', P7)."""
-    adjuntos = caso.adjuntos  # M1: siempre lista (default_factory); vacía ⇒ mock
-    if adjuntos:
-        return {"pdfs": sum(1 for a in adjuntos if a.tipo == "pdf"),
-                "fotos": sum(1 for a in adjuntos if a.tipo == "foto"),
-                "origen": "real"}
-    h = sum(ord(c) for c in caso.id)
-    return {"pdfs": 1 + h % 4, "fotos": 2 + h % 8, "origen": "demo"}
+    """Conteo REAL de adjuntos leídos por la IA. Interfaz {pdfs, fotos, origen}. Cuenta lo que el correo
+    trajo; si no trajo nada, ceros (P7: no se fabrica un conteo). `origen` siempre 'real'."""
+    adjuntos = caso.adjuntos  # M1: siempre lista (default_factory); vacía ⇒ ceros
+    return {"pdfs": sum(1 for a in adjuntos if a.tipo == "pdf"),
+            "fotos": sum(1 for a in adjuntos if a.tipo == "foto"),
+            "origen": "real"}
 
 
 def timeline(caso, traza) -> list[dict]:
-    """Timeline agent-native (W18): correo → docs (mock rotulado) → pasos de AGENTES (de la traza) → estado.
-    Passive (P7): los pasos de agentes salen de la traza REAL (nunca se fabrican); los conteos van rotulados
-    `demo` y distintos. P4: lee la traza sin re-ejecutar agentes; sin traza, no hay pasos de agente."""
+    """Timeline agent-native (W18): correo → docs reales (si los hubo) → pasos de AGENTES (de la traza) →
+    estado. Passive (P7): conteos de docs REALES y pasos de agentes de la traza REAL (nunca se fabrican).
+    P4: lee la traza sin re-ejecutar agentes; sin traza, no hay pasos de agente."""
     docs = conteo_adjuntos(caso)
-    demo = docs["origen"] == "demo"
-    pasos = [
-        {"icono": "📬", "texto": "Correo recibido", "estado": "ok", "demo": False},
-        {"icono": "📄", "texto": f"Leyó {docs['pdfs']} PDF(s)", "estado": "ok", "demo": demo},
-        {"icono": "📷", "texto": f"Leyó {docs['fotos']} fotografía(s)", "estado": "ok", "demo": demo},
-    ]
+    pasos = [{"icono": "📬", "texto": "Correo recibido", "estado": "ok", "demo": False}]
+    # P7: los pasos de lectura de documentos solo aparecen si el correo REALMENTE trajo adjuntos.
+    if docs["pdfs"]:
+        pasos.append({"icono": "📄", "texto": f"Leyó {docs['pdfs']} PDF(s)", "estado": "ok", "demo": False})
+    if docs["fotos"]:
+        pasos.append({"icono": "📷", "texto": f"Leyó {docs['fotos']} fotografía(s)", "estado": "ok", "demo": False})
     for ev in actividad_agentes(traza):  # 🔴 pasos de AGENTES: SOLO de la traza real (nunca fabricados)
         pasos.append({"icono": ev["icono"], "texto": ev["etiqueta"],
                       "detalle": ev.get("resultado", ""), "tokens": ev.get("tokens", 0),

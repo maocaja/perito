@@ -217,7 +217,7 @@ def test_confirmacion_fuerte_solo_en_terminal(client):
     aprobado = _guardar("feliz", estado=EstadoCaso.APROBADO, aprobado_por="ana")
     html = client.get(f"/workbench/caso/{aprobado.id}").text
     assert "Caso aprobado y radicado" in html   # W24·N9: banner de estado + tarjeta fusionados en una
-    assert ("#" + aprobado.id[:8].upper()) in html          # referencia del expediente
+    assert ("#" + aprobado.id) in html          # referencia del expediente (código completo)
     assert 'role="status"' in html and "Continuar" in html   # anuncio + siguiente paso
 
     bloqueado = _guardar("campos-faltantes")

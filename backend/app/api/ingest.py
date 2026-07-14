@@ -27,7 +27,7 @@ from app.orchestrator.c7 import orquestar_fnol
 from app.hitl import c8
 from app.observability.tracer import Tracer
 from app.observability.replay import get_replay_store
-from app.dashboard.store import get_caso_repository
+from app.dashboard.store import get_caso_repository, con_codigo_de_siniestro
 from app.demo.scenarios import construir_caso_preset, PRESETS
 from app.demo.seed import sembrar_traza_demo
 
@@ -57,6 +57,7 @@ def crear_desde_texto(request: Request, aviso_texto: str = Form(...), rol: str =
         }, status_code=400)
 
     caso = intake_crear_caso(AvisoNormalizado(texto_crudo=texto, calidad=CalidadDoc.LIMPIO))
+    caso = con_codigo_de_siniestro(caso)  # código de siniestro definitivo ANTES de traza/persistencia
     tracer = Tracer(caso.id)
     try:
         resultado = orquestar_fnol(caso, c8, Cotas(max_rondas=1, presupuesto_tokens=50000), tracer)
@@ -78,6 +79,7 @@ def crear_desde_preset(escenario: str, rol: str = Form(RolUsuario.ANALISTA.value
         caso = construir_caso_preset(escenario)
     except ValueError:
         raise HTTPException(status_code=404, detail=f"escenario desconocido: {escenario}")
+    caso = con_codigo_de_siniestro(caso)  # código de siniestro definitivo antes de traza/persistencia
     get_caso_repository().save(caso)
     sembrar_traza_demo(caso)
     # W20/A6: el preset aterriza en la Workbench (única superficie del operador).

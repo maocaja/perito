@@ -20,6 +20,16 @@ from app.contracts.adjunto import Adjunto
 from app.contracts.correlacion import Correlacion
 
 
+def _id_provisional() -> str:
+    """ID provisional ÚNICO para un Caso construido en aislamiento (p.ej. un test).
+
+    En los flujos reales el código DEFINITIVO de siniestro — `SIN-AÑO-NNNN`, **consecutivo y único** — lo
+    asigna el repositorio al CREAR el caso (`CasoRepository.reservar_codigo`), que es el dueño de la
+    secuencia. El prefijo `PROV-` deja ver a simple vista un caso que aún no pasó por esa asignación.
+    """
+    return f"PROV-{uuid4().hex}"
+
+
 class Caso(Contract):
     """Caso FNOL (claim) — estado mutable solo vía HITL (C8).
     
@@ -28,7 +38,7 @@ class Caso(Contract):
     Terminal (APROBADO/RECHAZADO) exige aprobado_por ≠ None.
     """
     
-    id: str = Field(default_factory=lambda: str(uuid4()), min_length=1)
+    id: str = Field(default_factory=_id_provisional, min_length=1)
     estado: EstadoCaso  # RECIBIDO → EN_PROCESO → ... → APROBADO/RECHAZADO
     
     aviso: AvisoNormalizado  # Entrada FNOL

@@ -14,6 +14,9 @@
         <embed class="wb-ev-media" src="{{ asset_url }}" type="application/pdf">
         {% elif asset_url %}
         <img class="wb-ev-media" src="{{ asset_url }}" alt="{{ documento.etiqueta }}">
+        {% elif documento.texto %}
+        {# El documento trae texto legible: se pinta el TEXTO REDACTADO real (P5), no un placeholder. #}
+        <pre class="wb-ev-texto">{{ documento.texto }}</pre>
         {% else %}
         <div class="wb-ev-page">
           {% for _ in range(9) %}<div class="wb-ev-line"></div>{% endfor %}
@@ -25,14 +28,15 @@
         <div class="wb-ev-field">{{ documento.etiqueta }}</div>
         <div class="wb-ev-src">
           {{ documento.tipo|icono_tipo }} {{ documento.tipo|capitalize }} · <span class="estado-{{ documento.estado }}">{{ documento.estado }}</span>
-          {% if documento.origen == 'demo' %}<span class="badge-demo" title="Adjunto de demostración; los reales llegan con Document AI (M1)">demo</span>{% endif %}
         </div>
         {% if documento.huella %}
         <div class="wb-ev-src mono" title="Huella perceptual (P5: la huella, no la imagen)">🔗 {{ documento.huella[:16] }}…</div>
+        {% elif documento.texto %}
+        <div class="hint">Texto extraído y redactado (P5).</div>
         {% elif not asset_url %}
-        <div class="hint">Sin huella (mock) — se poblará con Document AI (M1)</div>
+        <div class="hint">Imagen sin huella — la redacción visual llega con Document AI (M1).</div>
         {% endif %}
-        {# 'Usar este valor' extrae un dato del documento a un campo: requiere OCR real → disponible con M1 (P7:
+        {# 'Usar este valor' extrae un dato del documento a un campo: requiere OCR/parseo real → M1 (P7:
            no se promete una extracción que aún no producimos). #}
         <button class="btn btn-ghost wb-ev-ctx" type="button" disabled
                 title="La extracción de valores del documento llega con Document AI (M1)">Usar este valor</button>

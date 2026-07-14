@@ -71,12 +71,12 @@ def test_barra_de_busqueda_presente(client):
 def test_busqueda_filtra_la_cola(client):
     """q filtra la cola por póliza/tipo/caso/asegurado."""
     caso = get_caso_repository().list()[0]
-    # busca por el id corto del caso → debe quedar ese caso (y no más que los que casen)
-    r = client.get(f"/workbench?q={caso.id[:8]}")
+    # busca por el código completo del siniestro → debe quedar SOLO ese caso (es único)
+    r = client.get(f"/workbench?q={caso.id}")
     assert r.status_code == 200
     assert r.text.count("data-caso-id=") == sum(
         1 for c in get_caso_repository().list()
-        if caso.id[:8].lower() in c.id.lower())
+        if caso.id.lower() in c.id.lower())
 
 
 def test_busqueda_sin_resultados_no_crashea(client):
