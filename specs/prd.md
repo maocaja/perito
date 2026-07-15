@@ -3,13 +3,15 @@
 | | |
 |---|---|
 | **Producto** | Perito — copiloto agéntico de admisión y triage de siniestros (FNOL) |
-| **Versión** | v1 (Estación 2, Hardcore AI C3) |
+| **Versión** | **v2 · julio 2026** (post-build) — v1 = plan de Estación 2, Hardcore AI C3 |
 | **Fecha** | Julio 2026 |
 | **Encuadre** | **Proyecto de portafolio honesto** — el objetivo es demostrar ingeniería de sistemas agénticos, no ganar mercado |
 | **Inputs** | `docs/pvb.md`, `docs/overview.md`, `docs/mercado.md`, `docs/icp.md`, `docs/critica.md`, `docs/stack.md`, `research/validacion.md`, `research/critica.md` |
-| **Estado** | Completo (13 segmentos). Vacíos declarados en el Apéndice B. |
+| **Estado** | v1 completo (13 segmentos). **v2**: estado real tras el build en el **Apéndice D**. Vacíos declarados en el Apéndice B. |
 
 > **Nota de honestidad transversal:** este PRD se apoya solo en evidencia verificada. Las cifras refutadas en verificación adversarial (tiempos de FNOL, adopción LATAM, tamaños de mercado absolutos) **no se usan**. Lo que no se pudo validar se declara en el Apéndice B, no se inventa.
+
+> **Nota de versión (v1 → v2):** los Segmentos 1-13 y los Apéndices A-C son el **plan de Estación 2** (previo a construir) y se conservan **intactos** como snapshot. El build real (FNOL U1–U10 + Claims Workbench W1–W24 + Fase M) **rebasó ese plan**: nuevas capacidades emergieron y un par de piezas planeadas quedaron como stub. Para no reescribir la historia (P7), ese delta se registra en el **Apéndice D — Estado de implementación**, marcando lo *emergente* como emergente, no como planeado.
 
 ---
 
@@ -30,6 +32,7 @@
 - Apéndice A: Resolución del Paso 0 (conflictos)
 - Apéndice B: Supuestos, vacíos y limitaciones declaradas
 - Apéndice C: Estados del caso y glosario
+- **Apéndice D: Estado de implementación (v2, post-build)**
 
 ---
 
@@ -185,6 +188,8 @@ R1 Vigencia · R2 Cobertura contratada · R3 Exclusiones · R4 Límite (suma ase
 
 ## 9. Especificación Funcional: Módulos
 
+> 📌 **v2:** esta es la arquitectura *planeada* (M1–M10). Lo realmente construido —incluidos módulos que no aparecen aquí (triage, analista del caso, fraude cross-claim, correlación de evidencia) y las piezas que quedaron stub (RAG pgvector, versionado de reglas)— se detalla en el **Apéndice D**.
+
 **Roles:** Analista (bandeja, aprobar/corregir/rechazar) · Operador/Cumplimiento (panel, config, export) · Admin/Dev (todo). *Ajustador fuera del MVP.* **Control de acceso = selector de rol stub; auth real = Won't.**
 
 **Módulos de producto:**
@@ -312,6 +317,8 @@ flowchart TB
 
 **Después (30/60/90):** +30 Should-haves + entrevistas para validar ICP · +60 Could-haves + red-team completo · +90 integración con core real (aquí dejaría de ser portafolio).
 
+> 📌 **v2 (post-build):** el cronograma de arriba es el plan de 5 días de Estación 2 y se conserva como registro. La ejecución real **rebasó ese plan**: se construyeron los estratos FNOL **U1–U10** y el **Claims Workbench W1–W24 + Fase M** (por encima de la "bandeja HITL" prevista). El estado efectivo está en el **Apéndice D**.
+
 ---
 
 ## Apéndice A — Resolución del Paso 0 (conflictos)
@@ -362,6 +369,41 @@ stateDiagram-v2
 
 **Glosario:** FNOL = First Notice of Loss (aviso de siniestro) · HITL = human-in-the-loop · STP = straight-through processing · PIA = estudio de impacto de privacidad · SOAT = Seguro Obligatorio de Accidentes de Tránsito · SIC = Superintendencia de Industria y Comercio · SFC = Superintendencia Financiera de Colombia.
 
+## Apéndice D — Estado de implementación (v2 · post-build)
+
+> Los Segmentos 1-13 y los Apéndices A-C son el **plan de Estación 2** y quedan intactos. Este apéndice registra el **estado real tras el build** — FNOL **U1–U10** + Claims Workbench **W1–W24** + Fase M. Honestidad de alcance (P7): lo que **emergió** durante la construcción se marca como emergente, no como planeado a priori. Todo está anclado a rutas reales bajo `backend/app/`.
+
+**Pipeline real (nodos C0–C11):** C0 triage (`intake/triage.py`) · C1 intake (`intake/c1.py`) · C2 extractor Haiku (`llm/extractor.py`) · C3 verificador Sonnet, adversarial + determinístico (`llm/verifier.py`) · C4 policy_lookup (`policy/lookup.py`) · C5 motor R1–R5 (`rules/motor_r1_r5.py`) · C6 fraude (`fraud/fraude.py`) · C7 orquestador con terminación acotada y **loop reflexivo C2↔C3** (`orchestrator/c7.py`) · C8 HITL (`hitl/c8.py`) · C9 observabilidad (`observability/`) · C11 dashboard/Workbench (`dashboard/c11.py`).
+
+### D.1 — Alineado con el plan (construido según lo previsto)
+- **Principios P1–P7** enforced con aserciones fail-closed (`.claude/rules/` + tests).
+- **Estados del caso** (`contracts/enums.py::EstadoCaso`): los 9 del Apéndice C, exactos; terminales exigen `aprobado_por`.
+- **Motor de cobertura R1–R5 + SOAT + cita de cláusula, determinístico** (`rules/motor_r1_r5.py`) — además **product-aware** (`PRODUCTOS_MODELADOS`).
+- **M2–M8**: extractor, verificador adversarial, policy_lookup, cobertura, fraude, orquestador (caps de rondas/tokens), HITL con firma obligatoria.
+- **Ingesta multimodal** (PDF/foto, `intake/multimodal.py` + `document_ai.py` con redacción PII y huella pHash) · **Observabilidad Langfuse real** (`observability/langfuse_sink.py`, fail-open) + tracer por nodo + replay · **Evals** pytest + **DeepEval** por estrato con **juez Claude propio** (`tests/evals/`).
+- **Roles = selector stub** (`RolUsuario`: ANALISTA, CUMPLIMIENTO), auth real = Won't — tal cual el plan.
+
+### D.2 — Emergente: construido MÁS ALLÁ del PRD v1 (no estaba en Seg. 8/9)
+| Capacidad | Ruta | Nota |
+|---|---|---|
+| **C0 Triage** | `intake/triage.py` | Clasifica y rutea determinístico; no decide (P1) |
+| **Fraude cross-claim / Capa 4** | `fraud/cross_claim.py`, `fraud/historia.py` | Foto reutilizada (pHash), frecuencia; solo sugiere (P6) |
+| **Analista del caso** (6º agente, Sonnet) | `llm/summary.py` | Redacta el análisis para el operador; guard P1/P2 + fallback |
+| **Evidence correlator + vista comparativa** | `agents/evidence_correlator.py`, `dashboard/comparativa.py` | Cruce multi-fuente |
+| **Entity resolution** | `policy/lookup.py`, `intake/entidades.py` | Fallback por placa/cédula/nombre |
+| **Loop reflexivo (evaluator-optimizer) C2↔C3** | `orchestrator/c7.py` | Re-extracción tras crítica, dentro de cotas (P4) |
+| **Poller de correo en vivo** (IMAP/SMTP) | `intake/poller.py` | Buzón real idempotente; el plan preveía ingesta genérica |
+| **Claims Workbench** (estación de decisión, W1–W24) | `dashboard/` | El PRD v1 preveía una "bandeja HITL"; se construyó una superficie mucho más rica |
+
+### D.3 — Del plan v1, pero stub o NO construido (declarado, P7)
+- **M10 RAG de pólizas con pgvector** — **solo esquema** (`rag/schema.py`), sin retrieval real cableado. La cita de cláusula se logra por `policy_lookup` **determinístico**, no por RAG vectorial.
+- **Versionado de reglas con test-gate** (journey J2, era Could) — **no construido**.
+- **OTel** — solo **Langfuse** real; OpenTelemetry no se cableó.
+- **Copiloto conversacional** (`dashboard/copiloto.py`) — **MOCK rotulado**, no capacidad real.
+
+### D.4 — Marca
+El producto se llama **"Perito"** (`dashboard/branding.py`, W16), pero el nombre está **en reconsideración** (Perito no realiza el peritaje físico). Si hay rebrand, este PRD se actualiza.
+
 ---
 
-*Hardcore AI 30X — Cohorte 3 — Perito — Estación 2 — Julio 2026*
+*Hardcore AI 30X — Cohorte 3 — Perito — v1 Estación 2 · v2 post-build — Julio 2026*

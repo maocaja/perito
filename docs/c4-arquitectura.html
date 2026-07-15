@@ -1,0 +1,422 @@
+<title>Perito — Arquitectura C4</title>
+<style>
+  :root{
+    --bg:#e9edf3; --panel:#ffffff; --panel-2:#f3f6fa;
+    --ink:#131b27; --ink-soft:#596677; --line:#d2dae4; --edge:#8994a6;
+    --core:#2f6fed; --actor:#7a58dd; --ext:#5f6b7d; --data:#0f9a8b;
+    --stub:#bd7a10; --built:#0d9d66; --code-ink:#39465a;
+    --shadow:0 1px 2px rgba(20,30,45,.06), 0 8px 24px rgba(20,30,45,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0a0e16; --panel:#131b28; --panel-2:#0e1420;
+      --ink:#e7edf6; --ink-soft:#93a1b5; --line:#26313f; --edge:#55647b;
+      --core:#5f8ef6; --actor:#9d82f0; --ext:#8592a6; --data:#2cc1b0;
+      --stub:#e2a63e; --built:#2cbd84; --code-ink:#9fb0c6;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0e16; --panel:#131b28; --panel-2:#0e1420;
+    --ink:#e7edf6; --ink-soft:#93a1b5; --line:#26313f; --edge:#55647b;
+    --core:#5f8ef6; --actor:#9d82f0; --ext:#8592a6; --data:#2cc1b0;
+    --stub:#e2a63e; --built:#2cbd84; --code-ink:#9fb0c6;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#e9edf3; --panel:#ffffff; --panel-2:#f3f6fa;
+    --ink:#131b27; --ink-soft:#596677; --line:#d2dae4; --edge:#8994a6;
+    --core:#2f6fed; --actor:#7a58dd; --ext:#5f6b7d; --data:#0f9a8b;
+    --stub:#bd7a10; --built:#0d9d66; --code-ink:#39465a;
+    --shadow:0 1px 2px rgba(20,30,45,.06), 0 8px 24px rgba(20,30,45,.06);
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:16px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px; margin:0 auto; padding:48px 24px 80px}
+  .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace}
+
+  /* ---- header ---- */
+  header.top{margin-bottom:34px}
+  .eyebrow{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--core); font-weight:600;
+  }
+  h1{
+    font-size:clamp(28px,4.6vw,44px); line-height:1.05; letter-spacing:-.02em;
+    margin:.28em 0 .12em; font-weight:700; text-wrap:balance;
+  }
+  .lede{max-width:64ch; color:var(--ink-soft); font-size:17px; margin:0}
+  .note{
+    margin-top:22px; display:flex; gap:12px; align-items:flex-start;
+    background:color-mix(in srgb, var(--core) 8%, var(--panel));
+    border:1px solid color-mix(in srgb, var(--core) 26%, transparent);
+    border-radius:12px; padding:13px 16px; font-size:14.5px; color:var(--ink);
+    max-width:78ch;
+  }
+  .note b{color:var(--core)}
+  .note .mk{flex:0 0 auto; margin-top:1px}
+
+  /* ---- legend ---- */
+  .legend{
+    display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:24px;
+    padding:14px 18px; background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; box-shadow:var(--shadow);
+  }
+  .lg{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft)}
+  .sw{width:15px; height:15px; border-radius:4px; flex:0 0 auto}
+  .sw.core{background:var(--core)}
+  .sw.actor{background:color-mix(in srgb,var(--actor) 22%,var(--panel)); border:1.5px solid var(--actor)}
+  .sw.ext{background:color-mix(in srgb,var(--ext) 20%,var(--panel)); border:1.5px solid var(--ext)}
+  .sw.data{background:color-mix(in srgb,var(--data) 20%,var(--panel)); border:1.5px solid var(--data)}
+  .sw.stub{background:color-mix(in srgb,var(--stub) 18%,var(--panel)); border:1.5px dashed var(--stub)}
+  .dotmk{width:12px;height:12px;border-radius:50%;background:var(--built);flex:0 0 auto}
+
+  /* ---- level cards ---- */
+  .level{
+    margin-top:30px; background:var(--panel); border:1px solid var(--line);
+    border-radius:18px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .level-head{padding:22px 26px 6px; display:flex; gap:14px; align-items:baseline; flex-wrap:wrap}
+  .level-num{
+    font-family:ui-monospace,Menlo,monospace; font-weight:700; font-size:13px;
+    color:var(--panel); background:var(--core); border-radius:7px;
+    padding:4px 9px; letter-spacing:.02em; flex:0 0 auto;
+  }
+  .level-head h2{font-size:21px; letter-spacing:-.01em; margin:0; font-weight:650}
+  .level-head .job{color:var(--ink-soft); font-size:14.5px; width:100%; margin:2px 0 0}
+  .diagram{overflow-x:auto; padding:14px 20px 8px}
+  .diagram svg{display:block; width:100%; min-width:680px; height:auto}
+  .level.l3 .diagram svg{min-width:920px}
+  .cap{padding:4px 26px 22px; color:var(--ink-soft); font-size:13.5px; max-width:82ch}
+  .cap code{
+    font-family:ui-monospace,Menlo,monospace; font-size:12.5px;
+    background:var(--panel-2); padding:1px 6px; border-radius:5px; color:var(--code-ink);
+  }
+  .cap .stubword{color:var(--stub); font-weight:600}
+
+  /* ---- svg shared ---- */
+  svg text{font-family:-apple-system,"Segoe UI",system-ui,sans-serif}
+  .t-title{fill:var(--ink); font-weight:600; font-size:15px}
+  .t-title.sm{font-size:13.5px}
+  .t-sub{fill:var(--ink-soft); font-size:11.5px}
+  .t-code{fill:var(--code-ink); font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:600; letter-spacing:.03em}
+  .t-edge{fill:var(--ink-soft); font-size:11px}
+  .t-cont{fill:var(--ink-soft); font-size:12px; font-weight:600; letter-spacing:.02em}
+  .on-core{fill:#fff}
+  .on-core.sub{fill:rgba(255,255,255,.82)}
+
+  .box{stroke-width:1.5}
+  .core{fill:var(--core); stroke:color-mix(in srgb,var(--core) 60%,#000)}
+  .actor{fill:color-mix(in srgb,var(--actor) 15%,var(--panel)); stroke:var(--actor)}
+  .ext{fill:color-mix(in srgb,var(--ext) 15%,var(--panel)); stroke:var(--ext)}
+  .data{fill:color-mix(in srgb,var(--data) 15%,var(--panel)); stroke:var(--data)}
+  .proc{fill:color-mix(in srgb,var(--core) 12%,var(--panel)); stroke:var(--core)}
+  .stub{fill:color-mix(in srgb,var(--stub) 13%,var(--panel)); stroke:var(--stub); stroke-dasharray:5 4}
+  .cont{fill:color-mix(in srgb,var(--core) 4%,var(--panel)); stroke:var(--edge); stroke-dasharray:7 6; stroke-width:1.3}
+
+  .edge{stroke:var(--edge); stroke-width:1.7; fill:none}
+  .edge.dot{stroke-dasharray:2.5 4}
+  .arw{fill:var(--edge)}
+  .emk{fill:var(--built)}
+
+  footer.ft{margin-top:40px; color:var(--ink-soft); font-size:13px; text-align:center}
+  @media (prefers-reduced-motion:no-preference){
+    .level{transition:none}
+  }
+  @media (max-width:640px){
+    .wrap{padding:32px 16px 60px}
+    .level-head{padding:18px 18px 4px}
+    .diagram{padding:10px 12px 6px}
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Modelo C4 · Perito FNOL</div>
+    <h1>Arquitectura de Perito, en tres zooms</h1>
+    <p class="lede">Copiloto agéntico de admisión y triage de siniestros. Del sistema en su entorno hasta los agentes C0–C11 que corren dentro — <strong>pintado según lo realmente construido</strong>, no según el plan original.</p>
+
+    <div class="note">
+      <span class="mk">📐</span>
+      <div>Refleja el <b>estado real post-build</b> (FNOL U1–U10 + Claims Workbench W1–W24 + Fase M), el mismo que quedó registrado en el <b>Apéndice D (v2)</b> del PRD. Las piezas <span style="color:var(--stub);font-weight:600">en ámbar punteado</span> son <b>stub/mock declarados</b>; el punto <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--built);vertical-align:middle"></span> marca componentes <b>emergentes</b> que no estaban en el PRD v1.</div>
+    </div>
+
+    <div class="legend" aria-label="Convenciones">
+      <span class="lg"><span class="sw core"></span>Perito (sistema)</span>
+      <span class="lg"><span class="sw actor"></span>Actor humano</span>
+      <span class="lg"><span class="sw ext"></span>Sistema externo</span>
+      <span class="lg"><span class="sw data"></span>Almacén de datos</span>
+      <span class="lg"><span class="sw stub"></span>Stub / mock declarado</span>
+      <span class="lg"><span class="dotmk"></span>Emergente (fuera del PRD v1)</span>
+    </div>
+  </header>
+
+  <!-- ============ LEVEL 1 · CONTEXTO ============ -->
+  <section class="level l1">
+    <div class="level-head">
+      <span class="level-num">C4 · 1</span>
+      <h2>Contexto</h2>
+      <p class="job">Quién usa Perito y de qué sistemas externos depende. Una sola caja: el sistema completo.</p>
+    </div>
+    <div class="diagram">
+      <svg viewBox="0 0 960 400" role="img" aria-label="Diagrama de contexto: tres actores humanos usan Perito, que delega en Claude API y Langfuse.">
+        <defs>
+          <marker id="arw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="arw"/></marker>
+        </defs>
+
+        <!-- edges (drawn first, behind) -->
+        <path class="edge" marker-end="url(#arw)" d="M205 82 C 300 92, 300 165, 378 178"/>
+        <path class="edge" marker-end="url(#arw)" d="M205 200 L 378 205"/>
+        <path class="edge" marker-end="url(#arw)" d="M205 318 C 300 308, 300 240, 378 232"/>
+        <path class="edge" marker-end="url(#arw)" d="M582 186 C 670 176, 680 150, 758 144"/>
+        <path class="edge" marker-end="url(#arw)" d="M582 226 C 670 240, 680 258, 758 262"/>
+
+        <text class="t-edge" x="250" y="120">aprueba · corrige · firma</text>
+        <text class="t-edge" x="238" y="196">audita · PIA</text>
+        <text class="t-edge" x="232" y="298">config · evals</text>
+        <text class="t-edge" x="612" y="150">prompts sin PII (P5)</text>
+        <text class="t-edge" x="612" y="282">traza por nodo (P3)</text>
+
+        <!-- actors -->
+        <g>
+          <rect class="box actor" x="30" y="48" width="175" height="68" rx="11"/>
+          <text class="t-title sm" x="47" y="80">👤 Analista · Diana</text>
+          <text class="t-sub" x="47" y="99">revisa y firma el caso</text>
+        </g>
+        <g>
+          <rect class="box actor" x="30" y="166" width="175" height="68" rx="11"/>
+          <text class="t-title sm" x="47" y="198">👤 Cumplimiento</text>
+          <text class="t-sub" x="47" y="217">audita · métricas · PIA</text>
+        </g>
+        <g>
+          <rect class="box actor" x="30" y="284" width="175" height="68" rx="11"/>
+          <text class="t-title sm" x="47" y="316">👤 Admin / Dev</text>
+          <text class="t-sub" x="47" y="335">configura · corre evals</text>
+        </g>
+
+        <!-- core -->
+        <rect class="box core" x="378" y="150" width="204" height="110" rx="15"/>
+        <text class="on-core" x="480" y="188" text-anchor="middle" style="font-size:18px;font-weight:700">🟦 PERITO</text>
+        <text class="on-core sub" x="480" y="210" text-anchor="middle" style="font-size:12px">copiloto agéntico FNOL</text>
+        <text class="on-core sub" x="480" y="230" text-anchor="middle" style="font-size:11.5px">extrae · verifica · cobertura</text>
+        <text class="on-core sub" x="480" y="246" text-anchor="middle" style="font-size:11.5px">por reglas · fraude · HITL</text>
+
+        <!-- externals -->
+        <g>
+          <rect class="box ext" x="758" y="110" width="172" height="68" rx="11"/>
+          <text class="t-title sm" x="774" y="142">☁️ Claude API</text>
+          <text class="t-sub" x="774" y="161">LLM multimodal</text>
+        </g>
+        <g>
+          <rect class="box ext" x="758" y="228" width="172" height="68" rx="11"/>
+          <text class="t-title sm" x="774" y="260">☁️ Langfuse</text>
+          <text class="t-sub" x="774" y="279">trazas · costo · replay</text>
+        </g>
+      </svg>
+    </div>
+    <p class="cap">Perito hace la admisión (extraer → verificar → cobertura → fraude → HITL) y <b>delega</b> el razonamiento a Claude y la observabilidad a Langfuse. <b>No</b> hace pagos, enrutamiento al ajustador ni integración con el core — eso es <em>Won't</em>.</p>
+  </section>
+
+  <!-- ============ LEVEL 2 · CONTENEDORES ============ -->
+  <section class="level l2">
+    <div class="level-head">
+      <span class="level-num">C4 · 2</span>
+      <h2>Contenedores</h2>
+      <p class="job">Las piezas desplegables. Un monolito modular, server-rendered (ADR-001 · ADR-002).</p>
+    </div>
+    <div class="diagram">
+      <svg viewBox="0 0 960 470" role="img" aria-label="Diagrama de contenedores: el navegador habla con el frontend HTMX, que consume el backend FastAPI, que usa Postgres, Claude API y Langfuse.">
+        <defs>
+          <marker id="arw2" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="arw"/></marker>
+        </defs>
+
+        <!-- system boundary -->
+        <rect class="cont" x="238" y="118" width="452" height="320" rx="16"/>
+        <text class="t-cont" x="258" y="142">🟦 PERITO — monolito modular · 1 despliegue</text>
+
+        <!-- edges -->
+        <path class="edge" marker-end="url(#arw2)" d="M480 84 L 480 165"/>
+        <path class="edge" marker-end="url(#arw2)" d="M464 233 L 464 262"/>
+        <path class="edge" marker-end="url(#arw2)" d="M464 350 L 464 372"/>
+        <path class="edge" marker-end="url(#arw2)" d="M672 300 L 756 292"/>
+        <path class="edge" marker-end="url(#arw2)" d="M672 316 C 720 340, 720 356, 756 360"/>
+        <path class="edge dot" marker-end="url(#arw2)" d="M212 404 C 280 404, 300 404, 338 400"/>
+
+        <text class="t-edge" x="490" y="130" style="font-size:10.5px">HTTPS</text>
+        <text class="t-edge" x="474" y="252" style="font-size:10.5px">REST interno</text>
+        <text class="t-edge" x="474" y="368" style="font-size:10.5px">SQL</text>
+        <text class="t-edge" x="686" y="286" style="font-size:10.5px">sin PII</text>
+        <text class="t-edge" x="120" y="392" style="font-size:10.5px">datos de demo</text>
+
+        <!-- browser -->
+        <rect class="box actor" x="380" y="28" width="200" height="56" rx="11"/>
+        <text class="t-title sm" x="480" y="53" text-anchor="middle">🖥️ Navegador</text>
+        <text class="t-sub" x="480" y="71" text-anchor="middle">Analista / Cumplimiento</text>
+
+        <!-- FE -->
+        <rect class="box core" x="296" y="167" width="336" height="66" rx="12" style="fill:color-mix(in srgb,var(--actor) 88%,#000);stroke:color-mix(in srgb,var(--actor) 55%,#000)"/>
+        <text class="on-core" x="316" y="193" style="font-size:14.5px;font-weight:650">📦 Frontend / Workbench</text>
+        <text class="on-core sub" x="316" y="213" style="font-size:11.5px">FastAPI + Jinja/HTMX · server-rendered (ADR-001)</text>
+
+        <!-- API -->
+        <rect class="box core" x="296" y="262" width="336" height="88" rx="12"/>
+        <text class="on-core" x="316" y="288" style="font-size:14.5px;font-weight:650">📦 Backend + Orquestador</text>
+        <text class="on-core sub" x="316" y="308" style="font-size:11.5px">FastAPI + LangGraph</text>
+        <text class="on-core sub" x="316" y="326" style="font-size:11px">intake · agents · rules (P2) · orchestrator (P4)</text>
+        <text class="on-core sub" x="316" y="342" style="font-size:11px">hitl (P1) · fraud (P6) · observability (P3)</text>
+
+        <!-- DB -->
+        <rect class="box data" x="336" y="372" width="256" height="54" rx="12"/>
+        <text class="t-title sm" x="356" y="396">🗄️ Postgres</text>
+        <text class="t-sub" x="356" y="414">casos · estados · pólizas <tspan style="fill:var(--stub);font-weight:600">· pgvector (esquema)</tspan></text>
+
+        <!-- externals -->
+        <rect class="box ext" x="756" y="266" width="172" height="52" rx="11"/>
+        <text class="t-title sm" x="772" y="297">☁️ Claude API</text>
+        <rect class="box ext" x="756" y="334" width="172" height="52" rx="11"/>
+        <text class="t-title sm" x="772" y="365">☁️ Langfuse</text>
+
+        <!-- generator -->
+        <rect class="box stub" x="28" y="378" width="184" height="52" rx="11" style="stroke-dasharray:none;fill:color-mix(in srgb,var(--data) 10%,var(--panel));stroke:var(--data)"/>
+        <text class="t-title sm" x="44" y="401">🧪 Generador es-CO</text>
+        <text class="t-sub" x="44" y="419">dev/test · no producto</text>
+      </svg>
+    </div>
+    <p class="cap">Una sola caja desplegable: el navegador llama al Workbench por HTTPS, que consume el backend por REST server-side (autorización siempre en el servidor). <span class="stubword">Ámbar:</span> <code>pgvector</code> existe como <em>esquema</em> pero el RAG de pólizas no está cableado — la cita de cláusula se logra por <code>policy_lookup</code> determinístico.</p>
+  </section>
+
+  <!-- ============ LEVEL 3 · COMPONENTES ============ -->
+  <section class="level l3">
+    <div class="level-head">
+      <span class="level-num">C4 · 3</span>
+      <h2>Componentes — el pipeline agéntico real</h2>
+      <p class="job">Dentro del backend: los nodos C0–C11 tal como se construyeron. El orquestador (C7) es dueño de la terminación (P4).</p>
+    </div>
+    <div class="diagram">
+      <svg viewBox="0 0 1180 680" role="img" aria-label="Diagrama de componentes del backend de Perito con los nodos C0 a C11, el orquestador, los stubs y los componentes emergentes.">
+        <defs>
+          <marker id="arw3" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="arw"/></marker>
+        </defs>
+
+        <!-- ===== ingesta row ===== -->
+        <rect class="box proc" x="40" y="40" width="185" height="70" rx="12"/>
+        <text class="t-code" x="56" y="63">C0</text>
+        <circle class="emk" cx="211" cy="55" r="6"/>
+        <text class="t-title sm" x="56" y="85">Triage</text>
+        <text class="t-sub" x="56" y="102">clasifica · rutea (no decide)</text>
+
+        <rect class="box proc" x="256" y="40" width="185" height="70" rx="12"/>
+        <text class="t-code" x="272" y="63">C1</text>
+        <text class="t-title sm" x="272" y="85">Intake</text>
+        <text class="t-sub" x="272" y="102">crea el caso · código SIN</text>
+
+        <text class="t-sub" x="474" y="70" style="font-size:12px">📎 document_ai</text>
+        <text class="t-sub" x="474" y="88" style="font-size:11px">pHash + redacción PII (P5)</text>
+        <text class="t-sub" x="474" y="106" style="font-size:11px">📬 poller de correo en vivo</text>
+        <circle class="emk" cx="600" cy="101" r="5"/>
+
+        <path class="edge" marker-end="url(#arw3)" d="M225 75 L 254 75"/>
+
+        <!-- ===== orchestrator container ===== -->
+        <rect class="cont" x="40" y="150" width="1100" height="205" rx="16"/>
+        <text class="t-cont" x="60" y="176">C7 · Orquestador — terminación acotada (P4) · loop reflexivo C2↔C3</text>
+
+        <!-- pipeline nodes -->
+        <!-- C2 -->
+        <rect class="box proc" x="60" y="238" width="185" height="86" rx="12"/>
+        <text class="t-code" x="76" y="261">C2</text>
+        <text class="t-title sm" x="76" y="285">Extractor</text>
+        <text class="t-sub" x="76" y="303">Haiku · campos+contrato</text>
+        <!-- C3 -->
+        <rect class="box proc" x="272" y="238" width="185" height="86" rx="12"/>
+        <text class="t-code" x="288" y="261">C3</text>
+        <text class="t-title sm" x="288" y="285">Verificador</text>
+        <text class="t-sub" x="288" y="303">Sonnet · adversarial</text>
+        <!-- C4 -->
+        <rect class="box proc" x="484" y="238" width="185" height="86" rx="12"/>
+        <text class="t-code" x="500" y="261">C4</text>
+        <circle class="emk" cx="655" cy="253" r="6"/>
+        <text class="t-title sm" x="500" y="285">Policy Lookup</text>
+        <text class="t-sub" x="500" y="303">+ entity resolution</text>
+        <!-- C5 -->
+        <rect class="box proc" x="696" y="238" width="185" height="86" rx="12" style="fill:color-mix(in srgb,var(--data) 13%,var(--panel));stroke:var(--data)"/>
+        <text class="t-code" x="712" y="261">C5</text>
+        <text class="t-title sm" x="712" y="285">Motor R1–R5</text>
+        <text class="t-sub" x="712" y="303">determinístico (P2)</text>
+        <!-- C6 -->
+        <rect class="box proc" x="908" y="238" width="185" height="86" rx="12"/>
+        <text class="t-code" x="924" y="261">C6</text>
+        <circle class="emk" cx="1087" cy="253" r="6"/>
+        <text class="t-title sm" x="924" y="285">Fraude</text>
+        <text class="t-sub" x="924" y="303">+ cross-claim (P6)</text>
+
+        <!-- pipeline edges -->
+        <path class="edge" marker-end="url(#arw3)" d="M245 281 L 270 281"/>
+        <path class="edge" marker-end="url(#arw3)" d="M457 281 L 482 281"/>
+        <path class="edge" marker-end="url(#arw3)" d="M669 281 L 694 281"/>
+        <path class="edge" marker-end="url(#arw3)" d="M881 281 L 906 281"/>
+        <!-- reflexive loop C3 -> C2 -->
+        <path class="edge dot" marker-end="url(#arw3)" d="M300 238 C 300 206, 217 206, 165 236"/>
+        <text class="t-edge" x="210" y="200" text-anchor="middle" style="font-size:10.5px">re-extrae (en cotas)</text>
+
+        <!-- intake into orchestrator -->
+        <path class="edge" marker-end="url(#arw3)" d="M300 110 C 300 150, 152 168, 152 236"/>
+
+        <!-- ===== decision row ===== -->
+        <!-- C9 observability -->
+        <rect class="box data" x="40" y="430" width="210" height="70" rx="12"/>
+        <text class="t-code" x="56" y="453">C9</text>
+        <text class="t-title sm" x="56" y="475">Observabilidad</text>
+        <text class="t-sub" x="56" y="492">Langfuse · replay (P3)</text>
+        <path class="edge dot" marker-end="url(#arw3)" d="M145 430 L 145 357"/>
+        <text class="t-edge" x="152" y="392" style="font-size:10.5px">instrumenta</text>
+
+        <!-- Analista -->
+        <rect class="box proc" x="300" y="430" width="230" height="70" rx="12"/>
+        <circle class="emk" cx="516" cy="445" r="6"/>
+        <text class="t-title sm" x="318" y="463">✍️ Analista del caso</text>
+        <text class="t-sub" x="318" y="482">Summary · Sonnet · guard P1/P2</text>
+
+        <!-- C8 HITL -->
+        <rect class="box core" x="560" y="430" width="180" height="70" rx="12"/>
+        <text class="t-code on-core" x="576" y="453" style="fill:rgba(255,255,255,.9)">C8</text>
+        <text class="on-core" x="576" y="475" style="font-size:14px;font-weight:650">HITL</text>
+        <text class="on-core sub" x="576" y="492" style="font-size:11px">firma humana (P1)</text>
+
+        <!-- C11 Workbench -->
+        <rect class="box core" x="770" y="430" width="240" height="70" rx="12" style="fill:color-mix(in srgb,var(--actor) 88%,#000);stroke:color-mix(in srgb,var(--actor) 55%,#000)"/>
+        <text class="t-code on-core" x="786" y="453" style="fill:rgba(255,255,255,.9)">C11</text>
+        <text class="on-core" x="786" y="475" style="font-size:14px;font-weight:650">Claims Workbench</text>
+        <text class="on-core sub" x="786" y="492" style="font-size:11px">el operador decide y firma</text>
+
+        <!-- edges decision -->
+        <path class="edge" marker-end="url(#arw3)" d="M590 355 C 590 390, 470 398, 430 428"/>
+        <text class="t-edge" x="470" y="384" style="font-size:10.5px">caso + dictamen + evidencia</text>
+        <path class="edge" marker-end="url(#arw3)" d="M530 465 L 558 465"/>
+        <path class="edge" marker-end="url(#arw3)" d="M740 465 L 768 465"/>
+
+        <!-- ===== stubs row ===== -->
+        <rect class="box stub" x="484" y="560" width="230" height="60" rx="12"/>
+        <text class="t-title sm" x="500" y="585">🗄️ RAG pólizas · pgvector</text>
+        <text class="t-sub" x="500" y="604" style="fill:var(--stub)">solo esquema — sin retrieval</text>
+        <path class="edge dot" marker-end="url(#arw3)" d="M640 560 C 660 500, 720 380, 760 326"/>
+
+        <rect class="box stub" x="770" y="560" width="240" height="60" rx="12"/>
+        <text class="t-title sm" x="786" y="585">💬 Copiloto conversacional</text>
+        <text class="t-sub" x="786" y="604" style="fill:var(--stub)">mock rotulado</text>
+        <path class="edge dot" marker-end="url(#arw3)" d="M890 560 L 890 502"/>
+      </svg>
+    </div>
+    <p class="cap">El aviso entra por <code>C0/C1</code>, el orquestador <code>C7</code> corre <code>C2→C6</code> (con el <b>loop reflexivo</b> extractor↔verificador acotado), el <b>analista</b> redacta el resumen, y todo aterriza en el <b>Workbench</b> donde el humano firma — ningún camino alcanza un estado terminal sin <code>aprobado_por</code> (P1). Puntos <span style="color:var(--built);font-weight:600">verdes</span> = emergentes del build (triage, entity resolution, cross-claim, analista, poller). <span class="stubword">Ámbar:</span> RAG vectorial y copiloto siguen como stub/mock — declarados, no escondidos (P7).</p>
+  </section>
+
+  <footer class="ft">Perito · Modelo C4 (Contexto · Contenedores · Componentes) · v2 post-build — julio 2026</footer>
+</div>
